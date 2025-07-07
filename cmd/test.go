@@ -5,6 +5,9 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+	"github.com/gnodet/mvx/pkg/config"
+	"github.com/gnodet/mvx/pkg/executor"
+	"github.com/gnodet/mvx/pkg/tools"
 )
 
 // testCmd represents the test command
@@ -46,23 +49,44 @@ func runTests() error {
 	if err != nil {
 		return fmt.Errorf("failed to find project root: %w", err)
 	}
-	
+
 	printVerbose("Project root: %s", projectRoot)
-	
-	// TODO: Load configuration and execute test command
-	// For now, simulate the test process
-	
-	testType := "all tests"
-	if unitTests {
-		testType = "unit tests"
-	} else if integrationTests {
-		testType = "integration tests"
+
+	// Load configuration
+	cfg, err := config.LoadConfig(projectRoot)
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
 	}
-	
-	printInfo("🧪 Running %s...", testType)
-	printInfo("  ⏳ Preparing test environment...")
-	printInfo("  ⏳ Executing tests...")
-	printInfo("  ✅ All tests passed!")
-	
-	return nil
+
+	// Create tool manager
+	manager, err := tools.NewManager()
+	if err != nil {
+		return fmt.Errorf("failed to create tool manager: %w", err)
+	}
+
+	// Create executor
+	exec := executor.NewExecutor(cfg, manager, projectRoot)
+
+	// Determine which test command to run
+	commandName := "test"
+	if unitTests {
+		commandName = "test-unit"
+	} else if integrationTests {
+		commandName = "test-integration"
+	}
+
+	// Check if the specific test command exists, fall back to "test"
+	if _, exists := cfg.Commands[commandName]; !exists {
+		if commandName != "test" {
+			printInfo("⚠️  Command '%s' not found, falling back to 'test'", commandName)
+			commandName = "test"
+		}
+	}
+
+	// Validate and execute command
+	if err := exec.ValidateCommand(commandName); err != nil {
+		return err
+	}
+
+	return exec.ExecuteCommand(commandName, []string{})
 }
