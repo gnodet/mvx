@@ -26,9 +26,10 @@ type ProjectConfig struct {
 
 // ToolConfig represents a tool requirement
 type ToolConfig struct {
-	Version      string   `json:"version" yaml:"version"`
-	Distribution string   `json:"distribution,omitempty" yaml:"distribution,omitempty"`
-	RequiredFor  []string `json:"required_for,omitempty" yaml:"required_for,omitempty"`
+	Version      string            `json:"version" yaml:"version"`
+	Distribution string            `json:"distribution,omitempty" yaml:"distribution,omitempty"`
+	RequiredFor  []string          `json:"required_for,omitempty" yaml:"required_for,omitempty"`
+	Options      map[string]string `json:"options,omitempty" yaml:"options,omitempty"`
 }
 
 // CommandConfig represents a command definition

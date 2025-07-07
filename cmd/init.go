@@ -95,45 +95,51 @@ func getDefaultJSON5Config() string {
 	return `{
   // mvx configuration
   // See: https://github.com/gnodet/mvx for documentation
-  
+
   project: {
     name: "my-project",
     description: "A sample project",
   },
-  
+
   tools: {
-    // Java configuration
+    // Java configuration - flexible version specifications
     java: {
-      version: "21",
-      distribution: "temurin",
+      version: "21",           // Latest Java 21.x (21.0.1, 21.0.2, etc.)
+      distribution: "temurin"  // temurin, graalvm, oracle, corretto
+      // version: "17",        // Latest Java 17.x
+      // version: "11",        // Latest Java 11.x
+      // distribution: "graalvm", // Use GraalVM instead
     },
-    
-    // Maven configuration
+
+    // Maven configuration - flexible version specifications
     maven: {
-      version: "3.9.6",
-    },
+      version: "3.9"           // Latest Maven 3.9.x (3.9.6, 3.9.7, etc.)
+      // version: "3",         // Latest Maven 3.x
+      // version: "4",         // Latest Maven 4.x (pre-release)
+      // version: "3.9.6",    // Exact version
+    }
   },
-  
+
   environment: {
     // JVM options for Maven builds
-    MAVEN_OPTS: "-Xmx2g",
+    MAVEN_OPTS: "-Xmx2g"
   },
-  
+
   commands: {
     build: {
       description: "Build the project",
       script: "./mvnw clean install",
     },
-    
+
     test: {
       description: "Run tests",
       script: "./mvnw test",
     },
-    
+
     clean: {
       description: "Clean build artifacts",
-      script: "./mvnw clean",
-    },
+      script: "./mvnw clean"
+    }
   },
 }
 `
@@ -148,14 +154,20 @@ project:
   description: A sample project
 
 tools:
-  # Java configuration
+  # Java configuration - flexible version specifications
   java:
-    version: "21"
-    distribution: temurin
-  
-  # Maven configuration
+    version: "21"           # Latest Java 21.x (21.0.1, 21.0.2, etc.)
+    distribution: temurin   # temurin, graalvm, oracle, corretto
+    # version: "17"         # Latest Java 17.x
+    # version: "11"         # Latest Java 11.x
+    # distribution: graalvm # Use GraalVM instead
+
+  # Maven configuration - flexible version specifications
   maven:
-    version: "3.9.6"
+    version: "3.9"          # Latest Maven 3.9.x (3.9.6, 3.9.7, etc.)
+    # version: "3"          # Latest Maven 3.x
+    # version: "4"          # Latest Maven 4.x (pre-release)
+    # version: "3.9.6"     # Exact version
 
 environment:
   # JVM options for Maven builds
@@ -165,11 +177,11 @@ commands:
   build:
     description: Build the project
     script: ./mvnw clean install
-  
+
   test:
     description: Run tests
     script: ./mvnw test
-  
+
   clean:
     description: Clean build artifacts
     script: ./mvnw clean

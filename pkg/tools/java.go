@@ -137,9 +137,9 @@ func (j *JavaTool) Verify(version string, cfg config.ToolConfig) error {
 
 // ListVersions returns available versions for installation
 func (j *JavaTool) ListVersions() ([]string, error) {
-	// For now, return common LTS versions
+	// For now, return common LTS versions + latest
 	// TODO: Implement dynamic version discovery from Adoptium API
-	return []string{"8", "11", "17", "21"}, nil
+	return []string{"8", "11", "17", "21", "22"}, nil
 }
 
 // getDownloadURL returns the download URL for the specified version and distribution
@@ -181,6 +181,8 @@ func (j *JavaTool) getTemurinURL(version string) (string, error) {
 	// Use Adoptium API endpoint for latest releases
 	// This is more reliable than hardcoded URLs
 	switch version {
+	case "22":
+		return fmt.Sprintf("https://api.adoptium.net/v3/binary/latest/22/ga/%s/%s/jdk/hotspot/normal/eclipse", osName, arch), nil
 	case "21":
 		return fmt.Sprintf("https://api.adoptium.net/v3/binary/latest/21/ga/%s/%s/jdk/hotspot/normal/eclipse", osName, arch), nil
 	case "17":
@@ -190,7 +192,7 @@ func (j *JavaTool) getTemurinURL(version string) (string, error) {
 	case "8":
 		return fmt.Sprintf("https://api.adoptium.net/v3/binary/latest/8/ga/%s/%s/jdk/hotspot/normal/eclipse", osName, arch), nil
 	default:
-		return "", fmt.Errorf("unsupported Java version: %s (supported: 8, 11, 17, 21)", version)
+		return "", fmt.Errorf("unsupported Java version: %s (supported: 8, 11, 17, 21, 22)", version)
 	}
 }
 

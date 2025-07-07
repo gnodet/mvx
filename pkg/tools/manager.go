@@ -12,6 +12,7 @@ import (
 type Manager struct {
 	cacheDir string
 	tools    map[string]Tool
+	registry *ToolRegistry
 }
 
 // Tool represents a tool that can be installed and managed
@@ -55,12 +56,13 @@ func NewManager() (*Manager, error) {
 	manager := &Manager{
 		cacheDir: cacheDir,
 		tools:    make(map[string]Tool),
+		registry: NewToolRegistry(),
 	}
-	
+
 	// Register built-in tools
 	manager.RegisterTool(&JavaTool{manager: manager})
 	manager.RegisterTool(&MavenTool{manager: manager})
-	
+
 	return manager, nil
 }
 
@@ -78,28 +80,44 @@ func (m *Manager) GetTool(name string) (Tool, error) {
 	return tool, nil
 }
 
-// InstallTool installs a specific tool version
+// InstallTool installs a specific tool version with version resolution
 func (m *Manager) InstallTool(name string, toolConfig config.ToolConfig) error {
 	tool, err := m.GetTool(name)
 	if err != nil {
 		return err
 	}
-	
-	if tool.IsInstalled(toolConfig.Version, toolConfig) {
-		return nil // Already installed
+
+	// Resolve version specification to concrete version
+	resolvedVersion, err := m.resolveVersion(name, toolConfig)
+	if err != nil {
+		return fmt.Errorf("failed to resolve version for %s: %w", name, err)
 	}
-	
-	fmt.Printf("Installing %s %s...\n", name, toolConfig.Version)
-	if err := tool.Install(toolConfig.Version, toolConfig); err != nil {
-		return fmt.Errorf("failed to install %s %s: %w", name, toolConfig.Version, err)
+
+	// Update config with resolved version for installation
+	resolvedConfig := toolConfig
+	resolvedConfig.Version = resolvedVersion
+
+	if tool.IsInstalled(resolvedVersion, resolvedConfig) {
+		fmt.Printf("✅ %s %s already installed\n", name, resolvedVersion)
+		return nil
 	}
-	
+
+	fmt.Printf("Installing %s %s", name, resolvedVersion)
+	if toolConfig.Distribution != "" {
+		fmt.Printf(" (%s)", toolConfig.Distribution)
+	}
+	fmt.Println("...")
+
+	if err := tool.Install(resolvedVersion, resolvedConfig); err != nil {
+		return fmt.Errorf("failed to install %s %s: %w", name, resolvedVersion, err)
+	}
+
 	// Verify installation
-	if err := tool.Verify(toolConfig.Version, toolConfig); err != nil {
-		return fmt.Errorf("installation verification failed for %s %s: %w", name, toolConfig.Version, err)
+	if err := tool.Verify(resolvedVersion, resolvedConfig); err != nil {
+		return fmt.Errorf("installation verification failed for %s %s: %w", name, resolvedVersion, err)
 	}
-	
-	fmt.Printf("✅ %s %s installed successfully\n", name, toolConfig.Version)
+
+	fmt.Printf("✅ %s %s installed successfully\n", name, resolvedVersion)
 	return nil
 }
 
@@ -175,4 +193,26 @@ func (m *Manager) SetupEnvironment(cfg *config.Config) (map[string]string, error
 	}
 	
 	return env, nil
+}
+
+// resolveVersion resolves a version specification to a concrete version
+func (m *Manager) resolveVersion(toolName string, toolConfig config.ToolConfig) (string, error) {
+	switch toolName {
+	case "java":
+		distribution := toolConfig.Distribution
+		if distribution == "" {
+			distribution = "temurin" // Default distribution
+		}
+		return m.registry.ResolveJavaVersion(toolConfig.Version, distribution)
+	case "maven":
+		return m.registry.ResolveMavenVersion(toolConfig.Version)
+	default:
+		// For unknown tools, return version as-is
+		return toolConfig.Version, nil
+	}
+}
+
+// GetRegistry returns the tool registry
+func (m *Manager) GetRegistry() *ToolRegistry {
+	return m.registry
 }
