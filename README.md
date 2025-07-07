@@ -50,13 +50,29 @@ No more "works on my machine" - every developer gets the exact same environment.
 ## 🏗️ Architecture
 
 ```
-project/
-├── mvx                    # Main executable script
-├── mvx.bat               # Windows batch equivalent  
+~/.mvx/                           # Global cache directory
+├── versions/                     # Cached mvx versions
+│   ├── 1.0.0/
+│   │   └── mvx                  # Go binary
+│   └── 1.1.0/
+├── tools/                        # Downloaded tools cache
+│   ├── maven/
+│   │   ├── 3.9.6/
+│   │   └── 4.0.0/
+│   ├── java/
+│   │   ├── temurin-21/
+│   │   └── graalvm-21/
+│   └── node/
+└── config/                       # Global configuration
+
+project/                          # Project directory
+├── mvx                          # Single Go binary
+├── mvx.exe                      # Windows binary
 ├── .mvx/
-│   ├── config.yml        # Project configuration
-│   ├── tools/            # Tool definitions and cache
-│   └── commands/         # Custom command scripts
+│   ├── config.json5             # Project configuration (JSON5)
+│   ├── config.yml               # Or YAML format
+│   ├── version                  # mvx version to use
+│   └── local/                   # Project-specific cache
 └── your-project-files...
 ```
 
@@ -72,6 +88,7 @@ project/
 - [ ] Custom tool definitions
 
 ### Command System
+- [ ] JSON5 and YAML configuration parsing
 - [ ] Configurable command definitions
 - [ ] Built-in help and documentation
 - [ ] Command aliases and shortcuts
@@ -91,6 +108,19 @@ project/
 - [ ] CI/CD integration helpers
 - [ ] Container/Docker support
 - [ ] Build metrics and performance tracking
+
+## 🛠️ Implementation
+
+**Language:** Go (single binary, cross-platform)
+**Configuration:** JSON5 and YAML support (inspired by [Maven Mason](https://github.com/maveniverse/mason))
+**Installation:** Single command that downloads the binary to your project
+
+### Configuration Format Detection
+
+mvx automatically detects the configuration format:
+- `.mvx/config.json5` → JSON5 format
+- `.mvx/config.yml` or `.mvx/config.yaml` → YAML format
+- Falls back to JSON5 if both exist
 
 ## 🎯 Use Cases
 
@@ -114,51 +144,115 @@ project/
 
 ## 💡 Example Configuration
 
-Here's what a `.mvx/config.yml` might look like for a typical Java project:
+mvx supports both **JSON5** and **YAML** configuration formats, inspired by [Maven Mason](https://github.com/maveniverse/mason).
+
+### JSON5 Configuration (`.mvx/config.json5`)
+
+```json5
+{
+  // mvx configuration for my-awesome-app
+  // See: https://mvx.dev/docs/config for full reference
+
+  project: {
+    name: "my-awesome-app",
+    description: "A full-stack application",
+  },
+
+  tools: {
+    // Java 21 required for virtual threads
+    java: {
+      version: "21",
+      distribution: "temurin",  // Consistent across team
+    },
+
+    maven: {
+      version: "4.0.0",
+    },
+
+    // Node.js only needed for frontend builds
+    node: {
+      version: "20.x",
+      required_for: ["frontend", "docs"],
+    },
+  },
+
+  environment: {
+    // Increase memory for large builds
+    JAVA_OPTS: "-Xmx2g -XX:+UseG1GC",
+    APP_ENV: "development",
+  },
+
+  commands: {
+    build: {
+      description: "Build the entire application",
+      script: "./mvnw clean install",
+    },
+
+    demo: {
+      description: "Run application demos",
+      script: `
+        # Launch with proper classpath and options
+        java -cp target/classes \\
+             -Xmx1g \\
+             com.example.Demo
+      `,
+      args: [
+        {
+          name: "type",
+          description: "Demo type (web, cli, batch)",
+          default: "web",
+        },
+      ],
+    },
+  },
+}
+```
+
+### YAML Configuration (`.mvx/config.yml`)
 
 ```yaml
+# mvx configuration for my-awesome-app
+# See: https://mvx.dev/docs/config for full reference
+
 project:
-  name: "my-awesome-app"
-  description: "A full-stack application"
+  name: my-awesome-app
+  description: A full-stack application
 
 tools:
+  # Java 21 required for virtual threads
   java:
     version: "21"
-    distribution: "temurin"
+    distribution: temurin  # Consistent across team
+
   maven:
     version: "4.0.0"
+
+  # Node.js only needed for frontend builds
   node:
     version: "20.x"
-    required_for: ["frontend", "docs"]
+    required_for: [frontend, docs]
 
 environment:
+  # Increase memory for large builds
   JAVA_OPTS: "-Xmx2g -XX:+UseG1GC"
-  APP_ENV: "development"
+  APP_ENV: development
 
 commands:
   build:
-    description: "Build the entire application"
-    script: "./mvnw clean install"
-
-  frontend:
-    description: "Build frontend assets"
-    script: "npm run build"
-    working_dir: "frontend"
-    requires: ["node"]
+    description: Build the entire application
+    script: ./mvnw clean install
 
   demo:
-    description: "Run application demos"
-    script: "java -cp target/classes com.example.Demo"
-    args:
-      - name: "type"
-        description: "Demo type (web, cli, batch)"
-        default: "web"
-
-  dev:
-    description: "Start development environment"
+    description: Run application demos
     script: |
-      ./mvx frontend &
-      ./mvnw spring-boot:run
+      # Launch with proper classpath and options
+      java -cp target/classes \
+           -Xmx1g \
+           com.example.Demo
+    args:
+      - name: type
+        description: "Demo type (web, cli, batch)"
+        default: web
 ```
 
 ## 🚦 Current Status
@@ -197,6 +291,7 @@ This project is just getting started! We're looking for:
 
 mvx builds on the success of:
 - **Maven Wrapper** - Proved that self-contained bootstrap works
+- **Maven Mason** - Demonstrated multi-format configuration support
 - **asdf/mise** - Demonstrated multi-tool version management
 - **just/task** - Showed the value of simple command runners
 - **direnv** - Pioneered automatic environment management
