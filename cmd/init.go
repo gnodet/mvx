@@ -108,9 +108,9 @@ func getDefaultJSON5Config() string {
       distribution: "temurin",
     },
     
-    // Maven configuration  
+    // Maven configuration
     maven: {
-      version: "4.0.0",
+      version: "3.9.6",
     },
   },
   
@@ -155,7 +155,7 @@ tools:
   
   # Maven configuration
   maven:
-    version: "4.0.0"
+    version: "3.9.6"
 
 environment:
   # JVM options for Maven builds

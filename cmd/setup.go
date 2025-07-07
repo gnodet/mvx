@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/gnodet/mvx/pkg/config"
+	"github.com/gnodet/mvx/pkg/tools"
 )
 
 // setupCmd represents the setup command
@@ -46,36 +48,60 @@ func setupEnvironment() error {
 	if err != nil {
 		return fmt.Errorf("failed to find project root: %w", err)
 	}
-	
+
 	printVerbose("Project root: %s", projectRoot)
-	
+
 	// Check if .mvx directory exists
 	mvxDir := filepath.Join(projectRoot, ".mvx")
 	if _, err := os.Stat(mvxDir); os.IsNotExist(err) {
 		return fmt.Errorf("no mvx configuration found. Run 'mvx init' first")
 	}
-	
-	// TODO: Load configuration (will implement in next phase)
+
+	// Load configuration
 	printInfo("🔍 Loading configuration...")
-	
-	// For now, just show what we would do
+	cfg, err := config.LoadConfig(projectRoot)
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	printVerbose("Loaded configuration for project: %s", cfg.Project.Name)
+
+	// Create tool manager
+	manager, err := tools.NewManager()
+	if err != nil {
+		return fmt.Errorf("failed to create tool manager: %w", err)
+	}
+
+	// Install tools
 	printInfo("📦 Installing tools...")
-	printInfo("  ⏳ Java 21 (temurin)...")
-	printInfo("  ✅ Java 21 installed")
-	printInfo("  ⏳ Maven 4.0.0...")
-	printInfo("  ✅ Maven 4.0.0 installed")
-	
+	if err := manager.InstallTools(cfg); err != nil {
+		return fmt.Errorf("failed to install tools: %w", err)
+	}
+
 	if !toolsOnly {
 		printInfo("🔧 Setting up environment...")
+		env, err := manager.SetupEnvironment(cfg)
+		if err != nil {
+			return fmt.Errorf("failed to setup environment: %w", err)
+		}
+
+		// Show environment variables that would be set
+		if verbose {
+			printVerbose("Environment variables:")
+			for key, value := range env {
+				printVerbose("  %s=%s", key, value)
+			}
+		}
+
 		printInfo("  ✅ Environment variables configured")
 	}
-	
+
 	printInfo("")
 	printInfo("✅ Setup complete! Your build environment is ready.")
 	printInfo("")
 	printInfo("Try running:")
 	printInfo("  mvx build    # Build your project")
 	printInfo("  mvx test     # Run tests")
-	
+
 	return nil
 }
