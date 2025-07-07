@@ -298,7 +298,7 @@ mvx builds on the success of:
 
 ## 📄 License
 
-Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
+Licensed under the Eclipse Public License, Version 2.0. See [LICENSE](LICENSE) for details.
 
 ---
 
