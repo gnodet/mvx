@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/yosuke-furukawa/json5/encoding/json5"
 	"gopkg.in/yaml.v3"
 )
 
@@ -86,12 +85,12 @@ func loadConfigFile(path string) (*Config, error) {
 	ext := strings.ToLower(filepath.Ext(path))
 	switch ext {
 	case ".json5":
-		err = json5.Unmarshal(data, &config)
+		err = ParseJSON5(data, &config)
 	case ".yml", ".yaml":
 		err = yaml.Unmarshal(data, &config)
 	case ".json":
-		// Fall back to regular JSON for .json files
-		err = json5.Unmarshal(data, &config)
+		// Use JSON5 preprocessor for .json files too (allows comments)
+		err = ParseJSON5(data, &config)
 	default:
 		return nil, fmt.Errorf("unsupported config file format: %s", ext)
 	}

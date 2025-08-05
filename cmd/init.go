@@ -102,21 +102,27 @@ func getDefaultJSON5Config() string {
   },
 
   tools: {
-    // Java: version can be "21", "17", "11", etc.
-    // Distribution: "temurin", "graalvm", "oracle", "corretto"
+    // Java configuration - flexible version specifications
     java: {
-      version: "21",
-      distribution: "temurin"
+      version: "21",           // Latest Java 21.x (21.0.1, 21.0.2, etc.)
+      distribution: "temurin", // temurin, graalvm, oracle, corretto
+      // version: "17",        // Latest Java 17.x
+      // version: "11",        // Latest Java 11.x
+      // distribution: "graalvm", // Use GraalVM instead
     },
 
-    // Maven: version can be "3", "3.9", "3.9.6", "4", etc.
+    // Maven configuration - flexible version specifications
     maven: {
-      version: "3.9"
-    }
+      version: "3.9",          // Latest Maven 3.9.x (3.9.6, 3.9.7, etc.)
+      // version: "3",         // Latest Maven 3.x
+      // version: "4",         // Latest Maven 4.x (pre-release)
+      // version: "3.9.6",    // Exact version
+    },
   },
 
   environment: {
-    MAVEN_OPTS: "-Xmx2g"
+    // JVM options for Maven builds
+    MAVEN_OPTS: "-Xmx2g",
   },
 
   commands: {
@@ -132,9 +138,9 @@ func getDefaultJSON5Config() string {
 
     clean: {
       description: "Clean build artifacts",
-      script: "./mvnw clean"
-    }
-  }
+      script: "./mvnw clean",
+    },
+  },
 }
 `
 }
