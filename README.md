@@ -47,6 +47,74 @@ The wrapper automatically:
 
 See [WRAPPER.md](WRAPPER.md) for detailed documentation.
 
+## 📦 Installation
+
+### Using the Wrapper (Recommended)
+
+The easiest way to use mvx is via the wrapper scripts:
+
+```bash
+# Install wrapper in your project
+curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-wrapper.sh | bash
+
+# Use mvx without global installation
+./mvx setup
+./mvx build
+./mvx test
+```
+
+### Direct Binary Installation
+
+Download the appropriate binary for your platform from [GitHub Releases](https://github.com/gnodet/mvx/releases):
+
+```bash
+# Linux x64
+curl -fsSL https://github.com/gnodet/mvx/releases/latest/download/mvx-linux-amd64 -o mvx
+chmod +x mvx
+
+# macOS x64
+curl -fsSL https://github.com/gnodet/mvx/releases/latest/download/mvx-darwin-amd64 -o mvx
+chmod +x mvx
+
+# macOS ARM64 (Apple Silicon)
+curl -fsSL https://github.com/gnodet/mvx/releases/latest/download/mvx-darwin-arm64 -o mvx
+chmod +x mvx
+
+# Windows x64
+curl -fsSL https://github.com/gnodet/mvx/releases/latest/download/mvx-windows-amd64.exe -o mvx.exe
+```
+
+### Supported Platforms
+
+| OS | Architecture | Binary | Notes |
+|---|---|---|---|
+| Linux | x64 | `mvx-linux-amd64` | Static binary, no dependencies |
+| Linux | ARM64 | `mvx-linux-arm64` | Static binary, no dependencies |
+| macOS | x64 | `mvx-darwin-amd64` | Intel Macs |
+| macOS | ARM64 | `mvx-darwin-arm64` | Apple Silicon Macs |
+| Windows | x64 | `mvx-windows-amd64.exe` | Static binary |
+
+All binaries are statically linked and have no external dependencies.
+
+### Building from Source
+
+Requirements: Go 1.24+
+
+```bash
+# Clone the repository
+git clone https://github.com/gnodet/mvx.git
+cd mvx
+
+# Build for current platform
+make build
+
+# Build for all platforms
+make build-all
+
+# Run tests
+make test
+```
+
 ## 🔧 Core Principles
 
 ### 1. **Self-Contained**

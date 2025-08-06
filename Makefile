@@ -6,24 +6,29 @@ COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Build flags
-LDFLAGS = -ldflags "-X main.Version=$(VERSION) -X main.Commit=$(COMMIT) -X main.Date=$(DATE)"
+LDFLAGS = -ldflags "-s -w -X main.Version=$(VERSION) -X main.Commit=$(COMMIT) -X main.Date=$(DATE)"
+STATIC_FLAGS = CGO_ENABLED=0
 
 # Default target
 .PHONY: all
 all: build
 
-# Build the binary
+# Build the binary (static)
 .PHONY: build
 build:
-	go build $(LDFLAGS) -o mvx-binary .
+	$(STATIC_FLAGS) go build $(LDFLAGS) -o mvx-binary .
 
-# Build for multiple platforms
+# Build for multiple platforms (static binaries)
 .PHONY: build-all
 build-all:
-	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o dist/mvx-linux-amd64 .
-	GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o dist/mvx-darwin-amd64 .
-	GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o dist/mvx-darwin-arm64 .
-	GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o dist/mvx-windows-amd64.exe .
+	@mkdir -p dist
+	$(STATIC_FLAGS) GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o dist/mvx-linux-amd64 .
+	$(STATIC_FLAGS) GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o dist/mvx-linux-arm64 .
+	$(STATIC_FLAGS) GOOS=darwin GOARCH=amd64 go build $(LDFLAGS) -o dist/mvx-darwin-amd64 .
+	$(STATIC_FLAGS) GOOS=darwin GOARCH=arm64 go build $(LDFLAGS) -o dist/mvx-darwin-arm64 .
+	$(STATIC_FLAGS) GOOS=windows GOARCH=amd64 go build $(LDFLAGS) -o dist/mvx-windows-amd64.exe .
+	@echo "Built binaries:"
+	@ls -la dist/
 
 # Run tests
 .PHONY: test
@@ -53,7 +58,7 @@ fmt:
 lint:
 	golangci-lint run
 
-# Development build with race detection
+# Development build with race detection (dynamic linking for race detector)
 .PHONY: dev
 dev:
 	go build -race $(LDFLAGS) -o mvx-binary .
@@ -62,6 +67,23 @@ dev:
 .PHONY: install
 install:
 	go install $(LDFLAGS) .
+
+# Generate checksums for release binaries
+.PHONY: checksums
+checksums:
+	@echo "Generating checksums..."
+	@cd dist && for file in mvx-*; do \
+		if [ -f "$$file" ] && [ "$${file##*.}" != "sha256" ]; then \
+			sha256sum "$$file" > "$$file.sha256"; \
+			echo "Generated checksum for $$file"; \
+		fi \
+	done
+	@cd dist && cat *.sha256 > checksums.txt
+	@echo "Combined checksums in dist/checksums.txt"
+
+# Build all platforms and generate checksums
+.PHONY: release-build
+release-build: build-all checksums
 
 # Package wrapper files
 .PHONY: package-wrapper
@@ -87,8 +109,10 @@ test-wrapper: build
 .PHONY: help
 help:
 	@echo "Available targets:"
-	@echo "  build          - Build the binary"
-	@echo "  build-all      - Build for multiple platforms"
+	@echo "  build          - Build the binary (static)"
+	@echo "  build-all      - Build for multiple platforms (static)"
+	@echo "  release-build  - Build all platforms and generate checksums"
+	@echo "  checksums      - Generate checksums for dist/ binaries"
 	@echo "  test           - Run tests"
 	@echo "  test-wrapper   - Test wrapper functionality"
 	@echo "  package-wrapper- Package wrapper files for distribution"
