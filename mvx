@@ -119,17 +119,17 @@ get_latest_version() {
 # Resolve version (handle "latest")
 resolve_version() {
     local version="$1"
-    
+
     if [ "$version" = "latest" ]; then
-        echo "Resolving latest version..."
+        echo "Resolving latest version..." >&2
         version=$(get_latest_version)
         if [ -z "$version" ]; then
             echo "Error: Could not determine latest version" >&2
             return 1
         fi
-        echo "Latest version: $version"
+        echo "Latest version: $version" >&2
     fi
-    
+
     echo "$version"
 }
 
