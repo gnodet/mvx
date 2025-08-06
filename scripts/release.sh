@@ -97,16 +97,60 @@ success "Built binaries for all platforms"
 info "Built artifacts:"
 ls -la dist/
 
-# Verify binaries work
+# Verify binaries work (only test compatible ones)
 info "Testing built binaries..."
-for binary in dist/mvx-linux-amd64 dist/mvx-darwin-amd64; do
-    if [ -f "$binary" ]; then
-        if ! "$binary" version >/dev/null 2>&1; then
-            error "Binary $binary failed to run"
+
+# Detect current platform
+case "$(uname -s)" in
+    Linux*)     platform_os="linux" ;;
+    Darwin*)    platform_os="darwin" ;;
+    CYGWIN*|MINGW*|MSYS*) platform_os="windows" ;;
+    *)          platform_os="unknown" ;;
+esac
+
+case "$(uname -m)" in
+    x86_64|amd64)   platform_arch="amd64" ;;
+    arm64|aarch64)  platform_arch="arm64" ;;
+    *)              platform_arch="unknown" ;;
+esac
+
+# Test the binary for current platform
+if [ "$platform_os" != "unknown" ] && [ "$platform_arch" != "unknown" ]; then
+    if [ "$platform_os" = "windows" ]; then
+        test_binary="dist/mvx-${platform_os}-${platform_arch}.exe"
+    else
+        test_binary="dist/mvx-${platform_os}-${platform_arch}"
+    fi
+
+    if [ -f "$test_binary" ]; then
+        info "Testing $test_binary..."
+        if ! "$test_binary" version >/dev/null 2>&1; then
+            error "Binary $test_binary failed to run"
         fi
+        success "Binary test passed for current platform"
+    else
+        warning "Binary for current platform ($platform_os-$platform_arch) not found"
+    fi
+else
+    warning "Could not detect platform for binary testing"
+fi
+
+# Verify all binaries exist
+info "Verifying all expected binaries exist..."
+expected_binaries=(
+    "dist/mvx-linux-amd64"
+    "dist/mvx-linux-arm64"
+    "dist/mvx-darwin-amd64"
+    "dist/mvx-darwin-arm64"
+    "dist/mvx-windows-amd64.exe"
+)
+
+for binary in "${expected_binaries[@]}"; do
+    if [ ! -f "$binary" ]; then
+        error "Expected binary $binary not found"
     fi
 done
-success "Binary tests passed"
+success "All expected binaries found"
 
 # Create and push tag
 info "Creating git tag $VERSION..."
