@@ -19,22 +19,22 @@ type Manager struct {
 type Tool interface {
 	// Name returns the tool name (e.g., "java", "maven")
 	Name() string
-	
+
 	// Install downloads and installs the specified version
 	Install(version string, config config.ToolConfig) error
-	
+
 	// IsInstalled checks if the specified version is installed
 	IsInstalled(version string, config config.ToolConfig) bool
-	
+
 	// GetPath returns the installation path for the specified version
 	GetPath(version string, config config.ToolConfig) (string, error)
-	
+
 	// GetBinPath returns the binary path for the specified version
 	GetBinPath(version string, config config.ToolConfig) (string, error)
-	
+
 	// Verify checks if the installation is working correctly
 	Verify(version string, config config.ToolConfig) error
-	
+
 	// ListVersions returns available versions for installation
 	ListVersions() ([]string, error)
 }
@@ -45,14 +45,14 @@ func NewManager() (*Manager, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user home directory: %w", err)
 	}
-	
+
 	cacheDir := filepath.Join(homeDir, ".mvx")
-	
+
 	// Create cache directory if it doesn't exist
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create cache directory %s: %w", cacheDir, err)
 	}
-	
+
 	manager := &Manager{
 		cacheDir: cacheDir,
 		tools:    make(map[string]Tool),
@@ -158,29 +158,29 @@ func (m *Manager) GetToolVersionDir(toolName, version string, distribution strin
 // SetupEnvironment sets up environment variables for installed tools
 func (m *Manager) SetupEnvironment(cfg *config.Config) (map[string]string, error) {
 	env := make(map[string]string)
-	
+
 	// Copy existing environment
 	for key, value := range cfg.Environment {
 		env[key] = value
 	}
-	
+
 	// Add tool-specific environment variables
 	for toolName, toolConfig := range cfg.Tools {
 		tool, err := m.GetTool(toolName)
 		if err != nil {
 			continue // Skip unknown tools
 		}
-		
+
 		if !tool.IsInstalled(toolConfig.Version, toolConfig) {
 			continue // Skip uninstalled tools
 		}
-		
+
 		// Get tool path
 		toolPath, err := tool.GetPath(toolConfig.Version, toolConfig)
 		if err != nil {
 			continue
 		}
-		
+
 		// Set tool-specific environment variables
 		switch toolName {
 		case "java":
@@ -191,7 +191,7 @@ func (m *Manager) SetupEnvironment(cfg *config.Config) (map[string]string, error
 			env["NODE_HOME"] = toolPath
 		}
 	}
-	
+
 	return env, nil
 }
 

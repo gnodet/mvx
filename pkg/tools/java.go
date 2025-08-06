@@ -31,26 +31,26 @@ func (j *JavaTool) Install(version string, cfg config.ToolConfig) error {
 	if distribution == "" {
 		distribution = "temurin" // Default to Eclipse Temurin
 	}
-	
+
 	installDir := j.manager.GetToolVersionDir("java", version, distribution)
-	
+
 	// Create installation directory
 	if err := os.MkdirAll(installDir, 0755); err != nil {
 		return fmt.Errorf("failed to create installation directory: %w", err)
 	}
-	
+
 	// Get download URL
 	downloadURL, err := j.getDownloadURL(version, distribution)
 	if err != nil {
 		return fmt.Errorf("failed to get download URL: %w", err)
 	}
-	
+
 	// Download and extract
 	fmt.Printf("  ⏳ Downloading Java %s (%s)...\n", version, distribution)
 	if err := j.downloadAndExtract(downloadURL, installDir); err != nil {
 		return fmt.Errorf("failed to download and extract: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -72,15 +72,15 @@ func (j *JavaTool) GetPath(version string, cfg config.ToolConfig) (string, error
 	if distribution == "" {
 		distribution = "temurin"
 	}
-	
+
 	installDir := j.manager.GetToolVersionDir("java", version, distribution)
-	
+
 	// Check if there's a nested directory (common with JDK archives)
 	entries, err := os.ReadDir(installDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to read installation directory: %w", err)
 	}
-	
+
 	// Look for a subdirectory that looks like a JDK
 	for _, entry := range entries {
 		if entry.IsDir() {
@@ -94,7 +94,7 @@ func (j *JavaTool) GetPath(version string, cfg config.ToolConfig) (string, error
 			}
 		}
 	}
-	
+
 	return installDir, nil
 }
 
@@ -113,25 +113,25 @@ func (j *JavaTool) Verify(version string, cfg config.ToolConfig) error {
 	if err != nil {
 		return err
 	}
-	
+
 	javaExe := filepath.Join(binPath, "java")
 	if runtime.GOOS == "windows" {
 		javaExe += ".exe"
 	}
-	
+
 	// Run java -version to verify installation
 	cmd := exec.Command(javaExe, "-version")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("java verification failed: %w\nOutput: %s", err, output)
 	}
-	
+
 	// Check if output contains expected version
 	outputStr := string(output)
 	if !strings.Contains(outputStr, version) {
 		return fmt.Errorf("java version mismatch: expected %s, got %s", version, outputStr)
 	}
-	
+
 	return nil
 }
 
@@ -204,21 +204,21 @@ func (j *JavaTool) downloadAndExtract(url, destDir string) error {
 		return fmt.Errorf("failed to download: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download failed with status: %s", resp.Status)
 	}
-	
+
 	// Create gzip reader
 	gzReader, err := gzip.NewReader(resp.Body)
 	if err != nil {
 		return fmt.Errorf("failed to create gzip reader: %w", err)
 	}
 	defer gzReader.Close()
-	
+
 	// Create tar reader
 	tarReader := tar.NewReader(gzReader)
-	
+
 	// Extract files
 	for {
 		header, err := tarReader.Next()
@@ -228,9 +228,9 @@ func (j *JavaTool) downloadAndExtract(url, destDir string) error {
 		if err != nil {
 			return fmt.Errorf("failed to read tar entry: %w", err)
 		}
-		
+
 		targetPath := filepath.Join(destDir, header.Name)
-		
+
 		switch header.Typeflag {
 		case tar.TypeDir:
 			if err := os.MkdirAll(targetPath, os.FileMode(header.Mode)); err != nil {
@@ -247,7 +247,7 @@ func (j *JavaTool) downloadAndExtract(url, destDir string) error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -257,14 +257,14 @@ func (j *JavaTool) extractFile(tarReader *tar.Reader, targetPath string, mode os
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
 		return err
 	}
-	
+
 	// Create file
 	file, err := os.OpenFile(targetPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
-	
+
 	// Copy content
 	_, err = io.Copy(file, tarReader)
 	return err

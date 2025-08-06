@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
 	"github.com/gnodet/mvx/pkg/config"
 	"github.com/gnodet/mvx/pkg/executor"
 	"github.com/gnodet/mvx/pkg/tools"
+	"github.com/spf13/cobra"
 )
 
 // buildCmd represents the build command
@@ -24,7 +24,7 @@ This command will:
 Examples:
   mvx build                   # Run the default build command
   mvx build --clean           # Clean before building`,
-	
+
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := buildProject(); err != nil {
 			printError("%v", err)

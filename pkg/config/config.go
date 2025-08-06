@@ -33,12 +33,12 @@ type ToolConfig struct {
 
 // CommandConfig represents a command definition
 type CommandConfig struct {
-	Description string                 `json:"description" yaml:"description"`
-	Script      string                 `json:"script" yaml:"script"`
-	WorkingDir  string                 `json:"working_dir,omitempty" yaml:"working_dir,omitempty"`
-	Requires    []string               `json:"requires,omitempty" yaml:"requires,omitempty"`
-	Args        []CommandArgConfig     `json:"args,omitempty" yaml:"args,omitempty"`
-	Environment map[string]string      `json:"environment,omitempty" yaml:"environment,omitempty"`
+	Description string             `json:"description" yaml:"description"`
+	Script      string             `json:"script" yaml:"script"`
+	WorkingDir  string             `json:"working_dir,omitempty" yaml:"working_dir,omitempty"`
+	Requires    []string           `json:"requires,omitempty" yaml:"requires,omitempty"`
+	Args        []CommandArgConfig `json:"args,omitempty" yaml:"args,omitempty"`
+	Environment map[string]string  `json:"environment,omitempty" yaml:"environment,omitempty"`
 }
 
 // CommandArgConfig represents a command argument
@@ -52,23 +52,23 @@ type CommandArgConfig struct {
 // LoadConfig loads configuration from the project directory
 func LoadConfig(projectRoot string) (*Config, error) {
 	mvxDir := filepath.Join(projectRoot, ".mvx")
-	
+
 	// Try different config file names in order of preference
 	configFiles := []string{
 		"config.json5",
-		"config.yml", 
+		"config.yml",
 		"config.yaml",
 		"config.json",
 	}
-	
+
 	for _, filename := range configFiles {
 		configPath := filepath.Join(mvxDir, filename)
 		if _, err := os.Stat(configPath); err == nil {
 			return loadConfigFile(configPath)
 		}
 	}
-	
-	return nil, fmt.Errorf("no configuration file found in %s (tried: %s)", 
+
+	return nil, fmt.Errorf("no configuration file found in %s (tried: %s)",
 		mvxDir, strings.Join(configFiles, ", "))
 }
 
@@ -78,9 +78,9 @@ func loadConfigFile(path string) (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file %s: %w", path, err)
 	}
-	
+
 	var config Config
-	
+
 	// Determine format by file extension
 	ext := strings.ToLower(filepath.Ext(path))
 	switch ext {
@@ -94,16 +94,16 @@ func loadConfigFile(path string) (*Config, error) {
 	default:
 		return nil, fmt.Errorf("unsupported config file format: %s", ext)
 	}
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config file %s: %w", path, err)
 	}
-	
+
 	// Validate configuration
 	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
-	
+
 	return &config, nil
 }
 
@@ -112,21 +112,21 @@ func (c *Config) Validate() error {
 	if c.Project.Name == "" {
 		return fmt.Errorf("project.name is required")
 	}
-	
+
 	// Validate tool configurations
 	for toolName, toolConfig := range c.Tools {
 		if toolConfig.Version == "" {
 			return fmt.Errorf("tool %s: version is required", toolName)
 		}
 	}
-	
+
 	// Validate command configurations
 	for cmdName, cmdConfig := range c.Commands {
 		if cmdConfig.Script == "" {
 			return fmt.Errorf("command %s: script is required", cmdName)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -135,7 +135,7 @@ func (c *Config) GetRequiredTools(commandName string) []string {
 	if cmd, exists := c.Commands[commandName]; exists {
 		return cmd.Requires
 	}
-	
+
 	// If no specific requirements, return all tools
 	var allTools []string
 	for toolName := range c.Tools {

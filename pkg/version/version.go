@@ -31,26 +31,26 @@ type Spec struct {
 func ParseVersion(v string) (*Version, error) {
 	// Remove 'v' prefix if present
 	v = strings.TrimPrefix(v, "v")
-	
+
 	// Regex for semantic version: major.minor.patch[-pre][+build]
 	re := regexp.MustCompile(`^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-([a-zA-Z0-9\-\.]+))?(?:\+([a-zA-Z0-9\-\.]+))?$`)
 	matches := re.FindStringSubmatch(v)
-	
+
 	if matches == nil {
 		return nil, fmt.Errorf("invalid version format: %s", v)
 	}
-	
+
 	major, _ := strconv.Atoi(matches[1])
 	minor := 0
 	patch := 0
-	
+
 	if matches[2] != "" {
 		minor, _ = strconv.Atoi(matches[2])
 	}
 	if matches[3] != "" {
 		patch, _ = strconv.Atoi(matches[3])
 	}
-	
+
 	return &Version{
 		Major: major,
 		Minor: minor,
@@ -63,7 +63,7 @@ func ParseVersion(v string) (*Version, error) {
 // ParseSpec parses a version specification
 func ParseSpec(spec string) (*Spec, error) {
 	spec = strings.TrimSpace(spec)
-	
+
 	// Handle special cases
 	if spec == "latest" || spec == "" {
 		return &Spec{
@@ -71,18 +71,18 @@ func ParseSpec(spec string) (*Spec, error) {
 			Constraint: "latest",
 		}, nil
 	}
-	
+
 	// Handle range specifications (future enhancement)
 	if strings.Contains(spec, ">=") || strings.Contains(spec, "<=") || strings.Contains(spec, "~") || strings.Contains(spec, "^") {
 		return nil, fmt.Errorf("range specifications not yet implemented: %s", spec)
 	}
-	
+
 	// Parse as version
 	v, err := ParseVersion(spec)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Determine constraint type based on how specific the version is
 	constraint := "exact"
 	if strings.Count(spec, ".") == 0 {
@@ -92,7 +92,7 @@ func ParseSpec(spec string) (*Spec, error) {
 		// Major.minor specified (e.g., "3.9")
 		constraint = "minor"
 	}
-	
+
 	return &Spec{
 		Raw:        spec,
 		Constraint: constraint,
@@ -123,21 +123,21 @@ func (v *Version) Compare(other *Version) int {
 		}
 		return 1
 	}
-	
+
 	if v.Minor != other.Minor {
 		if v.Minor < other.Minor {
 			return -1
 		}
 		return 1
 	}
-	
+
 	if v.Patch != other.Patch {
 		if v.Patch < other.Patch {
 			return -1
 		}
 		return 1
 	}
-	
+
 	// Handle pre-release versions
 	if v.Pre == "" && other.Pre != "" {
 		return 1 // Release version > pre-release
@@ -148,7 +148,7 @@ func (v *Version) Compare(other *Version) int {
 	if v.Pre != other.Pre {
 		return strings.Compare(v.Pre, other.Pre)
 	}
-	
+
 	return 0
 }
 
@@ -173,11 +173,11 @@ func (s *Spec) Resolve(availableVersions []string) (string, error) {
 	if len(availableVersions) == 0 {
 		return "", fmt.Errorf("no versions available")
 	}
-	
+
 	// Parse all available versions
 	var versions []*Version
 	var versionMap = make(map[string]string) // version -> original string
-	
+
 	for _, vStr := range availableVersions {
 		v, err := ParseVersion(vStr)
 		if err != nil {
@@ -186,11 +186,11 @@ func (s *Spec) Resolve(availableVersions []string) (string, error) {
 		versions = append(versions, v)
 		versionMap[v.String()] = vStr
 	}
-	
+
 	if len(versions) == 0 {
 		return "", fmt.Errorf("no valid versions found")
 	}
-	
+
 	// Filter matching versions
 	var matching []*Version
 	for _, v := range versions {
@@ -198,16 +198,16 @@ func (s *Spec) Resolve(availableVersions []string) (string, error) {
 			matching = append(matching, v)
 		}
 	}
-	
+
 	if len(matching) == 0 {
 		return "", fmt.Errorf("no versions match specification %s", s.Raw)
 	}
-	
+
 	// Sort versions (highest first)
 	sort.Slice(matching, func(i, j int) bool {
 		return matching[i].Compare(matching[j]) > 0
 	})
-	
+
 	// Return the highest matching version
 	best := matching[0]
 	if original, exists := versionMap[best.String()]; exists {
@@ -220,7 +220,7 @@ func (s *Spec) Resolve(availableVersions []string) (string, error) {
 func SortVersions(versions []string) []string {
 	var parsed []*Version
 	var versionMap = make(map[string]string)
-	
+
 	for _, vStr := range versions {
 		v, err := ParseVersion(vStr)
 		if err != nil {
@@ -229,11 +229,11 @@ func SortVersions(versions []string) []string {
 		parsed = append(parsed, v)
 		versionMap[v.String()] = vStr
 	}
-	
+
 	sort.Slice(parsed, func(i, j int) bool {
 		return parsed[i].Compare(parsed[j]) > 0
 	})
-	
+
 	var result []string
 	for _, v := range parsed {
 		if original, exists := versionMap[v.String()]; exists {
@@ -242,6 +242,6 @@ func SortVersions(versions []string) []string {
 			result = append(result, v.String())
 		}
 	}
-	
+
 	return result
 }

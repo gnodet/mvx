@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/spf13/cobra"
 	"github.com/gnodet/mvx/pkg/config"
 	"github.com/gnodet/mvx/pkg/tools"
+	"github.com/spf13/cobra"
 )
 
 // setupCmd represents the setup command
@@ -26,7 +26,7 @@ This command will:
 Examples:
   mvx setup                   # Setup everything
   mvx setup --tools-only      # Only install tools, skip environment setup`,
-	
+
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := setupEnvironment(); err != nil {
 			printError("%v", err)

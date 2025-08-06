@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
 	"github.com/gnodet/mvx/pkg/config"
 	"github.com/gnodet/mvx/pkg/executor"
 	"github.com/gnodet/mvx/pkg/tools"
+	"github.com/spf13/cobra"
 )
 
 // testCmd represents the test command
@@ -25,7 +25,7 @@ Examples:
   mvx test                    # Run all tests
   mvx test --unit             # Run only unit tests
   mvx test --integration      # Run only integration tests`,
-	
+
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := runTests(); err != nil {
 			printError("%v", err)

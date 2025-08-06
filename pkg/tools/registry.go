@@ -87,25 +87,25 @@ func (r *ToolRegistry) getTemurinVersions() ([]string, error) {
 		return []string{"8", "11", "17", "21", "22", "23"}, nil
 	}
 	defer resp.Body.Close()
-	
+
 	var releases struct {
 		AvailableReleases []int `json:"available_releases"`
 	}
-	
+
 	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
 		return []string{"8", "11", "17", "21", "22", "23"}, nil
 	}
-	
+
 	var versions []string
 	for _, release := range releases.AvailableReleases {
 		versions = append(versions, fmt.Sprintf("%d", release))
 	}
-	
+
 	// Sort in descending order (newest first)
 	sort.Slice(versions, func(i, j int) bool {
 		return versions[i] > versions[j]
 	})
-	
+
 	return versions, nil
 }
 
@@ -139,7 +139,7 @@ func (r *ToolRegistry) GetMavenVersions() ([]string, error) {
 		"3.8.8", "3.8.7", "3.8.6", "3.8.5", "3.8.4", "3.8.3", "3.8.2", "3.8.1",
 		"3.6.3", "3.6.2", "3.6.1", "3.6.0",
 	}
-	
+
 	return version.SortVersions(versions), nil
 }
 
@@ -149,17 +149,17 @@ func (r *ToolRegistry) ResolveJavaVersion(versionSpec, distribution string) (str
 	if err != nil {
 		return "", err
 	}
-	
+
 	spec, err := version.ParseSpec(versionSpec)
 	if err != nil {
 		return "", fmt.Errorf("invalid version specification %s: %w", versionSpec, err)
 	}
-	
+
 	resolved, err := spec.Resolve(availableVersions)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve Java %s version %s: %w", distribution, versionSpec, err)
 	}
-	
+
 	return resolved, nil
 }
 
@@ -169,17 +169,17 @@ func (r *ToolRegistry) ResolveMavenVersion(versionSpec string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	
+
 	spec, err := version.ParseSpec(versionSpec)
 	if err != nil {
 		return "", fmt.Errorf("invalid version specification %s: %w", versionSpec, err)
 	}
-	
+
 	resolved, err := spec.Resolve(availableVersions)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve Maven version %s: %w", versionSpec, err)
 	}
-	
+
 	return resolved, nil
 }
 
@@ -192,27 +192,27 @@ func (r *ToolRegistry) GetToolInfo(toolName string) (map[string]interface{}, err
 			"name":          "Java Development Kit",
 			"distributions": distributions,
 		}
-		
+
 		// Add version info for each distribution
 		for _, dist := range distributions {
 			if versions, err := r.GetJavaVersions(dist.Name); err == nil {
 				info[dist.Name+"_versions"] = versions
 			}
 		}
-		
+
 		return info, nil
-		
+
 	case "maven":
 		versions, err := r.GetMavenVersions()
 		if err != nil {
 			return nil, err
 		}
-		
+
 		return map[string]interface{}{
 			"name":     "Apache Maven",
 			"versions": versions,
 		}, nil
-		
+
 	default:
 		return nil, fmt.Errorf("unknown tool: %s", toolName)
 	}

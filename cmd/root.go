@@ -13,7 +13,7 @@ var (
 	version = "dev"
 	commit  = "unknown"
 	date    = "unknown"
-	
+
 	// Global flags
 	verbose bool
 	quiet   bool
@@ -35,7 +35,7 @@ Examples:
   mvx demo           # Launch project-specific demos
 
 For more information, visit: https://github.com/gnodet/mvx`,
-	
+
 	// Show help if no command is provided
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
@@ -59,7 +59,7 @@ func init() {
 	// Global flags
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "quiet output (errors only)")
-	
+
 	// Add subcommands
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(setupCmd)
@@ -91,13 +91,13 @@ func findProjectRoot() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	
+
 	for {
 		mvxDir := filepath.Join(dir, ".mvx")
 		if info, err := os.Stat(mvxDir); err == nil && info.IsDir() {
 			return dir, nil
 		}
-		
+
 		parent := filepath.Dir(dir)
 		if parent == dir {
 			// Reached filesystem root
@@ -105,7 +105,7 @@ func findProjectRoot() (string, error) {
 		}
 		dir = parent
 	}
-	
+
 	// If no .mvx directory found, use current directory
 	return os.Getwd()
 }

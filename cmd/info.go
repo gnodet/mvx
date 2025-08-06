@@ -5,10 +5,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/gnodet/mvx/pkg/config"
 	"github.com/gnodet/mvx/pkg/executor"
 	"github.com/gnodet/mvx/pkg/tools"
+	"github.com/spf13/cobra"
 )
 
 // infoCmd represents the info command
@@ -22,7 +22,7 @@ Examples:
   mvx info build             # Show info about build command
   mvx info test              # Show info about test command
   mvx info                   # Show project information`,
-	
+
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) == 0 {
 			// No command specified, show project info
@@ -32,7 +32,7 @@ Examples:
 			}
 			return
 		}
-		
+
 		commandName := args[0]
 		if err := showCommandInfo(commandName); err != nil {
 			printError("%v", err)
@@ -51,20 +51,20 @@ func showProjectInfo() error {
 	if err != nil {
 		return fmt.Errorf("failed to find project root: %w", err)
 	}
-	
+
 	// Load configuration
 	cfg, err := config.LoadConfig(projectRoot)
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
-	
+
 	printInfo("📋 Project Information")
 	printInfo("")
 	printInfo("Name:        %s", cfg.Project.Name)
 	printInfo("Description: %s", cfg.Project.Description)
 	printInfo("Root:        %s", projectRoot)
 	printInfo("")
-	
+
 	// Show configured tools
 	if len(cfg.Tools) > 0 {
 		printInfo("🛠️  Configured Tools:")
@@ -77,14 +77,14 @@ func showProjectInfo() error {
 		}
 		printInfo("")
 	}
-	
+
 	// Show available commands
 	if len(cfg.Commands) > 0 {
 		printInfo("⚡ Available Commands: %d", len(cfg.Commands))
 		printInfo("  Run 'mvx run' to see all commands")
 		printInfo("  Run 'mvx info <command>' for command details")
 	}
-	
+
 	return nil
 }
 
@@ -94,35 +94,35 @@ func showCommandInfo(commandName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to find project root: %w", err)
 	}
-	
+
 	// Load configuration
 	cfg, err := config.LoadConfig(projectRoot)
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
-	
+
 	// Create tool manager and executor
 	manager, err := tools.NewManager()
 	if err != nil {
 		return fmt.Errorf("failed to create tool manager: %w", err)
 	}
-	
+
 	exec := executor.NewExecutor(cfg, manager, projectRoot)
-	
+
 	// Get command info
 	cmdInfo, err := exec.GetCommandInfo(commandName)
 	if err != nil {
 		return err
 	}
-	
+
 	printInfo("⚡ Command: %s", commandName)
 	printInfo("")
-	
+
 	if cmdInfo.Description != "" {
 		printInfo("Description: %s", cmdInfo.Description)
 		printInfo("")
 	}
-	
+
 	// Show script
 	printInfo("Script:")
 	scriptLines := strings.Split(strings.TrimSpace(cmdInfo.Script), "\n")
@@ -130,13 +130,13 @@ func showCommandInfo(commandName string) error {
 		printInfo("  %s", line)
 	}
 	printInfo("")
-	
+
 	// Show working directory if specified
 	if cmdInfo.WorkingDir != "" {
 		printInfo("Working Directory: %s", cmdInfo.WorkingDir)
 		printInfo("")
 	}
-	
+
 	// Show required tools
 	if len(cmdInfo.Requires) > 0 {
 		printInfo("Required Tools:")
@@ -155,7 +155,7 @@ func showCommandInfo(commandName string) error {
 		}
 		printInfo("")
 	}
-	
+
 	// Show environment variables
 	if len(cmdInfo.Environment) > 0 {
 		printInfo("Environment Variables:")
@@ -164,7 +164,7 @@ func showCommandInfo(commandName string) error {
 		}
 		printInfo("")
 	}
-	
+
 	// Show arguments if defined
 	if len(cmdInfo.Args) > 0 {
 		printInfo("Arguments:")
@@ -181,13 +181,13 @@ func showCommandInfo(commandName string) error {
 		}
 		printInfo("")
 	}
-	
+
 	// Show usage
 	printInfo("Usage:")
 	printInfo("  mvx run %s", commandName)
 	if commandName == "build" || commandName == "test" {
 		printInfo("  mvx %s", commandName)
 	}
-	
+
 	return nil
 }

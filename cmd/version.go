@@ -20,7 +20,7 @@ commit hash, build date, and runtime information.`,
 
 func showVersion() {
 	fmt.Printf("mvx version %s\n", version)
-	
+
 	if verbose {
 		fmt.Printf("Commit:      %s\n", commit)
 		fmt.Printf("Built:       %s\n", date)

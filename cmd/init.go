@@ -27,7 +27,7 @@ Examples:
   mvx init                    # Create config.json5 (default)
   mvx init --format=yaml      # Create config.yml instead
   mvx init --force            # Overwrite existing configuration`,
-	
+
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := initProject(); err != nil {
 			printError("%v", err)
@@ -46,18 +46,18 @@ func initProject() error {
 	if err != nil {
 		return fmt.Errorf("failed to get current directory: %w", err)
 	}
-	
+
 	mvxDir := filepath.Join(projectRoot, ".mvx")
-	
+
 	// Create .mvx directory
 	if err := os.MkdirAll(mvxDir, 0755); err != nil {
 		return fmt.Errorf("failed to create .mvx directory: %w", err)
 	}
-	
+
 	// Determine config file name and content based on format
 	var configFile string
 	var configContent string
-	
+
 	switch initFormat {
 	case "json5":
 		configFile = "config.json5"
@@ -68,26 +68,26 @@ func initProject() error {
 	default:
 		return fmt.Errorf("unsupported format: %s (supported: json5, yaml)", initFormat)
 	}
-	
+
 	configPath := filepath.Join(mvxDir, configFile)
-	
+
 	// Check if config already exists
 	if _, err := os.Stat(configPath); err == nil && !initForce {
 		return fmt.Errorf("configuration file already exists: %s (use --force to overwrite)", configPath)
 	}
-	
+
 	// Write config file
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		return fmt.Errorf("failed to write configuration file: %w", err)
 	}
-	
+
 	printInfo("✅ Initialized mvx configuration in %s", configPath)
 	printInfo("")
 	printInfo("Next steps:")
 	printInfo("  1. Edit %s to configure your project", configPath)
 	printInfo("  2. Run 'mvx setup' to install required tools")
 	printInfo("  3. Run 'mvx build' to build your project")
-	
+
 	return nil
 }
 

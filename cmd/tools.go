@@ -6,8 +6,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/spf13/cobra"
 	"github.com/gnodet/mvx/pkg/tools"
+	"github.com/spf13/cobra"
 )
 
 // toolsCmd represents the tools command
@@ -20,7 +20,7 @@ Subcommands:
   list       List available tools and their versions
   search     Search for specific tool versions
   info       Show detailed information about a tool`,
-	
+
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) == 0 {
 			// Default to list
@@ -30,7 +30,7 @@ Subcommands:
 			}
 			return
 		}
-		
+
 		subcommand := args[0]
 		switch subcommand {
 		case "list":
@@ -74,12 +74,12 @@ func listTools() error {
 	if err != nil {
 		return fmt.Errorf("failed to create tool manager: %w", err)
 	}
-	
+
 	registry := manager.GetRegistry()
-	
+
 	printInfo("🛠️  Available Tools")
 	printInfo("")
-	
+
 	// Java
 	printInfo("📦 Java Development Kit")
 	distributions := registry.GetJavaDistributions()
@@ -98,7 +98,7 @@ func listTools() error {
 		}
 	}
 	printInfo("")
-	
+
 	// Maven
 	printInfo("📦 Apache Maven")
 	if versions, err := registry.GetMavenVersions(); err == nil && len(versions) > 0 {
@@ -113,12 +113,12 @@ func listTools() error {
 		}
 	}
 	printInfo("")
-	
+
 	printInfo("Usage:")
 	printInfo("  mvx tools search java        # Search Java versions")
 	printInfo("  mvx tools search maven       # Search Maven versions")
 	printInfo("  mvx tools info java          # Show Java details")
-	
+
 	return nil
 }
 
@@ -128,9 +128,9 @@ func searchTool(toolName string, filters []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create tool manager: %w", err)
 	}
-	
+
 	registry := manager.GetRegistry()
-	
+
 	switch toolName {
 	case "java":
 		return searchJavaVersions(registry, filters)
@@ -144,7 +144,7 @@ func searchTool(toolName string, filters []string) error {
 // searchJavaVersions searches for Java versions
 func searchJavaVersions(registry *tools.ToolRegistry, filters []string) error {
 	distributions := registry.GetJavaDistributions()
-	
+
 	// If distribution filter is provided, use it
 	var targetDistributions []tools.JavaDistribution
 	if len(filters) > 0 {
@@ -161,31 +161,31 @@ func searchJavaVersions(registry *tools.ToolRegistry, filters []string) error {
 	} else {
 		targetDistributions = distributions
 	}
-	
+
 	printInfo("☕ Java Versions")
 	printInfo("")
-	
+
 	for _, dist := range targetDistributions {
 		printInfo("📦 %s (%s)", dist.DisplayName, dist.Name)
-		
+
 		versions, err := registry.GetJavaVersions(dist.Name)
 		if err != nil {
 			printInfo("  ❌ Error: %v", err)
 			continue
 		}
-		
+
 		if len(versions) == 0 {
 			printInfo("  No versions available")
 			continue
 		}
-		
+
 		// Group by major version
 		majorVersions := make(map[string][]string)
 		for _, v := range versions {
 			major := strings.Split(v, ".")[0]
 			majorVersions[major] = append(majorVersions[major], v)
 		}
-		
+
 		// Sort major versions
 		var majors []string
 		for major := range majorVersions {
@@ -194,7 +194,7 @@ func searchJavaVersions(registry *tools.ToolRegistry, filters []string) error {
 		sort.Slice(majors, func(i, j int) bool {
 			return majors[i] > majors[j] // Newest first
 		})
-		
+
 		for _, major := range majors {
 			versions := majorVersions[major]
 			if len(versions) == 1 {
@@ -205,13 +205,13 @@ func searchJavaVersions(registry *tools.ToolRegistry, filters []string) error {
 		}
 		printInfo("")
 	}
-	
+
 	printInfo("Usage examples:")
 	printInfo("  version: \"21\"           # Latest Java 21")
 	printInfo("  version: \"17\"           # Latest Java 17")
 	printInfo("  version: \"11\"           # Latest Java 11")
 	printInfo("  distribution: \"graalvm\"  # Use GraalVM instead of Temurin")
-	
+
 	return nil
 }
 
@@ -221,17 +221,17 @@ func searchMavenVersions(registry *tools.ToolRegistry, filters []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get Maven versions: %w", err)
 	}
-	
+
 	printInfo("📦 Apache Maven Versions")
 	printInfo("")
-	
+
 	// Group by major version
 	majorVersions := make(map[string][]string)
 	for _, v := range versions {
 		major := strings.Split(v, ".")[0]
 		majorVersions[major] = append(majorVersions[major], v)
 	}
-	
+
 	// Sort major versions
 	var majors []string
 	for major := range majorVersions {
@@ -240,17 +240,17 @@ func searchMavenVersions(registry *tools.ToolRegistry, filters []string) error {
 	sort.Slice(majors, func(i, j int) bool {
 		return majors[i] > majors[j] // Newest first
 	})
-	
+
 	for _, major := range majors {
 		versions := majorVersions[major]
 		printInfo("Maven %s.x:", major)
-		
+
 		// Show first few versions in each major
 		shown := versions
 		if len(versions) > 6 {
 			shown = versions[:6]
 		}
-		
+
 		for _, v := range shown {
 			status := ""
 			if strings.Contains(v, "rc") || strings.Contains(v, "beta") || strings.Contains(v, "alpha") {
@@ -258,19 +258,19 @@ func searchMavenVersions(registry *tools.ToolRegistry, filters []string) error {
 			}
 			printInfo("  %s%s", v, status)
 		}
-		
+
 		if len(versions) > 6 {
 			printInfo("  ... and %d more", len(versions)-6)
 		}
 		printInfo("")
 	}
-	
+
 	printInfo("Usage examples:")
 	printInfo("  version: \"3\"             # Latest Maven 3.x")
 	printInfo("  version: \"3.9\"           # Latest Maven 3.9.x")
 	printInfo("  version: \"3.9.6\"         # Exact version")
 	printInfo("  version: \"4\"             # Latest Maven 4.x (pre-release)")
-	
+
 	return nil
 }
 
@@ -280,17 +280,17 @@ func showToolInfo(toolName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create tool manager: %w", err)
 	}
-	
+
 	registry := manager.GetRegistry()
 	info, err := registry.GetToolInfo(toolName)
 	if err != nil {
 		return err
 	}
-	
+
 	printInfo("🔍 Tool Information: %s", toolName)
 	printInfo("")
 	printInfo("Name: %s", info["name"])
-	
+
 	// Tool-specific information
 	switch toolName {
 	case "java":
@@ -308,6 +308,6 @@ func showToolInfo(toolName string) error {
 			printInfo("Latest: %s", versions[0])
 		}
 	}
-	
+
 	return nil
 }
