@@ -1,0 +1,221 @@
+#!/bin/bash
+
+##############################################################################
+# mvx Wrapper Script
+#
+# This script acts as a wrapper for mvx, automatically downloading and 
+# caching the appropriate binary version for your platform.
+#
+# Similar to Maven Wrapper (mvnw), this allows projects to use mvx without
+# requiring users to install it separately.
+##############################################################################
+
+set -e
+
+# Default values
+DEFAULT_MVX_VERSION="latest"
+DEFAULT_DOWNLOAD_URL="https://github.com/gnodet/mvx/releases"
+
+# Determine the mvx version to use
+MVX_VERSION="${MVX_VERSION:-}"
+if [ -z "$MVX_VERSION" ]; then
+    if [ -f ".mvx/wrapper/mvx-wrapper.properties" ]; then
+        MVX_VERSION=$(grep "^mvxVersion=" ".mvx/wrapper/mvx-wrapper.properties" 2>/dev/null | cut -d'=' -f2 | tr -d ' \t\r\n' || echo "")
+    fi
+    if [ -z "$MVX_VERSION" ]; then
+        if [ -f ".mvx/version" ]; then
+            MVX_VERSION=$(cat ".mvx/version" | tr -d ' \t\r\n')
+        fi
+    fi
+    if [ -z "$MVX_VERSION" ]; then
+        MVX_VERSION="$DEFAULT_MVX_VERSION"
+    fi
+fi
+
+# Determine download URL
+DOWNLOAD_URL="${MVX_DOWNLOAD_URL:-$DEFAULT_DOWNLOAD_URL}"
+
+# Detect platform and architecture
+detect_platform() {
+    local os arch
+    
+    case "$(uname -s)" in
+        Linux*)     os="linux" ;;
+        Darwin*)    os="darwin" ;;
+        CYGWIN*|MINGW*|MSYS*) os="windows" ;;
+        *)          os="linux" ;;  # Default fallback
+    esac
+    
+    case "$(uname -m)" in
+        x86_64|amd64)   arch="amd64" ;;
+        arm64|aarch64)  arch="arm64" ;;
+        *)              arch="amd64" ;;  # Default fallback
+    esac
+    
+    echo "${os}-${arch}"
+}
+
+# Get the user's home directory
+get_home_dir() {
+    if [ -n "$HOME" ]; then
+        echo "$HOME"
+    elif [ -n "$USERPROFILE" ]; then
+        echo "$USERPROFILE"
+    else
+        echo "."
+    fi
+}
+
+# Create directory if it doesn't exist
+ensure_dir() {
+    local dir="$1"
+    if [ ! -d "$dir" ]; then
+        mkdir -p "$dir"
+    fi
+}
+
+# Download file with progress
+download_file() {
+    local url="$1"
+    local output="$2"
+    local temp_file="${output}.tmp"
+    
+    echo "Downloading from: $url"
+    
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL --progress-bar -o "$temp_file" "$url"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -q --show-progress -O "$temp_file" "$url"
+    else
+        echo "Error: Neither curl nor wget is available for downloading" >&2
+        return 1
+    fi
+    
+    mv "$temp_file" "$output"
+}
+
+# Get the latest version from GitHub API
+get_latest_version() {
+    local api_url="https://api.github.com/repos/gnodet/mvx/releases/latest"
+    local version=""
+
+    if command -v curl >/dev/null 2>&1; then
+        version=$(curl -fsSL "$api_url" 2>/dev/null | grep '"tag_name":' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/' | sed 's/^v//' || echo "")
+    elif command -v wget >/dev/null 2>&1; then
+        version=$(wget -qO- "$api_url" 2>/dev/null | grep '"tag_name":' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/' | sed 's/^v//' || echo "")
+    else
+        echo "Error: Neither curl nor wget is available for version detection" >&2
+        return 1
+    fi
+
+    if [ -z "$version" ]; then
+        echo "Error: No releases found. Please specify a version in .mvx/wrapper/mvx-wrapper.properties or .mvx/version" >&2
+        return 1
+    fi
+
+    echo "$version"
+}
+
+# Resolve version (handle "latest")
+resolve_version() {
+    local version="$1"
+    
+    if [ "$version" = "latest" ]; then
+        echo "Resolving latest version..."
+        version=$(get_latest_version)
+        if [ -z "$version" ]; then
+            echo "Error: Could not determine latest version" >&2
+            return 1
+        fi
+        echo "Latest version: $version"
+    fi
+    
+    echo "$version"
+}
+
+# Find or download mvx binary
+find_mvx_binary() {
+    local version="$1"
+    local platform="$2"
+    local home_dir="$3"
+    
+    # Check for local binary first (in project directory)
+    local local_binaries="./mvx-local ./mvx-binary"
+    if [ "$platform" = "windows-amd64" ]; then
+        local_binaries="./mvx.exe ./mvx-binary.exe $local_binaries"
+    fi
+
+    for local_binary in $local_binaries; do
+        if [ -f "$local_binary" ] && [ -x "$local_binary" ]; then
+            echo "$local_binary"
+            return 0
+        fi
+    done
+
+    
+    # Check cached version
+    local cache_dir="$home_dir/.mvx/versions/$version"
+    local cached_binary="$cache_dir/mvx"
+    if [ "$platform" = "windows-amd64" ]; then
+        cached_binary="$cache_dir/mvx.exe"
+    fi
+    
+    if [ -f "$cached_binary" ] && [ -x "$cached_binary" ]; then
+        echo "$cached_binary"
+        return 0
+    fi
+    
+    # Need to download
+    echo "mvx $version not found, downloading..."
+    
+    ensure_dir "$cache_dir"
+    
+    # Construct download URL
+    local binary_name="mvx-$platform"
+    if [ "$platform" = "windows-amd64" ]; then
+        binary_name="mvx-$platform.exe"
+    fi
+    
+    local download_url="$DOWNLOAD_URL/download/v$version/$binary_name"
+    
+    echo "Downloading mvx $version for $platform..."
+    if download_file "$download_url" "$cached_binary"; then
+        chmod +x "$cached_binary"
+        echo "$cached_binary"
+        return 0
+    else
+        echo "Error: Failed to download mvx binary" >&2
+        return 1
+    fi
+}
+
+# Main execution
+main() {
+    local platform home_dir resolved_version mvx_binary
+    
+    platform=$(detect_platform)
+    home_dir=$(get_home_dir)
+    
+    echo "mvx Wrapper"
+    echo "Platform: $platform"
+    echo "Requested version: $MVX_VERSION"
+    
+    resolved_version=$(resolve_version "$MVX_VERSION")
+    if [ $? -ne 0 ]; then
+        exit 1
+    fi
+    
+    mvx_binary=$(find_mvx_binary "$resolved_version" "$platform" "$home_dir")
+    if [ $? -ne 0 ]; then
+        exit 1
+    fi
+    
+    echo "Using mvx binary: $mvx_binary"
+    echo ""
+    
+    # Execute mvx with all arguments
+    exec "$mvx_binary" "$@"
+}
+
+# Run main function with all arguments
+main "$@"

@@ -18,11 +18,19 @@
 go.work
 
 # Build artifacts
-mvx
 dist/
 
-# Development files
-.mvx/
+# Built binary (but not wrapper scripts)
+mvx-binary
+/mvx-linux-*
+/mvx-darwin-*
+/mvx-windows-*
+/mvx.exe
+
+# Development cache (but not wrapper config)
+.mvx/local/
+.mvx/tools/
+.mvx/versions/
 
 # IDE files
 .vscode/

@@ -25,6 +25,28 @@ Imagine cloning any project and running:
 
 No more "works on my machine" - every developer gets the exact same environment.
 
+## 📦 mvx Wrapper
+
+Just like Maven Wrapper (`mvnw`), mvx provides wrapper scripts that automatically download and run the appropriate mvx version for your project:
+
+```bash
+# Install the wrapper in your project (one-time setup)
+curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-wrapper.sh | bash
+
+# Now anyone can use mvx without installing it
+./mvx setup
+./mvx build
+./mvx test
+```
+
+The wrapper automatically:
+- Downloads the correct mvx version for your project
+- Caches binaries to avoid re-downloading
+- Works on Linux, macOS, and Windows
+- Requires no global installation
+
+See [WRAPPER.md](WRAPPER.md) for detailed documentation.
+
 ## 🔧 Core Principles
 
 ### 1. **Self-Contained**
