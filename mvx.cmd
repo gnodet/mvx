@@ -18,8 +18,8 @@ set DEFAULT_DOWNLOAD_URL=https://github.com/gnodet/mvx/releases
 rem Determine the mvx version to use
 set MVX_VERSION_TO_USE=%MVX_VERSION%
 if "%MVX_VERSION_TO_USE%"=="" (
-    if exist ".mvx\wrapper\mvx-wrapper.properties" (
-        for /f "tokens=2 delims==" %%i in ('findstr "^mvxVersion=" ".mvx\wrapper\mvx-wrapper.properties" 2^>nul') do set MVX_VERSION_TO_USE=%%i
+    if exist ".mvx\config\mvx.properties" (
+        for /f "tokens=2 delims==" %%i in ('findstr "^mvxVersion=" ".mvx\config\mvx.properties" 2^>nul') do set MVX_VERSION_TO_USE=%%i
     )
 )
 if "%MVX_VERSION_TO_USE%"=="" (
@@ -45,16 +45,15 @@ set HOME_DIR=%USERPROFILE%
 if "%HOME_DIR%"=="" set HOME_DIR=%HOMEDRIVE%%HOMEPATH%
 if "%HOME_DIR%"=="" set HOME_DIR=.
 
-echo mvx Wrapper
+echo mvx
 echo Platform: windows-amd64
 echo Requested version: %MVX_VERSION_TO_USE%
 
-rem Check for local binary first
-set LOCAL_BINARY=.\mvx.exe
-if exist "%LOCAL_BINARY%" (
-    echo Using local mvx binary: %LOCAL_BINARY%
+rem Check for local development binary first - always check regardless of version
+if exist ".\mvx-dev.exe" (
+    echo Using local development binary: .\mvx-dev.exe
     echo.
-    "%LOCAL_BINARY%" %*
+    ".\mvx-dev.exe" %*
     goto :eof
 )
 
