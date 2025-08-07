@@ -164,12 +164,21 @@ func (r *ToolRegistry) getDiscoVersions(distribution string) ([]string, error) {
 
 // GetMavenVersions returns available Maven versions
 func (r *ToolRegistry) GetMavenVersions() ([]string, error) {
-	// For now, return known Maven versions
+	// For now, return known Maven versions including latest RCs
 	// TODO: Implement Maven Central API integration
 	versions := []string{
-		"4.0.0", "4.0.0-rc-3", "4.0.0-beta-5", "4.0.0-beta-4", "4.0.0-beta-3",
+		// Maven 4.x (pre-release versions)
+		"4.0.0", "4.0.0-rc-4", "4.0.0-rc-3", "4.0.0-rc-2", "4.0.0-rc-1",
+		"4.0.0-beta-5", "4.0.0-beta-4", "4.0.0-beta-3", "4.0.0-beta-2", "4.0.0-beta-1",
+		"4.0.0-alpha-13", "4.0.0-alpha-12", "4.0.0-alpha-11", "4.0.0-alpha-10",
+
+		// Maven 3.9.x (latest stable)
 		"3.9.6", "3.9.5", "3.9.4", "3.9.3", "3.9.2", "3.9.1", "3.9.0",
+
+		// Maven 3.8.x (previous stable)
 		"3.8.8", "3.8.7", "3.8.6", "3.8.5", "3.8.4", "3.8.3", "3.8.2", "3.8.1",
+
+		// Maven 3.6.x (older stable)
 		"3.6.3", "3.6.2", "3.6.1", "3.6.0",
 	}
 

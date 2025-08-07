@@ -123,25 +123,20 @@ func (m *MavenTool) Verify(version string, cfg config.ToolConfig) error {
 
 // ListVersions returns available versions for installation
 func (m *MavenTool) ListVersions() ([]string, error) {
-	// For now, return common versions
-	// TODO: Implement dynamic version discovery from Maven Central
-	return []string{"3.9.6", "4.0.0", "4.0.0-rc-3"}, nil
+	// Use the registry to get versions
+	registry := m.manager.GetRegistry()
+	return registry.GetMavenVersions()
 }
 
 // getDownloadURL returns the download URL for the specified version
 func (m *MavenTool) getDownloadURL(version string) string {
 	// Maven download URLs follow a consistent pattern
 	if strings.HasPrefix(version, "4.") {
-		// Maven 4.x is still in development, use different URL structure
-		if version == "4.0.0" {
-			return "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/4.0.0/apache-maven-4.0.0-bin.zip"
-		}
-		if version == "4.0.0-rc-3" {
-			return "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/4.0.0-rc-3/apache-maven-4.0.0-rc-3-bin.zip"
-		}
+		// Maven 4.x versions (including RCs and betas) are in Maven Central
+		return fmt.Sprintf("https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/%s/apache-maven-%s-bin.zip", version, version)
 	}
 
-	// Maven 3.x versions
+	// Maven 3.x versions are in the archive
 	return fmt.Sprintf("https://archive.apache.org/dist/maven/maven-3/%s/binaries/apache-maven-%s-bin.zip", version, version)
 }
 
