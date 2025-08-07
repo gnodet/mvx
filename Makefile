@@ -68,6 +68,16 @@ dev:
 build-local:
 	$(STATIC_FLAGS) go build $(LDFLAGS) -o mvx-local .
 
+# Deploy local binary to another project
+.PHONY: deploy
+deploy:
+	@if [ -z "$(TARGET)" ]; then \
+		echo "Usage: make deploy TARGET=/path/to/project [METHOD=copy|symlink|wrapper]"; \
+		echo "Example: make deploy TARGET=~/projects/my-app METHOD=symlink"; \
+		exit 1; \
+	fi
+	@./scripts/deploy-local.sh "$(TARGET)" "$(METHOD)"
+
 # Install locally
 .PHONY: install
 install:
@@ -116,6 +126,7 @@ help:
 	@echo "Available targets:"
 	@echo "  build          - Build the binary (static)"
 	@echo "  build-local    - Build for wrapper testing (creates mvx-local)"
+	@echo "  deploy         - Deploy local binary to another project (requires TARGET=path)"
 	@echo "  build-all      - Build for multiple platforms (static)"
 	@echo "  release-build  - Build all platforms and generate checksums"
 	@echo "  checksums      - Generate checksums for dist/ binaries"
