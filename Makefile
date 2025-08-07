@@ -38,7 +38,7 @@ test:
 # Clean build artifacts
 .PHONY: clean
 clean:
-	rm -f mvx-binary mvx-local mvx-dev
+	rm -f mvx-binary mvx-dev
 	rm -rf dist/
 	rm -rf .mvx/local/ .mvx/tools/ .mvx/versions/
 
@@ -63,10 +63,7 @@ lint:
 dev:
 	go build -race $(LDFLAGS) -o mvx-dev .
 
-# Build for wrapper testing (creates mvx-local)
-.PHONY: build-local
-build-local:
-	$(STATIC_FLAGS) go build $(LDFLAGS) -o mvx-local .
+
 
 # Deploy local binary to another project
 .PHONY: deploy
@@ -125,7 +122,6 @@ test-wrapper: build
 help:
 	@echo "Available targets:"
 	@echo "  build          - Build the binary (static)"
-	@echo "  build-local    - Build for wrapper testing (creates mvx-local)"
 	@echo "  deploy         - Deploy local binary to another project (requires TARGET=path)"
 	@echo "  build-all      - Build for multiple platforms (static)"
 	@echo "  release-build  - Build all platforms and generate checksums"

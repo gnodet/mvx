@@ -71,29 +71,29 @@ info "Deploying local mvx binary to: $TARGET_DIR"
 info "Method: $METHOD"
 
 # Build the binary if it doesn't exist or is older than source
-if [ ! -f "mvx-local" ] || [ "main.go" -nt "mvx-local" ]; then
-    info "Building local mvx binary..."
-    make build-local
-    success "Built mvx-local"
+if [ ! -f "mvx-dev" ] || [ "main.go" -nt "mvx-dev" ]; then
+    info "Building development mvx binary..."
+    make dev
+    success "Built mvx-dev"
 fi
 
 case "$METHOD" in
     "copy")
         info "Copying binary to target directory..."
-        cp mvx-local "$TARGET_DIR/mvx-local"
-        success "Copied mvx-local to $TARGET_DIR"
+        cp mvx-dev "$TARGET_DIR/mvx-dev"
+        success "Copied mvx-dev to $TARGET_DIR"
         ;;
-        
+
     "symlink")
         info "Creating symlink in target directory..."
-        ln -sf "$MVX_ROOT/mvx-local" "$TARGET_DIR/mvx-local"
-        success "Created symlink $TARGET_DIR/mvx-local -> $MVX_ROOT/mvx-local"
+        ln -sf "$MVX_ROOT/mvx-dev" "$TARGET_DIR/mvx-dev"
+        success "Created symlink $TARGET_DIR/mvx-dev -> $MVX_ROOT/mvx-dev"
         ;;
-        
+
     "wrapper")
         info "Installing wrapper in target directory..."
         cd "$TARGET_DIR"
-        
+
         # Install wrapper if not present
         if [ ! -f "mvx" ]; then
             curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-wrapper.sh | bash
@@ -101,10 +101,11 @@ case "$METHOD" in
         else
             info "Wrapper already present"
         fi
-        
-        # Copy binary
-        cp "$MVX_ROOT/mvx-local" "./mvx-local"
-        success "Copied binary to wrapper directory"
+
+        # Copy binary and set version to dev
+        cp "$MVX_ROOT/mvx-dev" "./mvx-dev"
+        echo "dev" > .mvx/version
+        success "Copied binary and configured for development"
         cd "$MVX_ROOT"
         ;;
         
@@ -124,10 +125,10 @@ if [ -f "./mvx" ]; then
     else
         warning "Deployment completed but test failed"
     fi
-elif [ -f "./mvx-local" ]; then
+elif [ -f "./mvx-dev" ]; then
     # Test direct binary
-    if ./mvx-local version >/dev/null 2>&1; then
-        success "Deployment successful! Test with: cd $TARGET_DIR && ./mvx-local version"
+    if ./mvx-dev version >/dev/null 2>&1; then
+        success "Deployment successful! Test with: cd $TARGET_DIR && ./mvx-dev version"
     else
         warning "Deployment completed but test failed"
     fi
@@ -145,7 +146,7 @@ if [ -f "$TARGET_DIR/mvx" ]; then
     echo "  ./mvx setup    # Set up development environment"
     echo "  ./mvx build    # Build the project"
 else
-    echo "  ./mvx-local init     # Initialize project configuration"
-    echo "  ./mvx-local setup    # Set up development environment"
-    echo "  ./mvx-local build    # Build the project"
+    echo "  ./mvx-dev init     # Initialize project configuration"
+    echo "  ./mvx-dev setup    # Set up development environment"
+    echo "  ./mvx-dev build    # Build the project"
 fi

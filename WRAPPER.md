@@ -31,42 +31,33 @@ The wrapper is designed to work seamlessly with locally compiled binaries for de
 ### **Quick Start for Developers**
 
 ```bash
-# Build a local binary
-make build-local    # Creates ./mvx-local
-# OR
-make build         # Creates ./mvx-binary
-# OR
+# Build a development binary
 make dev          # Creates ./mvx-dev (with race detection)
 
-# Use the wrapper - it automatically finds your local binary
+# Use the wrapper - it automatically finds your development binary
 ./mvx version
 ./mvx setup
 ./mvx build
 ```
 
-### **Local Binary Detection Order**
+### **Local Binary Detection**
 
-The wrapper checks for local binaries in this priority order:
-
-1. **`./mvx-local`** - Preferred for wrapper testing
-2. **`./mvx-binary`** - Default build output
-3. **`./mvx-dev`** - Development build with race detection
-4. **`./mvx`** - Generic binary (if not the wrapper script itself)
+The wrapper automatically detects and uses `./mvx-dev` for development.
 
 ### **Development Workflow**
 
 ```bash
 # 1. Build your changes
-make build-local
+make dev
 
 # 2. Test with wrapper immediately
-./mvx version        # Uses your local binary
+./mvx version        # Uses your development binary
 ./mvx setup          # Tests your changes
 ./mvx build          # Runs your development version
 
 # 3. Make changes and rebuild
 # Edit code...
-make build-local     # Rebuild
+make dev             # Rebuild
 ./mvx test           # Test again
 
 # 4. No need to install or update anything!

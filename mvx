@@ -187,23 +187,15 @@ main() {
     echo "Requested version: $MVX_VERSION"
 
     # Check for local binaries first, regardless of version
-    # This allows development versions like "dev", "local", etc. to work
-    local local_binaries="./mvx-local ./mvx-binary ./mvx-dev"
+    # This allows development version "dev" to work
+    local local_binaries="./mvx-dev"
     if [ "$platform" = "windows-amd64" ]; then
-        local_binaries="./mvx.exe ./mvx-binary.exe ./mvx-dev.exe ./mvx-local.exe $local_binaries"
-    else
-        # On Unix, also check for ./mvx if it's not this wrapper script
-        if [ -f "./mvx" ] && [ "./mvx" -ef "$0" ]; then
-            # This is the wrapper script itself, skip it
-            :
-        elif [ -f "./mvx" ]; then
-            local_binaries="./mvx $local_binaries"
-        fi
+        local_binaries="./mvx-dev.exe"
     fi
 
     for local_binary in $local_binaries; do
         if [ -f "$local_binary" ] && [ -x "$local_binary" ]; then
-            echo "Using local mvx binary: $local_binary"
+            echo "Using local development binary: $local_binary"
             echo ""
             exec "$local_binary" "$@"
         fi
