@@ -19,13 +19,8 @@ DEFAULT_DOWNLOAD_URL="https://github.com/gnodet/mvx/releases"
 # Determine the mvx version to use
 MVX_VERSION="${MVX_VERSION:-}"
 if [ -z "$MVX_VERSION" ]; then
-    if [ -f ".mvx/config/mvx.properties" ]; then
-        MVX_VERSION=$(grep "^mvxVersion=" ".mvx/config/mvx.properties" 2>/dev/null | cut -d'=' -f2 | tr -d ' \t\r\n' || echo "")
-    fi
-    if [ -z "$MVX_VERSION" ]; then
-        if [ -f ".mvx/version" ]; then
-            MVX_VERSION=$(cat ".mvx/version" | tr -d ' \t\r\n')
-        fi
+    if [ -f ".mvx/mvx.properties" ]; then
+        MVX_VERSION=$(grep "^mvxVersion=" ".mvx/mvx.properties" 2>/dev/null | cut -d'=' -f2 | tr -d ' \t\r\n' || echo "")
     fi
     if [ -z "$MVX_VERSION" ]; then
         MVX_VERSION="$DEFAULT_MVX_VERSION"
@@ -109,7 +104,7 @@ get_latest_version() {
     fi
 
     if [ -z "$version" ]; then
-        echo "Error: No releases found. Please specify a version in .mvx/wrapper/mvx-wrapper.properties or .mvx/version" >&2
+        echo "Error: No releases found. Please specify a version in .mvx/mvx.properties" >&2
         return 1
     fi
 
@@ -131,6 +126,150 @@ resolve_version() {
     fi
 
     echo "$version"
+}
+
+# Check if we should perform a daily update check
+should_check_for_updates() {
+    local home_dir="$1"
+    local mvx_dir="$home_dir/.mvx"
+    local last_check_file="$mvx_dir/last_check"
+
+    # If no last check file exists, we should check
+    if [ ! -f "$last_check_file" ]; then
+        return 0
+    fi
+
+    # Get last check timestamp
+    local last_check=$(cat "$last_check_file" 2>/dev/null || echo "0")
+    local current_time=$(date +%s)
+    local one_day=86400  # 24 hours in seconds
+
+    # Check if more than 24 hours have passed
+    if [ $((current_time - last_check)) -gt $one_day ]; then
+        return 0
+    fi
+
+    return 1
+}
+
+# Perform daily update check (non-blocking)
+check_for_updates() {
+    local home_dir="$1"
+    local current_version="$2"
+    local mvx_dir="$home_dir/.mvx"
+    local last_check_file="$mvx_dir/last_check"
+    local latest_version_file="$mvx_dir/latest_version"
+
+    ensure_dir "$mvx_dir"
+
+    # Update last check timestamp
+    date +%s > "$last_check_file"
+
+    # Get latest version (silently)
+    local latest_version=$(get_latest_version 2>/dev/null || echo "")
+
+    if [ -n "$latest_version" ]; then
+        echo "$latest_version" > "$latest_version_file"
+
+        # Compare versions and show notification if update available
+        if [ "$current_version" != "$latest_version" ] && [ "$current_version" != "latest" ]; then
+            echo "💡 mvx update available: $current_version → $latest_version"
+            echo "   Run './mvx update-bootstrap' to update"
+            echo ""
+        fi
+    fi
+}
+
+# Handle update-bootstrap command
+handle_update_bootstrap() {
+    local home_dir="$1"
+    local platform="$2"
+    local check_only="$3"
+
+    echo "🔍 Checking for mvx bootstrap updates..."
+
+    # Get latest version
+    local latest_version=$(get_latest_version)
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to get latest version" >&2
+        return 1
+    fi
+
+    # Get current version from properties file
+    local current_version=""
+    if [ -f ".mvx/mvx.properties" ]; then
+        current_version=$(grep "^mvxVersion=" ".mvx/mvx.properties" 2>/dev/null | cut -d'=' -f2 | tr -d ' \t\r\n' || echo "")
+    fi
+
+    if [ -z "$current_version" ]; then
+        echo "No current version found, will update to latest"
+    elif [ "$current_version" = "$latest_version" ]; then
+        echo "✅ Bootstrap scripts are already up to date (version $current_version)"
+        return 0
+    else
+        echo "📦 Update available: $current_version → $latest_version"
+    fi
+
+    if [ "$check_only" = "true" ]; then
+        if [ "$current_version" != "$latest_version" ]; then
+            echo "🆕 New version available: $latest_version"
+            echo "Run './mvx update-bootstrap' to update"
+        fi
+        return 0
+    fi
+
+    echo "⬇️  Downloading bootstrap scripts..."
+
+    local base_url="https://raw.githubusercontent.com/gnodet/mvx/v$latest_version"
+
+    # Download mvx script
+    echo "Downloading mvx script..."
+    if download_file "$base_url/mvx" "mvx.new"; then
+        mv "mvx.new" "mvx"
+        chmod +x "mvx"
+    else
+        echo "Error: Failed to download mvx script" >&2
+        return 1
+    fi
+
+    # Download mvx.cmd script
+    echo "Downloading mvx.cmd script..."
+    if download_file "$base_url/mvx.cmd" "mvx.cmd.new"; then
+        mv "mvx.cmd.new" "mvx.cmd"
+    else
+        echo "Error: Failed to download mvx.cmd script" >&2
+        return 1
+    fi
+
+    # Create .mvx directory if it doesn't exist
+    ensure_dir ".mvx"
+
+    # Update mvx.properties with new version
+    if [ -f ".mvx/mvx.properties" ]; then
+        # Update existing properties file
+        sed -i.bak "s/^mvxVersion=.*/mvxVersion=$latest_version/" ".mvx/mvx.properties" && rm -f ".mvx/mvx.properties.bak"
+    else
+        # Create new properties file
+        echo "Downloading mvx.properties..."
+        if download_file "$base_url/.mvx/mvx.properties" ".mvx/mvx.properties"; then
+            # Update the downloaded file with the specific version
+            sed -i.bak "s/^mvxVersion=.*/mvxVersion=$latest_version/" ".mvx/mvx.properties" && rm -f ".mvx/mvx.properties.bak"
+        else
+            # Create a minimal properties file if download fails
+            cat > ".mvx/mvx.properties" << EOF
+# mvx Configuration
+mvxVersion=$latest_version
+EOF
+        fi
+    fi
+
+    echo "✅ Bootstrap scripts updated successfully to version $latest_version"
+    echo "📝 Files updated:"
+    echo "  - mvx (Unix/Linux/macOS script)"
+    echo "  - mvx.cmd (Windows script)"
+    echo "  - .mvx/mvx.properties (version specification)"
+
+    return 0
 }
 
 # Find or download mvx binary (local binaries are checked in main() now)
@@ -182,6 +321,16 @@ main() {
     platform=$(detect_platform)
     home_dir=$(get_home_dir)
 
+    # Handle update-bootstrap command specially
+    if [ "$1" = "update-bootstrap" ]; then
+        local check_only="false"
+        if [ "$2" = "--check" ]; then
+            check_only="true"
+        fi
+        handle_update_bootstrap "$home_dir" "$platform" "$check_only"
+        exit $?
+    fi
+
     echo "mvx"
     echo "Platform: $platform"
     echo "Requested version: $MVX_VERSION"
@@ -205,6 +354,11 @@ main() {
     resolved_version=$(resolve_version "$MVX_VERSION")
     if [ $? -ne 0 ]; then
         exit 1
+    fi
+
+    # Perform daily update check (non-blocking, only if not running update-bootstrap)
+    if should_check_for_updates "$home_dir"; then
+        check_for_updates "$home_dir" "$resolved_version" &
     fi
 
     mvx_binary=$(find_mvx_binary "$resolved_version" "$platform" "$home_dir")
