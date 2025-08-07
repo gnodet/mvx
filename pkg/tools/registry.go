@@ -97,8 +97,13 @@ func (r *ToolRegistry) getTemurinVersions() ([]string, error) {
 	}
 
 	var versions []string
+	supportedVersions := map[int]bool{8: true, 11: true, 17: true, 21: true, 22: true, 23: true}
+
 	for _, release := range releases.AvailableReleases {
-		versions = append(versions, fmt.Sprintf("%d", release))
+		// Only include versions we actually support for download
+		if supportedVersions[release] {
+			versions = append(versions, fmt.Sprintf("%d", release))
+		}
 	}
 
 	// Sort in descending order (newest first)

@@ -93,6 +93,8 @@ func (m *Manager) InstallTool(name string, toolConfig config.ToolConfig) error {
 		return fmt.Errorf("failed to resolve version for %s: %w", name, err)
 	}
 
+	fmt.Printf("  🔍 Resolved %s version %s to %s\n", name, toolConfig.Version, resolvedVersion)
+
 	// Update config with resolved version for installation
 	resolvedConfig := toolConfig
 	resolvedConfig.Version = resolvedVersion

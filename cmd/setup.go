@@ -61,7 +61,7 @@ func setupEnvironment() error {
 	printInfo("🔍 Loading configuration...")
 	cfg, err := config.LoadConfig(projectRoot)
 	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
+		return fmt.Errorf("failed to load configuration: %w\n\nHint: Run 'mvx init' to create a configuration file first", err)
 	}
 
 	printVerbose("Loaded configuration for project: %s", cfg.Project.Name)
