@@ -75,8 +75,14 @@ func (j *JavaTool) IsInstalled(version string, cfg config.ToolConfig) bool {
 	}
 
 	// Try to get the actual Java path (which handles nested directories)
-	_, err := j.GetPath(version, cfg)
-	return err == nil
+	javaPath, err := j.GetPath(version, cfg)
+	if err != nil {
+		logVerbose("Java %s (%s) not installed: %v", version, distribution, err)
+		return false
+	}
+
+	logVerbose("Java %s (%s) found at: %s", version, distribution, javaPath)
+	return true
 }
 
 // GetPath returns the installation path for the specified version
@@ -87,12 +93,16 @@ func (j *JavaTool) GetPath(version string, cfg config.ToolConfig) (string, error
 	}
 
 	installDir := j.manager.GetToolVersionDir("java", version, distribution)
+	logVerbose("Checking Java installation in: %s", installDir)
 
 	// Check if there's a nested directory (common with JDK archives)
 	entries, err := os.ReadDir(installDir)
 	if err != nil {
+		logVerbose("Failed to read installation directory %s: %v", installDir, err)
 		return "", fmt.Errorf("failed to read installation directory: %w", err)
 	}
+
+	logVerbose("Found %d entries in installation directory", len(entries))
 
 	// Look for a subdirectory that looks like a JDK
 	for _, entry := range entries {
@@ -102,13 +112,27 @@ func (j *JavaTool) GetPath(version string, cfg config.ToolConfig) (string, error
 			if runtime.GOOS == "windows" {
 				javaExe += ".exe"
 			}
+			logVerbose("Checking for Java executable at: %s", javaExe)
 			if _, err := os.Stat(javaExe); err == nil {
+				logVerbose("Found Java executable in subdirectory: %s", subPath)
 				return subPath, nil
 			}
 		}
 	}
 
-	return installDir, nil
+	// Also check if java is directly in the install directory (some distributions)
+	javaExe := filepath.Join(installDir, "bin", "java")
+	if runtime.GOOS == "windows" {
+		javaExe += ".exe"
+	}
+	logVerbose("Checking for Java executable directly at: %s", javaExe)
+	if _, err := os.Stat(javaExe); err == nil {
+		logVerbose("Found Java executable directly in install directory: %s", installDir)
+		return installDir, nil
+	}
+
+	logVerbose("Java executable not found anywhere in %s", installDir)
+	return "", fmt.Errorf("Java executable not found in %s", installDir)
 }
 
 // GetBinPath returns the binary path for the specified version
