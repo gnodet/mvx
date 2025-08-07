@@ -272,6 +272,9 @@ func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, rel
 			DirectDownloadURI string `json:"direct_download_uri"`
 			Filename          string `json:"filename"`
 			VersionNumber     string `json:"version_number"`
+			Links             struct {
+				PkgDownloadRedirect string `json:"pkg_download_redirect"`
+			} `json:"links"`
 		} `json:"result"`
 	}
 
@@ -290,20 +293,52 @@ func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, rel
 
 	logVerbose("Found %d packages in response", len(packages.Result))
 	for i, pkg := range packages.Result {
+		downloadURI := pkg.DirectDownloadURI
+		if downloadURI == "" {
+			downloadURI = pkg.Links.PkgDownloadRedirect
+		}
 		logVerbose("Package %d: filename=%s, version=%s, download_uri=%s",
-			i+1, pkg.Filename, pkg.VersionNumber, pkg.DirectDownloadURI)
+			i+1, pkg.Filename, pkg.VersionNumber, downloadURI)
 	}
 
 	if len(packages.Result) == 0 {
 		return "", fmt.Errorf("no packages found for Java %s (%s)", version, distribution)
 	}
 
-	// Return the first (and typically only) result
-	downloadURL := packages.Result[0].DirectDownloadURI
-	if downloadURL == "" {
-		return "", fmt.Errorf("empty download URL returned for Java %s (%s)", version, distribution)
+	// Prefer tar.gz files over other formats (pkg, dmg, zip)
+	var selectedPkg *struct {
+		DirectDownloadURI string `json:"direct_download_uri"`
+		Filename          string `json:"filename"`
+		VersionNumber     string `json:"version_number"`
+		Links             struct {
+			PkgDownloadRedirect string `json:"pkg_download_redirect"`
+		} `json:"links"`
 	}
 
+	// First, look for tar.gz files
+	for _, pkg := range packages.Result {
+		if strings.HasSuffix(pkg.Filename, ".tar.gz") {
+			selectedPkg = &pkg
+			break
+		}
+	}
+
+	// If no tar.gz found, use the first available package
+	if selectedPkg == nil {
+		selectedPkg = &packages.Result[0]
+	}
+
+	logVerbose("Selected package: %s", selectedPkg.Filename)
+	downloadURL := selectedPkg.DirectDownloadURI
+	if downloadURL == "" {
+		downloadURL = selectedPkg.Links.PkgDownloadRedirect
+	}
+
+	if downloadURL == "" {
+		return "", fmt.Errorf("no download URL found for Java %s (%s)", version, distribution)
+	}
+
+	logVerbose("Selected download URL: %s", downloadURL)
 	return downloadURL, nil
 }
 
