@@ -140,9 +140,18 @@ find_mvx_binary() {
     local home_dir="$3"
     
     # Check for local binary first (in project directory)
-    local local_binaries="./mvx-local ./mvx-binary"
+    # Priority order: mvx-local, mvx-binary, mvx-dev, mvx (if not wrapper script)
+    local local_binaries="./mvx-local ./mvx-binary ./mvx-dev"
     if [ "$platform" = "windows-amd64" ]; then
-        local_binaries="./mvx.exe ./mvx-binary.exe $local_binaries"
+        local_binaries="./mvx.exe ./mvx-binary.exe ./mvx-dev.exe ./mvx-local.exe $local_binaries"
+    else
+        # On Unix, also check for ./mvx if it's not this wrapper script
+        if [ -f "./mvx" ] && [ "./mvx" -ef "$0" ]; then
+            # This is the wrapper script itself, skip it
+            :
+        elif [ -f "./mvx" ]; then
+            local_binaries="./mvx $local_binaries"
+        fi
     fi
 
     for local_binary in $local_binaries; do

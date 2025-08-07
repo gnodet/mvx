@@ -38,7 +38,7 @@ test:
 # Clean build artifacts
 .PHONY: clean
 clean:
-	rm -f mvx-binary
+	rm -f mvx-binary mvx-local mvx-dev
 	rm -rf dist/
 	rm -rf .mvx/local/ .mvx/tools/ .mvx/versions/
 
@@ -61,7 +61,12 @@ lint:
 # Development build with race detection (dynamic linking for race detector)
 .PHONY: dev
 dev:
-	go build -race $(LDFLAGS) -o mvx-binary .
+	go build -race $(LDFLAGS) -o mvx-dev .
+
+# Build for wrapper testing (creates mvx-local)
+.PHONY: build-local
+build-local:
+	$(STATIC_FLAGS) go build $(LDFLAGS) -o mvx-local .
 
 # Install locally
 .PHONY: install
@@ -110,6 +115,7 @@ test-wrapper: build
 help:
 	@echo "Available targets:"
 	@echo "  build          - Build the binary (static)"
+	@echo "  build-local    - Build for wrapper testing (creates mvx-local)"
 	@echo "  build-all      - Build for multiple platforms (static)"
 	@echo "  release-build  - Build all platforms and generate checksums"
 	@echo "  checksums      - Generate checksums for dist/ binaries"
@@ -120,6 +126,6 @@ help:
 	@echo "  deps           - Install dependencies"
 	@echo "  fmt            - Format code"
 	@echo "  lint           - Run linter"
-	@echo "  dev            - Development build with race detection"
+	@echo "  dev            - Development build with race detection (creates mvx-dev)"
 	@echo "  install        - Install locally"
 	@echo "  help           - Show this help"

@@ -19,10 +19,58 @@ mvx.cmd test
 ```
 
 The wrapper will automatically:
-1. Check for a local `mvx` binary in the project directory
+1. Check for local development binaries in the project directory
 2. Check for a cached version in `~/.mvx/versions/`
 3. Download the appropriate binary from GitHub releases if needed
 4. Execute the binary with all provided arguments
+
+## 🛠️ Using with Local Development Binary
+
+The wrapper is designed to work seamlessly with locally compiled binaries for development:
+
+### **Quick Start for Developers**
+
+```bash
+# Build a local binary
+make build-local    # Creates ./mvx-local
+# OR
+make build         # Creates ./mvx-binary
+# OR
+make dev          # Creates ./mvx-dev (with race detection)
+
+# Use the wrapper - it automatically finds your local binary
+./mvx version
+./mvx setup
+./mvx build
+```
+
+### **Local Binary Detection Order**
+
+The wrapper checks for local binaries in this priority order:
+
+1. **`./mvx-local`** - Preferred for wrapper testing
+2. **`./mvx-binary`** - Default build output
+3. **`./mvx-dev`** - Development build with race detection
+4. **`./mvx`** - Generic binary (if not the wrapper script itself)
+
+### **Development Workflow**
+
+```bash
+# 1. Build your changes
+make build-local
+
+# 2. Test with wrapper immediately
+./mvx version        # Uses your local binary
+./mvx setup          # Tests your changes
+./mvx build          # Runs your development version
+
+# 3. Make changes and rebuild
+# Edit code...
+make build-local     # Rebuild
+./mvx test           # Test again
+
+# 4. No need to install or update anything!
+```
 
 ## 📁 Files
 

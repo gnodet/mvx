@@ -49,13 +49,15 @@ echo mvx Wrapper
 echo Platform: windows-amd64
 echo Requested version: %MVX_VERSION_TO_USE%
 
-rem Check for local binary first
-set LOCAL_BINARY=.\mvx.exe
-if exist "%LOCAL_BINARY%" (
-    echo Using local mvx binary: %LOCAL_BINARY%
-    echo.
-    "%LOCAL_BINARY%" %*
-    goto :eof
+rem Check for local binary first (priority order)
+set LOCAL_BINARIES=.\mvx-local.exe .\mvx-binary.exe .\mvx-dev.exe .\mvx.exe
+for %%i in (%LOCAL_BINARIES%) do (
+    if exist "%%i" (
+        echo Using local mvx binary: %%i
+        echo.
+        "%%i" %*
+        goto :eof
+    )
 )
 
 rem Resolve version (handle "latest")
