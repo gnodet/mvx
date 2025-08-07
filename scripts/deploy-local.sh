@@ -46,12 +46,12 @@ if [ $# -lt 1 ]; then
     echo "Methods:"
     echo "  copy     - Copy binary to target directory (default)"
     echo "  symlink  - Create symlink to binary in target directory"
-    echo "  wrapper  - Install wrapper and copy binary"
+    echo "  bootstrap  - Install bootstrap and copy binary"
     echo ""
     echo "Examples:"
     echo "  $0 ~/projects/my-java-app"
     echo "  $0 ~/projects/my-java-app symlink"
-    echo "  $0 ~/projects/my-java-app wrapper"
+    echo "  $0 ~/projects/my-java-app bootstrap"
     exit 1
 fi
 
@@ -90,8 +90,8 @@ case "$METHOD" in
         success "Created symlink $TARGET_DIR/mvx-dev -> $MVX_ROOT/mvx-dev"
         ;;
 
-    "wrapper")
-        info "Installing wrapper in target directory..."
+    "bootstrap")
+        info "Installing bootstrap in target directory..."
         cd "$TARGET_DIR"
 
         # Install mvx if not present
@@ -110,7 +110,7 @@ case "$METHOD" in
         ;;
         
     *)
-        error "Unknown method: $METHOD (use: copy, symlink, or wrapper)"
+        error "Unknown method: $METHOD (use: copy, symlink, or bootstrap)"
         ;;
 esac
 
@@ -119,7 +119,7 @@ info "Testing deployment..."
 cd "$TARGET_DIR"
 
 if [ -f "./mvx" ]; then
-    # Test with wrapper
+    # Test with bootstrap
     if ./mvx version >/dev/null 2>&1; then
         success "Deployment successful! Test with: cd $TARGET_DIR && ./mvx version"
     else

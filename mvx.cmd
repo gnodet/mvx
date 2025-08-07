@@ -1,8 +1,8 @@
 @echo off
 rem ##############################################################################
-rem mvx Wrapper Script for Windows
+rem mvx Bootstrap Script for Windows
 rem
-rem This script acts as a wrapper for mvx, automatically downloading and 
+rem This script acts as a bootstrap for mvx, automatically downloading and
 rem caching the appropriate binary version for Windows.
 rem
 rem Similar to Maven Wrapper (mvnw.cmd), this allows projects to use mvx without

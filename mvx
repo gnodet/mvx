@@ -1,9 +1,9 @@
 #!/bin/bash
 
 ##############################################################################
-# mvx Wrapper Script
+# mvx Bootstrap Script
 #
-# This script acts as a wrapper for mvx, automatically downloading and 
+# This script acts as a bootstrap for mvx, automatically downloading and
 # caching the appropriate binary version for your platform.
 #
 # Similar to Maven Wrapper (mvnw), this allows projects to use mvx without

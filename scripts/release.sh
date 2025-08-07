@@ -170,5 +170,5 @@ echo "2. Check the Actions tab: https://github.com/gnodet/mvx/actions"
 echo "3. The release will be available at: https://github.com/gnodet/mvx/releases/tag/$VERSION"
 echo
 echo "To test the release once it's published:"
-echo "  curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-wrapper.sh | bash"
+echo "  curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-mvx.sh | bash"
 echo "  ./mvx version"

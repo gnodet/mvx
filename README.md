@@ -169,7 +169,7 @@ project/                          # Project directory
 ## 📋 Planned Features
 
 ### Tool Management
-- [x] Maven wrapper functionality (baseline)
+- [x] Maven bootstrap functionality (baseline)
 - [ ] Java version management (OpenJDK, GraalVM, etc.)
 - [ ] Node.js and npm/yarn support
 - [ ] Python and pip/poetry support
@@ -354,7 +354,7 @@ We're starting with the Maven ecosystem (building on Maven Wrapper's success) an
 ### Roadmap
 
 **Phase 1: Maven Foundation** (Q1 2025)
-- [ ] Enhanced Maven wrapper with tool management
+- [ ] Enhanced Maven bootstrap with tool management
 - [ ] Basic Java version detection and management
 - [ ] Simple command configuration system
 

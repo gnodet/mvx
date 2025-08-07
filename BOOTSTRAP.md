@@ -1,10 +1,10 @@
-# mvx Wrapper
+# mvx Bootstrap
 
-The mvx wrapper provides a way to use mvx in any project without requiring users to install mvx separately. This is similar to how Maven Wrapper (`mvnw`) works for Maven projects.
+The mvx bootstrap provides a way to use mvx in any project without requiring users to install mvx separately. This is similar to how Maven Wrapper (`mvnw`) works for Maven projects.
 
 ## 🚀 Quick Start
 
-Once you have the wrapper files in your project, users can simply run:
+Once you have the bootstrap files in your project, users can simply run:
 
 ```bash
 # Unix/Linux/macOS
@@ -18,7 +18,7 @@ mvx.cmd build
 mvx.cmd test
 ```
 
-The wrapper will automatically:
+The bootstrap will automatically:
 1. Check for local development binaries in the project directory
 2. Check for a cached version in `~/.mvx/versions/`
 3. Download the appropriate binary from GitHub releases if needed
@@ -26,7 +26,7 @@ The wrapper will automatically:
 
 ## 🛠️ Using with Local Development Binary
 
-The wrapper is designed to work seamlessly with locally compiled binaries for development:
+The bootstrap is designed to work seamlessly with locally compiled binaries for development:
 
 ### **Quick Start for Developers**
 
@@ -42,7 +42,7 @@ make dev          # Creates ./mvx-dev (with race detection)
 
 ### **Local Binary Detection**
 
-The wrapper automatically detects and uses `./mvx-dev` for development.
+The bootstrap automatically detects and uses `./mvx-dev` for development.
 
 ### **Development Workflow**
 
@@ -65,11 +65,11 @@ make dev             # Rebuild
 
 ## 📁 Files
 
-The wrapper consists of these files:
+The bootstrap consists of these files:
 
 - **`mvx`** - Unix/Linux/macOS shell script
 - **`mvx.cmd`** - Windows batch script  
-- **`.mvx/wrapper/mvx-wrapper.properties`** - Configuration file
+- **`.mvx/mvx.properties`** - Configuration file
 - **`.mvx/version`** - Simple version file (alternative to properties)
 
 ## ⚙️ Configuration
@@ -79,13 +79,13 @@ The wrapper consists of these files:
 You can specify which version of mvx to use in several ways (in order of precedence):
 
 1. **Environment variable**: `MVX_VERSION=1.0.0`
-2. **Properties file**: Set `mvxVersion=1.0.0` in `.mvx/wrapper/mvx-wrapper.properties`
+2. **Properties file**: Set `mvxVersion=1.0.0` in `.mvx/mvx.properties`
 3. **Version file**: Put the version in `.mvx/version`
 4. **Default**: Uses `latest` if nothing is specified
 
 ### Properties File
 
-The `.mvx/wrapper/mvx-wrapper.properties` file supports:
+The `.mvx/mvx.properties` file supports:
 
 ```properties
 # The version of mvx to download and use
@@ -113,7 +113,7 @@ latest
 
 ### Platform Detection
 
-The wrapper automatically detects your platform and downloads the appropriate binary:
+The bootstrap automatically detects your platform and downloads the appropriate binary:
 
 - **Linux x64**: `mvx-linux-amd64`
 - **macOS x64**: `mvx-darwin-amd64`  
@@ -142,14 +142,14 @@ By default, binaries are downloaded from GitHub releases:
 
 You can override this with the `MVX_DOWNLOAD_URL` environment variable or `mvxDownloadUrl` property.
 
-## 🛠️ Setting Up the Wrapper
+## 🛠️ Setting Up the Bootstrap
 
-To add the mvx wrapper to your project:
+To add the mvx bootstrap to your project:
 
-1. **Copy the wrapper files** to your project root:
+1. **Copy the bootstrap files** to your project root:
    - `mvx` (Unix script)
    - `mvx.cmd` (Windows script)
-   - `.mvx/wrapper/mvx-wrapper.properties`
+   - `.mvx/mvx.properties`
    - `.mvx/version` (optional)
 
 2. **Make the Unix script executable**:
@@ -206,7 +206,7 @@ chmod +x mvx
 
 To see what version is being resolved:
 ```bash
-# The wrapper will show version information before executing
+# The bootstrap will show version information before executing
 ./mvx version
 ```
 
@@ -222,9 +222,9 @@ To see what version is being resolved:
 
 If you're migrating from a globally installed mvx:
 
-1. Add the wrapper files to your project
+1. Add the bootstrap files to your project
 2. Update build scripts and documentation to use `./mvx`
 3. Team members can uninstall global mvx if desired
 4. CI/CD systems no longer need to install mvx
 
-The wrapper provides the same functionality as a global installation but with better version control and consistency.
+The bootstrap provides the same functionality as a global installation but with better version control and consistency.
