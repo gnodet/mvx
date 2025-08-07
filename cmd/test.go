@@ -12,22 +12,24 @@ import (
 
 // testCmd represents the test command
 var testCmd = &cobra.Command{
-	Use:   "test",
+	Use:   "test [args...]",
 	Short: "Run tests",
 	Long: `Run tests using the configured test command.
 
 This command will:
   - Load the project configuration
-  - Set up the environment  
+  - Set up the environment
   - Execute the test script defined in the configuration
+  - Pass any additional arguments to the test script
 
 Examples:
   mvx test                    # Run all tests
   mvx test --unit             # Run only unit tests
-  mvx test --integration      # Run only integration tests`,
+  mvx test --integration      # Run only integration tests
+  mvx test -Dtest=MyTest      # Pass Maven test arguments through`,
 
 	Run: func(cmd *cobra.Command, args []string) {
-		if err := runTests(); err != nil {
+		if err := runTests(args); err != nil {
 			printError("%v", err)
 			os.Exit(1)
 		}
@@ -44,7 +46,7 @@ func init() {
 	testCmd.Flags().BoolVar(&integrationTests, "integration", false, "run only integration tests")
 }
 
-func runTests() error {
+func runTests(args []string) error {
 	projectRoot, err := findProjectRoot()
 	if err != nil {
 		return fmt.Errorf("failed to find project root: %w", err)
@@ -88,5 +90,5 @@ func runTests() error {
 		return err
 	}
 
-	return exec.ExecuteCommand(commandName, []string{})
+	return exec.ExecuteCommand(commandName, args)
 }

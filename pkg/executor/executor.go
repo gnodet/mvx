@@ -151,8 +151,13 @@ func (e *Executor) setupEnvironment(cmdConfig config.CommandConfig) ([]string, e
 
 // processScript processes the script string, handling multiline scripts and arguments
 func (e *Executor) processScript(script string, args []string) string {
-	// For now, just return the script as-is
-	// TODO: Add argument substitution, variable expansion, etc.
+	// If there are arguments, append them to the script
+	if len(args) > 0 {
+		// Join arguments with spaces and append to script
+		argsStr := strings.Join(args, " ")
+		script = script + " " + argsStr
+	}
+
 	return script
 }
 

@@ -12,7 +12,7 @@ import (
 
 // buildCmd represents the build command
 var buildCmd = &cobra.Command{
-	Use:   "build",
+	Use:   "build [args...]",
 	Short: "Build the project",
 	Long: `Build the project using the configured build command.
 
@@ -20,13 +20,16 @@ This command will:
   - Load the project configuration
   - Set up the environment
   - Execute the build script defined in the configuration
+  - Pass any additional arguments to the build script
 
 Examples:
   mvx build                   # Run the default build command
-  mvx build --clean           # Clean before building`,
+  mvx build --clean           # Clean before building
+  mvx build foo bar           # Pass 'foo bar' as arguments to the build script
+  mvx build -DskipTests       # Pass Maven arguments through`,
 
 	Run: func(cmd *cobra.Command, args []string) {
-		if err := buildProject(); err != nil {
+		if err := buildProject(args); err != nil {
 			printError("%v", err)
 			os.Exit(1)
 		}
@@ -41,7 +44,7 @@ func init() {
 	buildCmd.Flags().BoolVar(&cleanBuild, "clean", false, "clean before building")
 }
 
-func buildProject() error {
+func buildProject(args []string) error {
 	projectRoot, err := findProjectRoot()
 	if err != nil {
 		return fmt.Errorf("failed to find project root: %w", err)
@@ -81,5 +84,5 @@ func buildProject() error {
 		return err
 	}
 
-	return exec.ExecuteCommand("build", []string{})
+	return exec.ExecuteCommand("build", args)
 }
