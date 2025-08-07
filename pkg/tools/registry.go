@@ -31,78 +31,124 @@ type JavaDistribution struct {
 	APIBase     string
 }
 
-// GetJavaDistributions returns available Java distributions
+// DiscoDistribution represents a Java distribution from Disco API
+type DiscoDistribution struct {
+	APIParameter string `json:"api_parameter"`
+	Name         string `json:"name"`
+	Maintained   bool   `json:"maintained"`
+	Available    bool   `json:"available"`
+}
+
+// GetJavaDistributions returns available Java distributions from Disco API
 func (r *ToolRegistry) GetJavaDistributions() []JavaDistribution {
+	// Try to get distributions from Disco API
+	if distributions, err := r.getDiscoDistributions(); err == nil {
+		return distributions
+	}
+
+	// Fallback to known distributions
 	return []JavaDistribution{
 		{
 			Name:        "temurin",
 			DisplayName: "Eclipse Temurin (OpenJDK)",
-			APIBase:     "https://api.adoptium.net/v3",
+			APIBase:     "https://api.foojay.io/disco/v3.0",
 		},
 		{
-			Name:        "graalvm",
-			DisplayName: "GraalVM",
-			APIBase:     "https://api.github.com/repos/graalvm/graalvm-ce-builds",
+			Name:        "graalvm_ce",
+			DisplayName: "GraalVM Community Edition",
+			APIBase:     "https://api.foojay.io/disco/v3.0",
 		},
 		{
 			Name:        "oracle",
 			DisplayName: "Oracle JDK",
-			APIBase:     "", // Oracle doesn't have a public API
+			APIBase:     "https://api.foojay.io/disco/v3.0",
 		},
 		{
 			Name:        "corretto",
 			DisplayName: "Amazon Corretto",
-			APIBase:     "https://api.github.com/repos/corretto/corretto-8", // Different repos per version
+			APIBase:     "https://api.foojay.io/disco/v3.0",
 		},
 		{
 			Name:        "liberica",
 			DisplayName: "BellSoft Liberica",
-			APIBase:     "", // Would need custom implementation
+			APIBase:     "https://api.foojay.io/disco/v3.0",
+		},
+		{
+			Name:        "zulu",
+			DisplayName: "Azul Zulu",
+			APIBase:     "https://api.foojay.io/disco/v3.0",
+		},
+		{
+			Name:        "microsoft",
+			DisplayName: "Microsoft Build of OpenJDK",
+			APIBase:     "https://api.foojay.io/disco/v3.0",
 		},
 	}
 }
 
-// GetJavaVersions returns available Java versions for a distribution
+// GetJavaVersions returns available Java versions for a distribution using Disco API
 func (r *ToolRegistry) GetJavaVersions(distribution string) ([]string, error) {
-	switch distribution {
-	case "temurin", "":
-		return r.getTemurinVersions()
-	case "graalvm":
-		return r.getGraalVMVersions()
-	case "oracle":
-		return r.getOracleVersions()
-	case "corretto":
-		return r.getCorrettoVersions()
-	default:
-		return nil, fmt.Errorf("unsupported Java distribution: %s", distribution)
-	}
+	return r.getDiscoVersions(distribution)
 }
 
-// getTemurinVersions fetches available Temurin versions from Adoptium API
-func (r *ToolRegistry) getTemurinVersions() ([]string, error) {
-	// Get available feature versions (major versions)
-	resp, err := r.httpClient.Get("https://api.adoptium.net/v3/info/available_releases")
+// getDiscoDistributions fetches available distributions from Disco API
+func (r *ToolRegistry) getDiscoDistributions() ([]JavaDistribution, error) {
+	resp, err := r.httpClient.Get("https://api.foojay.io/disco/v3.0/distributions")
 	if err != nil {
-		// Fallback to known versions if API is unavailable
-		return []string{"8", "11", "17", "21", "22", "23"}, nil
+		return nil, err
 	}
 	defer resp.Body.Close()
 
-	var releases struct {
-		AvailableReleases []int `json:"available_releases"`
+	var discoDistributions []DiscoDistribution
+	if err := json.NewDecoder(resp.Body).Decode(&discoDistributions); err != nil {
+		return nil, err
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
-		return []string{"8", "11", "17", "21", "22", "23"}, nil
+	var distributions []JavaDistribution
+	for _, dist := range discoDistributions {
+		if dist.Available && dist.Maintained {
+			distributions = append(distributions, JavaDistribution{
+				Name:        dist.APIParameter,
+				DisplayName: dist.Name,
+				APIBase:     "https://api.foojay.io/disco/v3.0",
+			})
+		}
+	}
+
+	return distributions, nil
+}
+
+// getDiscoVersions fetches available versions for a distribution from Disco API
+func (r *ToolRegistry) getDiscoVersions(distribution string) ([]string, error) {
+	if distribution == "" {
+		distribution = "temurin" // Default to Temurin
+	}
+
+	// Get major versions available for this distribution
+	url := fmt.Sprintf("https://api.foojay.io/disco/v3.0/major_versions?distribution=%s&maintained=true", distribution)
+	resp, err := r.httpClient.Get(url)
+	if err != nil {
+		// Fallback to known versions if API is unavailable
+		return []string{"8", "11", "17", "21", "22", "23", "24", "25"}, nil
+	}
+	defer resp.Body.Close()
+
+	var majorVersions []struct {
+		MajorVersion int  `json:"major_version"`
+		Maintained   bool `json:"maintained"`
+		EarlyAccess  bool `json:"early_access"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&majorVersions); err != nil {
+		return []string{"8", "11", "17", "21", "22", "23", "24", "25"}, nil
 	}
 
 	var versions []string
-	supportedVersions := map[int]bool{8: true, 11: true, 17: true, 21: true, 22: true, 23: true}
-
-	for _, release := range releases.AvailableReleases {
-		// Only include versions we actually support for download
-		if supportedVersions[release] {
-			versions = append(versions, fmt.Sprintf("%d", release))
+	for _, mv := range majorVersions {
+		if mv.EarlyAccess {
+			versions = append(versions, fmt.Sprintf("%d-ea", mv.MajorVersion))
+		} else {
+			versions = append(versions, fmt.Sprintf("%d", mv.MajorVersion))
 		}
 	}
 
@@ -114,25 +160,7 @@ func (r *ToolRegistry) getTemurinVersions() ([]string, error) {
 	return versions, nil
 }
 
-// getGraalVMVersions returns available GraalVM versions
-func (r *ToolRegistry) getGraalVMVersions() ([]string, error) {
-	// For now, return known GraalVM versions
-	// TODO: Implement GitHub API integration
-	return []string{"23.0.0", "22.3.0", "22.2.0", "22.1.0", "21.3.0"}, nil
-}
 
-// getOracleVersions returns available Oracle JDK versions
-func (r *ToolRegistry) getOracleVersions() ([]string, error) {
-	// Oracle doesn't provide a public API, return known versions
-	return []string{"8", "11", "17", "21", "22", "23"}, nil
-}
-
-// getCorrettoVersions returns available Amazon Corretto versions
-func (r *ToolRegistry) getCorrettoVersions() ([]string, error) {
-	// For now, return known Corretto versions
-	// TODO: Implement GitHub API integration for multiple Corretto repos
-	return []string{"8", "11", "17", "21", "22"}, nil
-}
 
 // GetMavenVersions returns available Maven versions
 func (r *ToolRegistry) GetMavenVersions() ([]string, error) {

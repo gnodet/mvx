@@ -3,6 +3,7 @@ package tools
 import (
 	"archive/tar"
 	"compress/gzip"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -135,32 +136,28 @@ func (j *JavaTool) Verify(version string, cfg config.ToolConfig) error {
 	return nil
 }
 
-// ListVersions returns available versions for installation
+// ListVersions returns available versions for installation using Disco API
 func (j *JavaTool) ListVersions() ([]string, error) {
-	// For now, return common LTS versions + latest
-	// TODO: Implement dynamic version discovery from Adoptium API
-	return []string{"8", "11", "17", "21", "22", "23"}, nil
+	// Use the registry to get versions from Disco API
+	registry := j.manager.GetRegistry()
+	return registry.GetJavaVersions("temurin") // Default to Temurin
 }
 
-// getDownloadURL returns the download URL for the specified version and distribution
+// getDownloadURL returns the download URL for the specified version and distribution using Disco API
 func (j *JavaTool) getDownloadURL(version, distribution string) (string, error) {
-	switch distribution {
-	case "temurin":
-		return j.getTemurinURL(version)
-	default:
-		return "", fmt.Errorf("unsupported Java distribution: %s", distribution)
-	}
+	return j.getDiscoURL(version, distribution)
 }
 
-// getTemurinURL returns the download URL for Eclipse Temurin
-func (j *JavaTool) getTemurinURL(version string) (string, error) {
-	// For now, let's use a simpler approach with known working URLs
-	// TODO: Use Adoptium API for dynamic URL discovery
+// getDiscoURL returns the download URL using Foojay Disco API
+func (j *JavaTool) getDiscoURL(version, distribution string) (string, error) {
+	if distribution == "" {
+		distribution = "temurin" // Default to Temurin
+	}
 
 	osName := runtime.GOOS
 	arch := runtime.GOARCH
 
-	// Map Go arch to JDK arch
+	// Map Go arch to Disco API arch
 	switch arch {
 	case "amd64":
 		arch = "x64"
@@ -168,34 +165,55 @@ func (j *JavaTool) getTemurinURL(version string) (string, error) {
 		arch = "aarch64"
 	}
 
-	// Map OS names
+	// Map OS names to Disco API format
 	switch osName {
 	case "darwin":
-		osName = "mac"
+		osName = "macos"
 	case "windows":
 		osName = "windows"
 	case "linux":
 		osName = "linux"
 	}
 
-	// Use Adoptium API endpoint for latest releases
-	// This is more reliable than hardcoded URLs
-	switch version {
-	case "23":
-		return fmt.Sprintf("https://api.adoptium.net/v3/binary/latest/23/ga/%s/%s/jdk/hotspot/normal/eclipse", osName, arch), nil
-	case "22":
-		return fmt.Sprintf("https://api.adoptium.net/v3/binary/latest/22/ga/%s/%s/jdk/hotspot/normal/eclipse", osName, arch), nil
-	case "21":
-		return fmt.Sprintf("https://api.adoptium.net/v3/binary/latest/21/ga/%s/%s/jdk/hotspot/normal/eclipse", osName, arch), nil
-	case "17":
-		return fmt.Sprintf("https://api.adoptium.net/v3/binary/latest/17/ga/%s/%s/jdk/hotspot/normal/eclipse", osName, arch), nil
-	case "11":
-		return fmt.Sprintf("https://api.adoptium.net/v3/binary/latest/11/ga/%s/%s/jdk/hotspot/normal/eclipse", osName, arch), nil
-	case "8":
-		return fmt.Sprintf("https://api.adoptium.net/v3/binary/latest/8/ga/%s/%s/jdk/hotspot/normal/eclipse", osName, arch), nil
-	default:
-		return "", fmt.Errorf("unsupported Java version: %s (supported: 8, 11, 17, 21, 22, 23)", version)
+	// Handle early access versions
+	releaseStatus := "ga" // General Availability
+	if strings.HasSuffix(version, "-ea") {
+		releaseStatus = "ea" // Early Access
+		version = strings.TrimSuffix(version, "-ea")
 	}
+
+	// Build Disco API URL for package search
+	url := fmt.Sprintf("https://api.foojay.io/disco/v3.0/packages?version=%s&distribution=%s&operating_system=%s&architecture=%s&package_type=jdk&release_status=%s&latest=available",
+		version, distribution, osName, arch, releaseStatus)
+
+	// Get package information
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", fmt.Errorf("failed to query Disco API: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("Disco API request failed with status: %s", resp.Status)
+	}
+
+	var packages struct {
+		Result []struct {
+			DirectDownloadURI string `json:"direct_download_uri"`
+			Filename          string `json:"filename"`
+		} `json:"result"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&packages); err != nil {
+		return "", fmt.Errorf("failed to parse Disco API response: %w", err)
+	}
+
+	if len(packages.Result) == 0 {
+		return "", fmt.Errorf("no packages found for Java %s (%s) on %s/%s", version, distribution, osName, arch)
+	}
+
+	// Return the first (and typically only) result
+	return packages.Result[0].DirectDownloadURI, nil
 }
 
 // downloadAndExtract downloads and extracts a tar.gz file

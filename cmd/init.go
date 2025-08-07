@@ -105,10 +105,12 @@ func getDefaultJSON5Config() string {
     // Java configuration - flexible version specifications
     java: {
       version: "21",           // Latest Java 21.x (21.0.1, 21.0.2, etc.)
-      distribution: "temurin", // temurin, graalvm, oracle, corretto
+      distribution: "temurin", // temurin, graalvm_ce, oracle, corretto, zulu, microsoft, liberica
       // version: "17",        // Latest Java 17.x
       // version: "11",        // Latest Java 11.x
-      // distribution: "graalvm", // Use GraalVM instead
+      // version: "25-ea",     // Early Access versions
+      // distribution: "graalvm_ce", // Use GraalVM Community Edition
+      // distribution: "zulu",       // Use Azul Zulu
     },
 
     // Maven configuration - flexible version specifications
@@ -157,10 +159,12 @@ tools:
   # Java configuration - flexible version specifications
   java:
     version: "21"           # Latest Java 21.x (21.0.1, 21.0.2, etc.)
-    distribution: temurin   # temurin, graalvm, oracle, corretto
+    distribution: temurin   # temurin, graalvm_ce, oracle, corretto, zulu, microsoft, liberica
     # version: "17"         # Latest Java 17.x
     # version: "11"         # Latest Java 11.x
-    # distribution: graalvm # Use GraalVM instead
+    # version: "25-ea"      # Early Access versions
+    # distribution: graalvm_ce # Use GraalVM Community Edition
+    # distribution: zulu       # Use Azul Zulu
 
   # Maven configuration - flexible version specifications
   maven:
