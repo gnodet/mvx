@@ -16,6 +16,18 @@ import (
 	"github.com/gnodet/mvx/pkg/config"
 )
 
+// isVerbose checks if verbose logging is enabled
+func isVerbose() bool {
+	return os.Getenv("MVX_VERBOSE") == "true"
+}
+
+// logVerbose prints verbose log messages
+func logVerbose(format string, args ...interface{}) {
+	if isVerbose() {
+		fmt.Printf("[VERBOSE] "+format+"\n", args...)
+	}
+}
+
 // JavaTool implements Tool interface for Java/JDK management
 type JavaTool struct {
 	manager *Manager
@@ -212,12 +224,20 @@ func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, rel
 	url := fmt.Sprintf("https://api.foojay.io/disco/v3.0/packages?version=%s&distribution=%s&operating_system=%s&architecture=%s&package_type=jdk&release_status=%s&latest=available",
 		version, distribution, osName, arch, releaseStatus)
 
+	// Add verbose logging for debugging
+	logVerbose("Disco API URL: %s", url)
+	logVerbose("Query parameters: version=%s, distribution=%s, os=%s, arch=%s, release_status=%s",
+		version, distribution, osName, arch, releaseStatus)
+
 	// Get package information
 	resp, err := http.Get(url)
 	if err != nil {
+		logVerbose("HTTP request failed: %v", err)
 		return "", fmt.Errorf("failed to query Disco API: %w", err)
 	}
 	defer resp.Body.Close()
+
+	logVerbose("HTTP response status: %s", resp.Status)
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("Disco API request failed with status: %s", resp.Status)
@@ -231,8 +251,23 @@ func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, rel
 		} `json:"result"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&packages); err != nil {
+	// Read response body for debugging
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	logVerbose("Raw API response: %s", string(body))
+
+	if err := json.Unmarshal(body, &packages); err != nil {
+		logVerbose("JSON parsing failed: %v", err)
 		return "", fmt.Errorf("failed to parse Disco API response: %w", err)
+	}
+
+	logVerbose("Found %d packages in response", len(packages.Result))
+	for i, pkg := range packages.Result {
+		logVerbose("Package %d: filename=%s, version=%s, download_uri=%s",
+			i+1, pkg.Filename, pkg.VersionNumber, pkg.DirectDownloadURI)
 	}
 
 	if len(packages.Result) == 0 {

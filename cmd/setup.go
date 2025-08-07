@@ -28,6 +28,11 @@ Examples:
   mvx setup --tools-only      # Only install tools, skip environment setup`,
 
 	Run: func(cmd *cobra.Command, args []string) {
+		// Set verbose environment variable for tools package
+		if verbose {
+			os.Setenv("MVX_VERBOSE", "true")
+		}
+
 		if err := setupEnvironment(); err != nil {
 			printError("%v", err)
 			os.Exit(1)
