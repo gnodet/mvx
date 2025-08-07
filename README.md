@@ -25,13 +25,13 @@ Imagine cloning any project and running:
 
 No more "works on my machine" - every developer gets the exact same environment.
 
-## 📦 mvx Wrapper
+## 📦 mvx Bootstrap
 
-Just like Maven Wrapper (`mvnw`), mvx provides wrapper scripts that automatically download and run the appropriate mvx version for your project:
+Just like Maven Wrapper (`mvnw`), mvx provides bootstrap scripts that automatically download and run the appropriate mvx version for your project:
 
 ```bash
-# Install the wrapper in your project (one-time setup)
-curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-wrapper.sh | bash
+# Install mvx in your project (one-time setup)
+curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-mvx.sh | bash
 
 # Now anyone can use mvx without installing it
 ./mvx setup
@@ -39,7 +39,7 @@ curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-wrapper.sh 
 ./mvx test
 ```
 
-The wrapper automatically:
+The bootstrap automatically:
 - Downloads the correct mvx version for your project
 - Caches binaries to avoid re-downloading
 - Works on Linux, macOS, and Windows
@@ -49,13 +49,13 @@ See [WRAPPER.md](WRAPPER.md) for detailed documentation.
 
 ## 📦 Installation
 
-### Using the Wrapper (Recommended)
+### Using Bootstrap Scripts (Recommended)
 
-The easiest way to use mvx is via the wrapper scripts:
+The easiest way to use mvx is via the bootstrap scripts:
 
 ```bash
-# Install wrapper in your project
-curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-wrapper.sh | bash
+# Install mvx in your project
+curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-mvx.sh | bash
 
 # Use mvx without global installation
 ./mvx setup

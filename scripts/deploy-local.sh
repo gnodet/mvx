@@ -94,12 +94,12 @@ case "$METHOD" in
         info "Installing wrapper in target directory..."
         cd "$TARGET_DIR"
 
-        # Install wrapper if not present
+        # Install mvx if not present
         if [ ! -f "mvx" ]; then
-            curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-wrapper.sh | bash
-            success "Installed mvx wrapper"
+            curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-mvx.sh | bash
+            success "Installed mvx"
         else
-            info "Wrapper already present"
+            info "mvx already present"
         fi
 
         # Copy binary and set version to dev

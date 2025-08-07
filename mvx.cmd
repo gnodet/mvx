@@ -18,8 +18,8 @@ set DEFAULT_DOWNLOAD_URL=https://github.com/gnodet/mvx/releases
 rem Determine the mvx version to use
 set MVX_VERSION_TO_USE=%MVX_VERSION%
 if "%MVX_VERSION_TO_USE%"=="" (
-    if exist ".mvx\wrapper\mvx-wrapper.properties" (
-        for /f "tokens=2 delims==" %%i in ('findstr "^mvxVersion=" ".mvx\wrapper\mvx-wrapper.properties" 2^>nul') do set MVX_VERSION_TO_USE=%%i
+    if exist ".mvx\config\mvx.properties" (
+        for /f "tokens=2 delims==" %%i in ('findstr "^mvxVersion=" ".mvx\config\mvx.properties" 2^>nul') do set MVX_VERSION_TO_USE=%%i
     )
 )
 if "%MVX_VERSION_TO_USE%"=="" (

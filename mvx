@@ -19,8 +19,8 @@ DEFAULT_DOWNLOAD_URL="https://github.com/gnodet/mvx/releases"
 # Determine the mvx version to use
 MVX_VERSION="${MVX_VERSION:-}"
 if [ -z "$MVX_VERSION" ]; then
-    if [ -f ".mvx/wrapper/mvx-wrapper.properties" ]; then
-        MVX_VERSION=$(grep "^mvxVersion=" ".mvx/wrapper/mvx-wrapper.properties" 2>/dev/null | cut -d'=' -f2 | tr -d ' \t\r\n' || echo "")
+    if [ -f ".mvx/config/mvx.properties" ]; then
+        MVX_VERSION=$(grep "^mvxVersion=" ".mvx/config/mvx.properties" 2>/dev/null | cut -d'=' -f2 | tr -d ' \t\r\n' || echo "")
     fi
     if [ -z "$MVX_VERSION" ]; then
         if [ -f ".mvx/version" ]; then

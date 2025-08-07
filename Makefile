@@ -97,24 +97,24 @@ checksums:
 .PHONY: release-build
 release-build: build-all checksums
 
-# Package wrapper files
-.PHONY: package-wrapper
-package-wrapper:
-	@echo "Packaging mvx wrapper files..."
-	@mkdir -p dist/wrapper
-	@cp mvx dist/wrapper/
-	@cp mvx.cmd dist/wrapper/
-	@cp -r .mvx dist/wrapper/
-	@cp WRAPPER.md dist/wrapper/
-	@cp install-wrapper.sh dist/wrapper/
-	@echo "Wrapper files packaged in dist/wrapper/"
+# Package mvx files
+.PHONY: package-mvx
+package-mvx:
+	@echo "Packaging mvx files..."
+	@mkdir -p dist/mvx
+	@cp mvx dist/mvx/
+	@cp mvx.cmd dist/mvx/
+	@cp -r .mvx dist/mvx/
+	@cp WRAPPER.md dist/mvx/
+	@cp install-mvx.sh dist/mvx/
+	@echo "mvx files packaged in dist/mvx/"
 
-# Test wrapper functionality
-.PHONY: test-wrapper
-test-wrapper: build
-	@echo "Testing mvx wrapper..."
+# Test mvx functionality
+.PHONY: test-mvx
+test-mvx: build
+	@echo "Testing mvx..."
 	@cp mvx-binary ./mvx.exe 2>/dev/null || cp mvx-binary ./mvx-binary-local
-	@./mvx version || echo "Wrapper test completed"
+	@./mvx version || echo "mvx test completed"
 	@rm -f ./mvx.exe ./mvx-binary-local
 
 # Show help
@@ -127,8 +127,8 @@ help:
 	@echo "  release-build  - Build all platforms and generate checksums"
 	@echo "  checksums      - Generate checksums for dist/ binaries"
 	@echo "  test           - Run tests"
-	@echo "  test-wrapper   - Test wrapper functionality"
-	@echo "  package-wrapper- Package wrapper files for distribution"
+	@echo "  test-mvx       - Test mvx functionality"
+	@echo "  package-mvx    - Package mvx files for distribution"
 	@echo "  clean          - Clean build artifacts"
 	@echo "  deps           - Install dependencies"
 	@echo "  fmt            - Format code"

@@ -1,10 +1,10 @@
 #!/bin/bash
 
 ##############################################################################
-# mvx Wrapper Installer
+# mvx Installer
 #
-# This script downloads and installs the mvx wrapper files into your project.
-# Run this once to set up the wrapper, then commit the files to your repo.
+# This script downloads and installs mvx bootstrap files into your project.
+# Run this once to set up mvx, then commit the files to your repo.
 ##############################################################################
 
 set -e
@@ -12,12 +12,12 @@ set -e
 WRAPPER_VERSION="main"
 BASE_URL="https://raw.githubusercontent.com/gnodet/mvx/${WRAPPER_VERSION}"
 
-echo "Installing mvx wrapper..."
+echo "Installing mvx..."
 
-# Create .mvx/wrapper directory
-mkdir -p .mvx/wrapper
+# Create .mvx/config directory
+mkdir -p .mvx/config
 
-# Download wrapper files
+# Download mvx files
 echo "Downloading mvx (Unix script)..."
 curl -fsSL "${BASE_URL}/mvx" -o mvx
 chmod +x mvx
@@ -25,24 +25,24 @@ chmod +x mvx
 echo "Downloading mvx.cmd (Windows script)..."
 curl -fsSL "${BASE_URL}/mvx.cmd" -o mvx.cmd
 
-echo "Downloading wrapper configuration..."
-curl -fsSL "${BASE_URL}/.mvx/wrapper/mvx-wrapper.properties" -o .mvx/wrapper/mvx-wrapper.properties
+echo "Downloading mvx configuration..."
+curl -fsSL "${BASE_URL}/.mvx/config/mvx.properties" -o .mvx/config/mvx.properties
 
 echo "Downloading version file..."
 curl -fsSL "${BASE_URL}/.mvx/version" -o .mvx/version
 
 echo ""
-echo "✅ mvx wrapper installed successfully!"
+echo "✅ mvx installed successfully!"
 echo ""
 echo "Files created:"
 echo "  - mvx (Unix/Linux/macOS script)"
 echo "  - mvx.cmd (Windows script)"
-echo "  - .mvx/wrapper/mvx-wrapper.properties (configuration)"
+echo "  - .mvx/config/mvx.properties (configuration)"
 echo "  - .mvx/version (version specification)"
 echo ""
 echo "Next steps:"
-echo "  1. Edit .mvx/wrapper/mvx-wrapper.properties or .mvx/version to set your desired mvx version"
-echo "  2. Test the wrapper: ./mvx version"
+echo "  1. Edit .mvx/config/mvx.properties or .mvx/version to set your desired mvx version"
+echo "  2. Test mvx: ./mvx version"
 echo "  3. Commit these files to your repository"
 echo "  4. Update your documentation to use './mvx' instead of 'mvx'"
 echo ""
