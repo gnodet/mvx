@@ -49,7 +49,7 @@ echo mvx Wrapper
 echo Platform: windows-amd64
 echo Requested version: %MVX_VERSION_TO_USE%
 
-rem Check for local binary first (priority order)
+rem Check for local binary first (priority order) - always check regardless of version
 set LOCAL_BINARIES=.\mvx-local.exe .\mvx-binary.exe .\mvx-dev.exe .\mvx.exe
 for %%i in (%LOCAL_BINARIES%) do (
     if exist "%%i" (
