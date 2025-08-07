@@ -108,6 +108,8 @@ func (j *JavaTool) GetPath(version string, cfg config.ToolConfig) (string, error
 	for _, entry := range entries {
 		if entry.IsDir() {
 			subPath := filepath.Join(installDir, entry.Name())
+
+			// Check standard location first
 			javaExe := filepath.Join(subPath, "bin", "java")
 			if runtime.GOOS == "windows" {
 				javaExe += ".exe"
@@ -116,6 +118,17 @@ func (j *JavaTool) GetPath(version string, cfg config.ToolConfig) (string, error
 			if _, err := os.Stat(javaExe); err == nil {
 				logVerbose("Found Java executable in subdirectory: %s", subPath)
 				return subPath, nil
+			}
+
+			// On macOS, also check Contents/Home/bin/java (common with JDK packages)
+			if runtime.GOOS == "darwin" {
+				macOSJavaExe := filepath.Join(subPath, "Contents", "Home", "bin", "java")
+				logVerbose("Checking for macOS Java executable at: %s", macOSJavaExe)
+				if _, err := os.Stat(macOSJavaExe); err == nil {
+					macOSJavaHome := filepath.Join(subPath, "Contents", "Home")
+					logVerbose("Found macOS Java executable, using JAVA_HOME: %s", macOSJavaHome)
+					return macOSJavaHome, nil
+				}
 			}
 		}
 	}
@@ -129,6 +142,17 @@ func (j *JavaTool) GetPath(version string, cfg config.ToolConfig) (string, error
 	if _, err := os.Stat(javaExe); err == nil {
 		logVerbose("Found Java executable directly in install directory: %s", installDir)
 		return installDir, nil
+	}
+
+	// On macOS, also check Contents/Home/bin/java directly in install directory
+	if runtime.GOOS == "darwin" {
+		macOSJavaExe := filepath.Join(installDir, "Contents", "Home", "bin", "java")
+		logVerbose("Checking for macOS Java executable directly at: %s", macOSJavaExe)
+		if _, err := os.Stat(macOSJavaExe); err == nil {
+			macOSJavaHome := filepath.Join(installDir, "Contents", "Home")
+			logVerbose("Found macOS Java executable directly, using JAVA_HOME: %s", macOSJavaHome)
+			return macOSJavaHome, nil
+		}
 	}
 
 	logVerbose("Java executable not found anywhere in %s", installDir)
