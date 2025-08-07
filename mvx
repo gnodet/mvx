@@ -19,8 +19,8 @@ DEFAULT_DOWNLOAD_URL="https://github.com/gnodet/mvx/releases"
 # Determine the mvx version to use
 MVX_VERSION="${MVX_VERSION:-}"
 if [ -z "$MVX_VERSION" ]; then
-    if [ -f ".mvx/config/mvx.properties" ]; then
-        MVX_VERSION=$(grep "^mvxVersion=" ".mvx/config/mvx.properties" 2>/dev/null | cut -d'=' -f2 | tr -d ' \t\r\n' || echo "")
+    if [ -f ".mvx/wrapper/mvx-wrapper.properties" ]; then
+        MVX_VERSION=$(grep "^mvxVersion=" ".mvx/wrapper/mvx-wrapper.properties" 2>/dev/null | cut -d'=' -f2 | tr -d ' \t\r\n' || echo "")
     fi
     if [ -z "$MVX_VERSION" ]; then
         if [ -f ".mvx/version" ]; then
@@ -119,51 +119,65 @@ get_latest_version() {
 # Resolve version (handle "latest")
 resolve_version() {
     local version="$1"
-
+    
     if [ "$version" = "latest" ]; then
-        echo "Resolving latest version..." >&2
+        echo "Resolving latest version..."
         version=$(get_latest_version)
         if [ -z "$version" ]; then
             echo "Error: Could not determine latest version" >&2
             return 1
         fi
-        echo "Latest version: $version" >&2
+        echo "Latest version: $version"
     fi
-
+    
     echo "$version"
 }
 
-# Find or download mvx binary (local binaries are checked in main() now)
+# Find or download mvx binary
 find_mvx_binary() {
     local version="$1"
     local platform="$2"
     local home_dir="$3"
+    
+    # Check for local binary first (in project directory)
+    local local_binaries="./mvx-local ./mvx-binary"
+    if [ "$platform" = "windows-amd64" ]; then
+        local_binaries="./mvx.exe ./mvx-binary.exe $local_binaries"
+    fi
 
+    for local_binary in $local_binaries; do
+        if [ -f "$local_binary" ] && [ -x "$local_binary" ]; then
+            echo "$local_binary"
+            return 0
+        fi
+    done
+
+    
     # Check cached version
     local cache_dir="$home_dir/.mvx/versions/$version"
     local cached_binary="$cache_dir/mvx"
     if [ "$platform" = "windows-amd64" ]; then
         cached_binary="$cache_dir/mvx.exe"
     fi
-
+    
     if [ -f "$cached_binary" ] && [ -x "$cached_binary" ]; then
         echo "$cached_binary"
         return 0
     fi
-
+    
     # Need to download
     echo "mvx $version not found, downloading..."
-
+    
     ensure_dir "$cache_dir"
-
+    
     # Construct download URL
     local binary_name="mvx-$platform"
     if [ "$platform" = "windows-amd64" ]; then
         binary_name="mvx-$platform.exe"
     fi
-
+    
     local download_url="$DOWNLOAD_URL/download/v$version/$binary_name"
-
+    
     echo "Downloading mvx $version for $platform..."
     if download_file "$download_url" "$cached_binary"; then
         chmod +x "$cached_binary"
@@ -178,43 +192,27 @@ find_mvx_binary() {
 # Main execution
 main() {
     local platform home_dir resolved_version mvx_binary
-
+    
     platform=$(detect_platform)
     home_dir=$(get_home_dir)
-
-    echo "mvx"
+    
+    echo "mvx Wrapper"
     echo "Platform: $platform"
     echo "Requested version: $MVX_VERSION"
-
-    # Check for local binaries first, regardless of version
-    # This allows development version "dev" to work
-    local local_binaries="./mvx-dev"
-    if [ "$platform" = "windows-amd64" ]; then
-        local_binaries="./mvx-dev.exe"
-    fi
-
-    for local_binary in $local_binaries; do
-        if [ -f "$local_binary" ] && [ -x "$local_binary" ]; then
-            echo "Using local development binary: $local_binary"
-            echo ""
-            exec "$local_binary" "$@"
-        fi
-    done
-
-    # No local binary found, proceed with version resolution and download
+    
     resolved_version=$(resolve_version "$MVX_VERSION")
     if [ $? -ne 0 ]; then
         exit 1
     fi
-
+    
     mvx_binary=$(find_mvx_binary "$resolved_version" "$platform" "$home_dir")
     if [ $? -ne 0 ]; then
         exit 1
     fi
-
+    
     echo "Using mvx binary: $mvx_binary"
     echo ""
-
+    
     # Execute mvx with all arguments
     exec "$mvx_binary" "$@"
 }
