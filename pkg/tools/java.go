@@ -182,6 +182,32 @@ func (j *JavaTool) getDiscoURL(version, distribution string) (string, error) {
 		version = strings.TrimSuffix(version, "-ea")
 	}
 
+	// Try primary distribution first
+	downloadURL, err := j.tryDiscoDistribution(version, distribution, osName, arch, releaseStatus)
+	if err == nil && downloadURL != "" {
+		return downloadURL, nil
+	}
+
+	// If primary distribution fails, try fallback distributions
+	fallbackDistributions := []string{"temurin", "zulu", "microsoft", "corretto"}
+	for _, fallback := range fallbackDistributions {
+		if fallback == distribution {
+			continue // Already tried this one
+		}
+
+		fmt.Printf("  🔄 Trying fallback distribution: %s\n", fallback)
+		downloadURL, err := j.tryDiscoDistribution(version, fallback, osName, arch, releaseStatus)
+		if err == nil && downloadURL != "" {
+			fmt.Printf("  ✅ Found Java %s in %s distribution\n", version, fallback)
+			return downloadURL, nil
+		}
+	}
+
+	return "", fmt.Errorf("Java %s not available in any supported distribution for %s/%s", version, osName, arch)
+}
+
+// tryDiscoDistribution attempts to get download URL from a specific distribution
+func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, releaseStatus string) (string, error) {
 	// Build Disco API URL for package search
 	url := fmt.Sprintf("https://api.foojay.io/disco/v3.0/packages?version=%s&distribution=%s&operating_system=%s&architecture=%s&package_type=jdk&release_status=%s&latest=available",
 		version, distribution, osName, arch, releaseStatus)
@@ -201,6 +227,7 @@ func (j *JavaTool) getDiscoURL(version, distribution string) (string, error) {
 		Result []struct {
 			DirectDownloadURI string `json:"direct_download_uri"`
 			Filename          string `json:"filename"`
+			VersionNumber     string `json:"version_number"`
 		} `json:"result"`
 	}
 
@@ -209,11 +236,16 @@ func (j *JavaTool) getDiscoURL(version, distribution string) (string, error) {
 	}
 
 	if len(packages.Result) == 0 {
-		return "", fmt.Errorf("no packages found for Java %s (%s) on %s/%s", version, distribution, osName, arch)
+		return "", fmt.Errorf("no packages found for Java %s (%s)", version, distribution)
 	}
 
 	// Return the first (and typically only) result
-	return packages.Result[0].DirectDownloadURI, nil
+	downloadURL := packages.Result[0].DirectDownloadURI
+	if downloadURL == "" {
+		return "", fmt.Errorf("empty download URL returned for Java %s (%s)", version, distribution)
+	}
+
+	return downloadURL, nil
 }
 
 // downloadAndExtract downloads and extracts a tar.gz file

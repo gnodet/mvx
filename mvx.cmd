@@ -45,7 +45,7 @@ set HOME_DIR=%USERPROFILE%
 if "%HOME_DIR%"=="" set HOME_DIR=%HOMEDRIVE%%HOMEPATH%
 if "%HOME_DIR%"=="" set HOME_DIR=.
 
-echo mvx Wrapper
+echo mvx
 echo Platform: windows-amd64
 echo Requested version: %MVX_VERSION_TO_USE%
 

@@ -182,7 +182,7 @@ main() {
     platform=$(detect_platform)
     home_dir=$(get_home_dir)
 
-    echo "mvx Wrapper"
+    echo "mvx"
     echo "Platform: $platform"
     echo "Requested version: $MVX_VERSION"
 
