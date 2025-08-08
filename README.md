@@ -115,6 +115,55 @@ make build-all
 make test
 ```
 
+## 🎯 Shell Completion
+
+mvx supports shell completion for commands and arguments:
+
+### Zsh Completion
+
+**For current session:**
+```bash
+source <(./mvx completion zsh)
+```
+
+**For permanent setup (recommended):**
+```bash
+# Create completion directory if it doesn't exist
+mkdir -p ~/.zsh/completions
+
+# Generate completion script
+./mvx completion zsh > ~/.zsh/completions/_mvx
+
+# Add to ~/.zshrc (if not already there)
+echo 'fpath=(~/.zsh/completions $fpath)' >> ~/.zshrc
+echo 'autoload -U compinit && compinit' >> ~/.zshrc
+
+# Reload shell
+source ~/.zshrc
+```
+
+### Bash Completion
+
+**For current session:**
+```bash
+source <(./mvx completion bash)
+```
+
+**For permanent setup:**
+```bash
+# Add to ~/.bashrc
+echo 'source <(./mvx completion bash)' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### Test Completion
+
+```bash
+./mvx <TAB>          # Shows available commands
+./mvx build <TAB>    # Shows build options
+./mvx setup <TAB>    # Shows setup flags
+```
+
 ## 🔧 Core Principles
 
 ### 1. **Self-Contained**
