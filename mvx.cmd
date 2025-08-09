@@ -40,20 +40,37 @@ set HOME_DIR=%USERPROFILE%
 if "%HOME_DIR%"=="" set HOME_DIR=%HOMEDRIVE%%HOMEPATH%
 if "%HOME_DIR%"=="" set HOME_DIR=.
 
+rem Check verbosity level
+set VERBOSITY=normal
+:check_args
+if "%~1"=="" goto args_done
+if "%~1"=="-v" set VERBOSITY=verbose
+if "%~1"=="--verbose" set VERBOSITY=verbose
+if "%~1"=="-q" set VERBOSITY=quiet
+if "%~1"=="--quiet" set VERBOSITY=quiet
+shift
+goto check_args
+:args_done
+
 rem Handle update-bootstrap command specially
 if "%1"=="update-bootstrap" (
     call :handle_update_bootstrap
     exit /b !errorlevel!
 )
 
-echo mvx
-echo Platform: windows-amd64
-echo Requested version: %MVX_VERSION_TO_USE%
+rem Only show bootstrap info in verbose mode
+if "%VERBOSITY%"=="verbose" (
+    echo mvx
+    echo Platform: windows-amd64
+    echo Requested version: %MVX_VERSION_TO_USE%
+)
 
 rem Check for local development binary first - always check regardless of version
 if exist ".\mvx-dev.exe" (
-    echo Using local development binary: .\mvx-dev.exe
-    echo.
+    if "%VERBOSITY%"=="verbose" (
+        echo Using local development binary: .\mvx-dev.exe
+        echo.
+    )
     ".\mvx-dev.exe" %*
     goto :eof
 )
@@ -102,8 +119,10 @@ if not exist "%CACHED_BINARY%" (
     exit /b 1
 )
 
-echo Using mvx binary: %CACHED_BINARY%
-echo.
+if "%VERBOSITY%"=="verbose" (
+    echo Using mvx binary: %CACHED_BINARY%
+    echo.
+)
 
 rem Execute mvx with all arguments
 "%CACHED_BINARY%" %*

@@ -54,9 +54,9 @@ type GitHubRelease struct {
 // getLatestRelease fetches the latest release information from GitHub
 func getLatestRelease() (*GitHubRelease, error) {
 	url := "https://api.github.com/repos/gnodet/mvx/releases/latest"
-	
+
 	printVerbose("Fetching latest release from: %s", url)
-	
+
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch release information: %w", err)
@@ -107,7 +107,7 @@ func getCurrentVersion() (string, error) {
 // downloadFile downloads a file from the given URL and saves it to the specified path
 func downloadFile(url, filepath string) error {
 	printVerbose("Downloading %s to %s", url, filepath)
-	
+
 	resp, err := http.Get(url)
 	if err != nil {
 		return fmt.Errorf("failed to download %s: %w", url, err)

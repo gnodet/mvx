@@ -314,12 +314,38 @@ find_mvx_binary() {
     fi
 }
 
+# Check if verbose or quiet mode is requested
+check_verbosity() {
+    local verbose="false"
+    local quiet="false"
+
+    for arg in "$@"; do
+        case "$arg" in
+            -v|--verbose)
+                verbose="true"
+                ;;
+            -q|--quiet)
+                quiet="true"
+                ;;
+        esac
+    done
+
+    if [ "$quiet" = "true" ]; then
+        echo "quiet"
+    elif [ "$verbose" = "true" ]; then
+        echo "verbose"
+    else
+        echo "normal"
+    fi
+}
+
 # Main execution
 main() {
-    local platform home_dir resolved_version mvx_binary
+    local platform home_dir resolved_version mvx_binary verbosity
 
     platform=$(detect_platform)
     home_dir=$(get_home_dir)
+    verbosity=$(check_verbosity "$@")
 
     # Handle update-bootstrap command specially
     if [ "$1" = "update-bootstrap" ]; then
@@ -331,9 +357,12 @@ main() {
         exit $?
     fi
 
-    echo "mvx"
-    echo "Platform: $platform"
-    echo "Requested version: $MVX_VERSION"
+    # Only show bootstrap info in verbose mode
+    if [ "$verbosity" = "verbose" ]; then
+        echo "mvx"
+        echo "Platform: $platform"
+        echo "Requested version: $MVX_VERSION"
+    fi
 
     # Check for local binaries first, regardless of version
     # This allows development version "dev" to work
@@ -344,8 +373,10 @@ main() {
 
     for local_binary in $local_binaries; do
         if [ -f "$local_binary" ] && [ -x "$local_binary" ]; then
-            echo "Using local development binary: $local_binary"
-            echo ""
+            if [ "$verbosity" = "verbose" ]; then
+                echo "Using local development binary: $local_binary"
+                echo ""
+            fi
             exec "$local_binary" "$@"
         fi
     done
@@ -366,8 +397,10 @@ main() {
         exit 1
     fi
 
-    echo "Using mvx binary: $mvx_binary"
-    echo ""
+    if [ "$verbosity" = "verbose" ]; then
+        echo "Using mvx binary: $mvx_binary"
+        echo ""
+    fi
 
     # Execute mvx with all arguments
     exec "$mvx_binary" "$@"

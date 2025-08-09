@@ -160,8 +160,6 @@ func (r *ToolRegistry) getDiscoVersions(distribution string) ([]string, error) {
 	return versions, nil
 }
 
-
-
 // GetMavenVersions returns available Maven versions
 func (r *ToolRegistry) GetMavenVersions() ([]string, error) {
 	// For now, return known Maven versions including latest RCs

@@ -14,7 +14,12 @@ echo "Installing mvx..."
 # Allow override with environment variable for development
 if [ -n "$MVX_VERSION" ]; then
     echo "🔧 Using specified version: $MVX_VERSION"
-    WRAPPER_VERSION="$MVX_VERSION"
+    BOOTSTRAP_VERSION="$MVX_VERSION"
+
+    # If main branch is specified, use development version
+    if [ "$MVX_VERSION" = "main" ]; then
+        echo "📦 Installing from main branch (development version)"
+    fi
 else
     # Get latest release version
     echo "🔍 Getting latest release version..."
@@ -22,14 +27,14 @@ else
 
     if [ -z "$LATEST_RELEASE" ]; then
         echo "❌ Failed to get latest release, falling back to main branch"
-        WRAPPER_VERSION="main"
+        BOOTSTRAP_VERSION="main"
     else
         echo "📦 Latest release: $LATEST_RELEASE"
-        WRAPPER_VERSION="$LATEST_RELEASE"
+        BOOTSTRAP_VERSION="$LATEST_RELEASE"
     fi
 fi
 
-BASE_URL="https://raw.githubusercontent.com/gnodet/mvx/${WRAPPER_VERSION}"
+BASE_URL="https://raw.githubusercontent.com/gnodet/mvx/${BOOTSTRAP_VERSION}"
 
 # Create .mvx directory
 mkdir -p .mvx
@@ -43,12 +48,34 @@ echo "Downloading mvx.cmd (Windows script)..."
 curl -fsSL "${BASE_URL}/mvx.cmd" -o mvx.cmd
 
 echo "Downloading mvx configuration..."
-curl -fsSL "${BASE_URL}/.mvx/mvx.properties" -o .mvx/mvx.properties
+if ! curl -fsSL "${BASE_URL}/.mvx/mvx.properties" -o .mvx/mvx.properties; then
+    echo "⚠️  Configuration file not found in release, creating default..."
+    cat > .mvx/mvx.properties << 'EOF'
+# mvx Configuration
+# This file configures mvx bootstrap behavior
+
+# The version of mvx to download and use
+# Can be a specific version (e.g., "1.0.0") or "latest" for the most recent release
+# For development, use "dev" when you have a local mvx-dev binary
+mvxVersion=latest
+
+# Alternative download URL (optional)
+# If not specified, defaults to GitHub releases
+# mvxDownloadUrl=https://github.com/gnodet/mvx/releases
+
+# Checksum validation (future feature)
+# mvxChecksumUrl=https://github.com/gnodet/mvx/releases/download/v{version}/checksums.txt
+# mvxValidateChecksum=true
+EOF
+fi
 
 # Update the version in the properties file to match the installed version
-if [ "$WRAPPER_VERSION" != "main" ]; then
+if [ "$BOOTSTRAP_VERSION" = "main" ]; then
+    echo "📝 Setting version to 'dev' for main branch in mvx.properties"
+    sed -i.bak "s/^mvxVersion=.*/mvxVersion=dev/" .mvx/mvx.properties && rm -f .mvx/mvx.properties.bak
+else
     # Remove 'v' prefix if present for version number
-    VERSION_NUMBER=$(echo "$WRAPPER_VERSION" | sed 's/^v//')
+    VERSION_NUMBER=$(echo "$BOOTSTRAP_VERSION" | sed 's/^v//')
     echo "📝 Setting version to $VERSION_NUMBER in mvx.properties"
     sed -i.bak "s/^mvxVersion=.*/mvxVersion=$VERSION_NUMBER/" .mvx/mvx.properties && rm -f .mvx/mvx.properties.bak
 fi
