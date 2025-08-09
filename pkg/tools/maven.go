@@ -130,13 +130,13 @@ func (m *MavenTool) ListVersions() ([]string, error) {
 
 // getDownloadURL returns the download URL for the specified version
 func (m *MavenTool) getDownloadURL(version string) string {
-	// Maven download URLs follow a consistent pattern
+	// Use Apache archive for all Maven distributions
 	if strings.HasPrefix(version, "4.") {
-		// Maven 4.x versions (including RCs and betas) are in Maven Central
-		return fmt.Sprintf("https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/%s/apache-maven-%s-bin.zip", version, version)
+		// Maven 4.x versions are in the Maven 4 archive
+		return fmt.Sprintf("https://archive.apache.org/dist/maven/maven-4/%s/binaries/apache-maven-%s-bin.zip", version, version)
 	}
 
-	// Maven 3.x versions are in the archive
+	// Maven 3.x versions are in the Maven 3 archive
 	return fmt.Sprintf("https://archive.apache.org/dist/maven/maven-3/%s/binaries/apache-maven-%s-bin.zip", version, version)
 }
 

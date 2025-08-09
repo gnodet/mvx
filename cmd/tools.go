@@ -114,9 +114,25 @@ func listTools() error {
 	}
 	printInfo("")
 
+	// Maven Daemon
+	printInfo("🚀 Maven Daemon (mvnd)")
+	if versions, err := registry.GetMvndVersions(); err == nil && len(versions) > 0 {
+		// Show first few versions
+		shown := versions
+		if len(versions) > 8 {
+			shown = versions[:8]
+		}
+		printInfo("  Versions: %s", strings.Join(shown, ", "))
+		if len(versions) > 8 {
+			printInfo("  ... and %d more", len(versions)-8)
+		}
+	}
+	printInfo("")
+
 	printInfo("Usage:")
 	printInfo("  mvx tools search java        # Search Java versions")
 	printInfo("  mvx tools search maven       # Search Maven versions")
+	printInfo("  mvx tools search mvnd        # Search Maven Daemon versions")
 	printInfo("  mvx tools info java          # Show Java details")
 
 	return nil
@@ -136,6 +152,8 @@ func searchTool(toolName string, filters []string) error {
 		return searchJavaVersions(registry, filters)
 	case "maven":
 		return searchMavenVersions(registry, filters)
+	case "mvnd":
+		return searchMvndVersions(registry, filters)
 	default:
 		return fmt.Errorf("unknown tool: %s", toolName)
 	}
@@ -274,6 +292,57 @@ func searchMavenVersions(registry *tools.ToolRegistry, filters []string) error {
 	return nil
 }
 
+// searchMvndVersions searches for Maven Daemon versions
+func searchMvndVersions(registry *tools.ToolRegistry, filters []string) error {
+	versions, err := registry.GetMvndVersions()
+	if err != nil {
+		return fmt.Errorf("failed to get mvnd versions: %w", err)
+	}
+
+	printInfo("🚀 Maven Daemon (mvnd) Versions")
+	printInfo("")
+
+	// Group by major version
+	majorVersions := make(map[string][]string)
+	for _, v := range versions {
+		major := strings.Split(v, ".")[0]
+		majorVersions[major] = append(majorVersions[major], v)
+	}
+
+	// Sort major versions
+	var majors []string
+	for major := range majorVersions {
+		majors = append(majors, major)
+	}
+	sort.Slice(majors, func(i, j int) bool {
+		return majors[i] > majors[j] // Newest first
+	})
+
+	// Display versions by major version
+	for _, major := range majors {
+		versions := majorVersions[major]
+		printInfo("📦 mvnd %s.x:", major)
+
+		// Show versions in rows of 6
+		for i := 0; i < len(versions); i += 6 {
+			end := i + 6
+			if end > len(versions) {
+				end = len(versions)
+			}
+			row := versions[i:end]
+			printInfo("  %s", strings.Join(row, ", "))
+		}
+		printInfo("")
+	}
+
+	printInfo("Usage examples:")
+	printInfo("  version: \"2\"             # Latest mvnd 2.x")
+	printInfo("  version: \"1.0\"           # Latest mvnd 1.0.x")
+	printInfo("  version: \"1.0.2\"         # Exact version")
+
+	return nil
+}
+
 // showToolInfo shows detailed information about a tool
 func showToolInfo(toolName string) error {
 	manager, err := tools.NewManager()
@@ -302,6 +371,12 @@ func showToolInfo(toolName string) error {
 			}
 		}
 	case "maven":
+		if versions, ok := info["versions"].([]string); ok {
+			printInfo("")
+			printInfo("Available Versions: %d", len(versions))
+			printInfo("Latest: %s", versions[0])
+		}
+	case "mvnd":
 		if versions, ok := info["versions"].([]string); ok {
 			printInfo("")
 			printInfo("Available Versions: %d", len(versions))

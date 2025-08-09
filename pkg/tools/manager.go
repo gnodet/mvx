@@ -62,6 +62,7 @@ func NewManager() (*Manager, error) {
 	// Register built-in tools
 	manager.RegisterTool(&JavaTool{manager: manager})
 	manager.RegisterTool(&MavenTool{manager: manager})
+	manager.RegisterTool(&MvndTool{manager: manager})
 
 	return manager, nil
 }
@@ -208,6 +209,8 @@ func (m *Manager) resolveVersion(toolName string, toolConfig config.ToolConfig) 
 		return m.registry.ResolveJavaVersion(toolConfig.Version, distribution)
 	case "maven":
 		return m.registry.ResolveMavenVersion(toolConfig.Version)
+	case "mvnd":
+		return m.registry.ResolveMvndVersion(toolConfig.Version)
 	default:
 		// For unknown tools, return version as-is
 		return toolConfig.Version, nil
