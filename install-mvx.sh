@@ -11,13 +11,15 @@ set -e
 
 echo "Installing mvx..."
 
-# Allow override with environment variable for development
-if [ -n "$MVX_VERSION" ]; then
-    echo "🔧 Using specified version: $MVX_VERSION"
-    BOOTSTRAP_VERSION="$MVX_VERSION"
+# Allow override with command line argument or environment variable
+REQUESTED_VERSION="${1:-$MVX_VERSION}"
+
+if [ -n "$REQUESTED_VERSION" ]; then
+    echo "🔧 Using specified version: $REQUESTED_VERSION"
+    BOOTSTRAP_VERSION="$REQUESTED_VERSION"
 
     # If main branch is specified, use development version
-    if [ "$MVX_VERSION" = "main" ]; then
+    if [ "$REQUESTED_VERSION" = "main" ]; then
         echo "📦 Installing from main branch (development version)"
     fi
 else
@@ -95,7 +97,8 @@ echo "  3. Run './mvx update-bootstrap' to check for updates"
 echo "  4. Commit these files to your repository"
 echo ""
 echo "Advanced usage:"
-echo "  - Install development version: MVX_VERSION=main curl -fsSL ... | bash"
-echo "  - Install specific version: MVX_VERSION=v0.1.0 curl -fsSL ... | bash"
+echo "  - Install development version: curl -fsSL ... | MVX_VERSION=main bash"
+echo "  - Install specific version: curl -fsSL ... | MVX_VERSION=v0.1.0 bash"
+echo "  - Or with command line argument: curl -fsSL ... | bash -s main"
 echo ""
 echo "For more information, see: https://github.com/gnodet/mvx/blob/main/BOOTSTRAP.md"
