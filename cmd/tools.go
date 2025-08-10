@@ -117,7 +117,19 @@ func listTools() error {
 	// Maven Daemon
 	printInfo("🚀 Maven Daemon (mvnd)")
 	if versions, err := registry.GetMvndVersions(); err == nil && len(versions) > 0 {
-		// Show first few versions
+		shown := versions
+		if len(versions) > 8 {
+			shown = versions[:8]
+		}
+		printInfo("  Versions: %s", strings.Join(shown, ", "))
+		if len(versions) > 8 {
+			printInfo("  ... and %d more", len(versions)-8)
+		}
+	}
+
+	// Node.js
+	printInfo("📦 Node.js")
+	if versions, err := registry.GetNodeVersions(); err == nil && len(versions) > 0 {
 		shown := versions
 		if len(versions) > 8 {
 			shown = versions[:8]
@@ -129,10 +141,13 @@ func listTools() error {
 	}
 	printInfo("")
 
+	printInfo("")
+
 	printInfo("Usage:")
 	printInfo("  mvx tools search java        # Search Java versions")
 	printInfo("  mvx tools search maven       # Search Maven versions")
 	printInfo("  mvx tools search mvnd        # Search Maven Daemon versions")
+	printInfo("  mvx tools search node        # Search Node.js versions")
 	printInfo("  mvx tools info java          # Show Java details")
 
 	return nil
@@ -154,6 +169,8 @@ func searchTool(toolName string, filters []string) error {
 		return searchMavenVersions(registry, filters)
 	case "mvnd":
 		return searchMvndVersions(registry, filters)
+	case "node":
+		return searchNodeVersions(registry, filters)
 	default:
 		return fmt.Errorf("unknown tool: %s", toolName)
 	}
@@ -339,6 +356,54 @@ func searchMvndVersions(registry *tools.ToolRegistry, filters []string) error {
 	printInfo("  version: \"2\"             # Latest mvnd 2.x")
 	printInfo("  version: \"1.0\"           # Latest mvnd 1.0.x")
 	printInfo("  version: \"1.0.2\"         # Exact version")
+
+	return nil
+}
+
+// searchNodeVersions searches for Node.js versions
+func searchNodeVersions(registry *tools.ToolRegistry, filters []string) error {
+	versions, err := registry.GetNodeVersions()
+	if err != nil {
+		return fmt.Errorf("failed to get Node.js versions: %w", err)
+	}
+
+	printInfo("📦 Node.js Versions")
+	printInfo("")
+
+	// Group by major version
+	majorVersions := make(map[string][]string)
+	for _, v := range versions {
+		major := strings.Split(v, ".")[0]
+		majorVersions[major] = append(majorVersions[major], v)
+	}
+
+	// Sort major versions
+	var majors []string
+	for major := range majorVersions {
+		majors = append(majors, major)
+	}
+	sort.Slice(majors, func(i, j int) bool { return majors[i] > majors[j] })
+
+	for _, major := range majors {
+		versions := majorVersions[major]
+		printInfo("Node %s.x:", major)
+		shown := versions
+		if len(versions) > 6 {
+			shown = versions[:6]
+		}
+		for _, v := range shown {
+			printInfo("  %s", v)
+		}
+		if len(versions) > 6 {
+			printInfo("  ... and %d more", len(versions)-6)
+		}
+		printInfo("")
+	}
+
+	printInfo("Usage examples:")
+	printInfo("  version: \"lts\"         # Latest LTS")
+	printInfo("  version: \"20\"          # Latest Node 20.x")
+	printInfo("  version: \"22.5.1\"      # Exact version")
 
 	return nil
 }

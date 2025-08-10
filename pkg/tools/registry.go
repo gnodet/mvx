@@ -337,6 +337,76 @@ func (r *ToolRegistry) ResolveMvndVersion(versionSpec string) (string, error) {
 	return resolved, nil
 }
 
+// GetNodeVersions returns available Node.js versions
+func (r *ToolRegistry) GetNodeVersions() ([]string, error) {
+	versions, err := r.fetchNodeVersions()
+	if err != nil {
+		// minimal fallback
+		return []string{"22.5.1", "22.4.1", "20.15.0", "18.20.4"}, nil
+	}
+	return version.SortVersions(versions), nil
+}
+
+// ResolveNodeVersion resolves a Node version specification
+func (r *ToolRegistry) ResolveNodeVersion(versionSpec string) (string, error) {
+	if versionSpec == "lts" {
+		lts, err := r.fetchNodeLTSVersions()
+		if err != nil || len(lts) == 0 {
+			return "", fmt.Errorf("failed to resolve Node LTS version")
+		}
+		// Return highest LTS
+		sorted := version.SortVersions(lts)
+		return sorted[len(sorted)-1], nil
+	}
+	available, err := r.GetNodeVersions()
+	if err != nil { return "", err }
+	spec, err := version.ParseSpec(versionSpec)
+	if err != nil { return "", fmt.Errorf("invalid version specification %s: %w", versionSpec, err) }
+	resolved, err := spec.Resolve(available)
+	if err != nil { return "", fmt.Errorf("failed to resolve Node version %s: %w", versionSpec, err) }
+	return resolved, nil
+}
+
+func (r *ToolRegistry) fetchNodeVersions() ([]string, error) {
+	entries, err := r.fetchNodeIndex()
+	if err != nil { return nil, err }
+	var versions []string
+	for _, e := range entries {
+		v := strings.TrimPrefix(e.Version, "v")
+		versions = append(versions, v)
+	}
+	return versions, nil
+}
+
+func (r *ToolRegistry) fetchNodeLTSVersions() ([]string, error) {
+	entries, err := r.fetchNodeIndex()
+	if err != nil { return nil, err }
+	var versions []string
+	for _, e := range entries {
+		if e.LTS != nil && e.LTS != false {
+			versions = append(versions, strings.TrimPrefix(e.Version, "v"))
+		}
+	}
+	return versions, nil
+}
+
+type nodeIndexEntry struct {
+	Version string      `json:"version"`
+	LTS     interface{} `json:"lts"`
+}
+
+func (r *ToolRegistry) fetchNodeIndex() ([]nodeIndexEntry, error) {
+	resp, err := r.httpClient.Get("https://nodejs.org/dist/index.json")
+	if err != nil { return nil, err }
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 { return nil, fmt.Errorf("node index fetch failed: %d", resp.StatusCode) }
+	var entries []nodeIndexEntry
+	dec := json.NewDecoder(resp.Body)
+	if err := dec.Decode(&entries); err != nil { return nil, err }
+	return entries, nil
+}
+
+
 // ResolveJavaVersion resolves a Java version specification to a concrete version
 func (r *ToolRegistry) ResolveJavaVersion(versionSpec, distribution string) (string, error) {
 	availableVersions, err := r.GetJavaVersions(distribution)

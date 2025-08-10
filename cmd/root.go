@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/spf13/cobra"
 )
@@ -25,12 +26,12 @@ var rootCmd = &cobra.Command{
 	Short: "Maven eXtended - Universal build environment bootstrap",
 	Long: `mvx is a universal build environment bootstrap tool that goes beyond Maven.
 
-It provides zero-dependency bootstrapping, universal tool management, and simple 
+It provides zero-dependency bootstrapping, universal tool management, and simple
 command interfaces for any project. Think of it as "Maven Wrapper for the modern era."
 
 Examples:
   mvx setup          # Install all required tools automatically
-  mvx build          # Build the project with the right environment  
+  mvx build          # Build the project with the right environment
   mvx test           # Run tests with proper configuration
   mvx demo           # Launch project-specific demos
 
@@ -54,6 +55,9 @@ func SetVersionInfo(v, c, d string) {
 	commit = c
 	date = d
 }
+
+func isWindows() bool { return runtime.GOOS == "windows" }
+
 
 func init() {
 	// Global flags
