@@ -64,6 +64,7 @@ func NewManager() (*Manager, error) {
 	manager.RegisterTool(&MavenTool{manager: manager})
 	manager.RegisterTool(&MvndTool{manager: manager})
 	manager.RegisterTool(&NodeTool{manager: manager})
+	manager.RegisterTool(&GoTool{manager: manager})
 
 	return manager, nil
 }
@@ -214,6 +215,8 @@ func (m *Manager) resolveVersion(toolName string, toolConfig config.ToolConfig) 
 		return m.registry.ResolveMvndVersion(toolConfig.Version)
 	case "node":
 		return m.registry.ResolveNodeVersion(toolConfig.Version)
+	case "go":
+		return m.registry.ResolveGoVersion(toolConfig.Version)
 	default:
 		// For unknown tools, return version as-is
 		return toolConfig.Version, nil

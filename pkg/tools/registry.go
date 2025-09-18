@@ -291,6 +291,85 @@ func (r *ToolRegistry) GetMvndVersions() ([]string, error) {
 	return version.SortVersions(versions), nil
 }
 
+// GetGoVersions returns available Go versions
+func (r *ToolRegistry) GetGoVersions() ([]string, error) {
+	// Try to fetch versions from Go releases API
+	versions, err := r.fetchGoVersions()
+	if err != nil {
+		// Fallback to known versions if API is unavailable
+		return r.getFallbackGoVersions(), nil
+	}
+	return version.SortVersions(versions), nil
+}
+
+// fetchGoVersions fetches Go versions from GitHub releases API
+func (r *ToolRegistry) fetchGoVersions() ([]string, error) {
+	resp, err := r.httpClient.Get("https://api.github.com/repos/golang/go/tags?per_page=100")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("failed to fetch Go versions: status %d", resp.StatusCode)
+	}
+
+	var tags []struct {
+		Name string `json:"name"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&tags); err != nil {
+		return nil, err
+	}
+
+	var versions []string
+	for _, tag := range tags {
+		// Go tags are like "go1.21.0", "go1.20.5", etc.
+		if strings.HasPrefix(tag.Name, "go") && r.isValidGoVersion(tag.Name[2:]) {
+			versions = append(versions, tag.Name[2:]) // Remove "go" prefix
+		}
+	}
+
+	return versions, nil
+}
+
+// isValidGoVersion checks if a version string looks like a valid Go version
+func (r *ToolRegistry) isValidGoVersion(version string) bool {
+	// Simple validation: should contain dots and numbers
+	return strings.Contains(version, ".") && len(version) > 2
+}
+
+// getFallbackGoVersions returns known Go versions as fallback
+func (r *ToolRegistry) getFallbackGoVersions() []string {
+	return []string{
+		"1.24.2", "1.24.1", "1.24.0",
+		"1.23.4", "1.23.3", "1.23.2", "1.23.1", "1.23.0",
+		"1.22.10", "1.22.9", "1.22.8", "1.22.7", "1.22.6", "1.22.5", "1.22.4", "1.22.3", "1.22.2", "1.22.1", "1.22.0",
+		"1.21.13", "1.21.12", "1.21.11", "1.21.10", "1.21.9", "1.21.8", "1.21.7", "1.21.6", "1.21.5", "1.21.4", "1.21.3", "1.21.2", "1.21.1", "1.21.0",
+		"1.20.14", "1.20.13", "1.20.12", "1.20.11", "1.20.10", "1.20.9", "1.20.8", "1.20.7", "1.20.6", "1.20.5", "1.20.4", "1.20.3", "1.20.2", "1.20.1", "1.20.0",
+	}
+}
+
+// ResolveGoVersion resolves a Go version specification to a concrete version
+func (r *ToolRegistry) ResolveGoVersion(versionSpec string) (string, error) {
+	availableVersions, err := r.GetGoVersions()
+	if err != nil {
+		return "", err
+	}
+
+	spec, err := version.ParseSpec(versionSpec)
+	if err != nil {
+		return "", fmt.Errorf("invalid version specification %s: %w", versionSpec, err)
+	}
+
+	resolved, err := spec.Resolve(availableVersions)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve Go version %s: %w", versionSpec, err)
+	}
+
+	return resolved, nil
+}
+
 // fetchMvndVersionsFromApache fetches mvnd versions from Apache archive
 func (r *ToolRegistry) fetchMvndVersionsFromApache() ([]string, error) {
 	// Fetch mvnd versions from archive
@@ -359,17 +438,25 @@ func (r *ToolRegistry) ResolveNodeVersion(versionSpec string) (string, error) {
 		return sorted[len(sorted)-1], nil
 	}
 	available, err := r.GetNodeVersions()
-	if err != nil { return "", err }
+	if err != nil {
+		return "", err
+	}
 	spec, err := version.ParseSpec(versionSpec)
-	if err != nil { return "", fmt.Errorf("invalid version specification %s: %w", versionSpec, err) }
+	if err != nil {
+		return "", fmt.Errorf("invalid version specification %s: %w", versionSpec, err)
+	}
 	resolved, err := spec.Resolve(available)
-	if err != nil { return "", fmt.Errorf("failed to resolve Node version %s: %w", versionSpec, err) }
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve Node version %s: %w", versionSpec, err)
+	}
 	return resolved, nil
 }
 
 func (r *ToolRegistry) fetchNodeVersions() ([]string, error) {
 	entries, err := r.fetchNodeIndex()
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	var versions []string
 	for _, e := range entries {
 		v := strings.TrimPrefix(e.Version, "v")
@@ -380,7 +467,9 @@ func (r *ToolRegistry) fetchNodeVersions() ([]string, error) {
 
 func (r *ToolRegistry) fetchNodeLTSVersions() ([]string, error) {
 	entries, err := r.fetchNodeIndex()
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	var versions []string
 	for _, e := range entries {
 		if e.LTS != nil && e.LTS != false {
@@ -397,15 +486,20 @@ type nodeIndexEntry struct {
 
 func (r *ToolRegistry) fetchNodeIndex() ([]nodeIndexEntry, error) {
 	resp, err := r.httpClient.Get("https://nodejs.org/dist/index.json")
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 { return nil, fmt.Errorf("node index fetch failed: %d", resp.StatusCode) }
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("node index fetch failed: %d", resp.StatusCode)
+	}
 	var entries []nodeIndexEntry
 	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(&entries); err != nil { return nil, err }
+	if err := dec.Decode(&entries); err != nil {
+		return nil, err
+	}
 	return entries, nil
 }
-
 
 // ResolveJavaVersion resolves a Java version specification to a concrete version
 func (r *ToolRegistry) ResolveJavaVersion(versionSpec, distribution string) (string, error) {
@@ -485,6 +579,17 @@ func (r *ToolRegistry) GetToolInfo(toolName string) (map[string]interface{}, err
 
 		return map[string]interface{}{
 			"name":     "Maven Daemon",
+			"versions": versions,
+		}, nil
+
+	case "go":
+		versions, err := r.GetGoVersions()
+		if err != nil {
+			return nil, err
+		}
+
+		return map[string]interface{}{
+			"name":     "Go Programming Language",
 			"versions": versions,
 		}, nil
 

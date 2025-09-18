@@ -139,7 +139,19 @@ func listTools() error {
 			printInfo("  ... and %d more", len(versions)-8)
 		}
 	}
-	printInfo("")
+
+	// Go
+	printInfo("🐹 Go Programming Language")
+	if versions, err := registry.GetGoVersions(); err == nil && len(versions) > 0 {
+		shown := versions
+		if len(versions) > 8 {
+			shown = versions[:8]
+		}
+		printInfo("  Versions: %s", strings.Join(shown, ", "))
+		if len(versions) > 8 {
+			printInfo("  ... and %d more", len(versions)-8)
+		}
+	}
 
 	printInfo("")
 
@@ -148,6 +160,7 @@ func listTools() error {
 	printInfo("  mvx tools search maven       # Search Maven versions")
 	printInfo("  mvx tools search mvnd        # Search Maven Daemon versions")
 	printInfo("  mvx tools search node        # Search Node.js versions")
+	printInfo("  mvx tools search go          # Search Go versions")
 	printInfo("  mvx tools info java          # Show Java details")
 
 	return nil
@@ -171,6 +184,8 @@ func searchTool(toolName string, filters []string) error {
 		return searchMvndVersions(registry, filters)
 	case "node":
 		return searchNodeVersions(registry, filters)
+	case "go":
+		return searchGoVersions(registry, filters)
 	default:
 		return fmt.Errorf("unknown tool: %s", toolName)
 	}
@@ -408,6 +423,57 @@ func searchNodeVersions(registry *tools.ToolRegistry, filters []string) error {
 	return nil
 }
 
+// searchGoVersions searches for Go versions
+func searchGoVersions(registry *tools.ToolRegistry, filters []string) error {
+	versions, err := registry.GetGoVersions()
+	if err != nil {
+		return fmt.Errorf("failed to get Go versions: %w", err)
+	}
+
+	printInfo("🐹 Go Versions")
+	printInfo("")
+
+	// Group by major.minor version
+	majorVersions := make(map[string][]string)
+	for _, v := range versions {
+		parts := strings.Split(v, ".")
+		if len(parts) >= 2 {
+			major := parts[0] + "." + parts[1]
+			majorVersions[major] = append(majorVersions[major], v)
+		}
+	}
+
+	// Sort major versions
+	var majors []string
+	for major := range majorVersions {
+		majors = append(majors, major)
+	}
+	sort.Slice(majors, func(i, j int) bool { return majors[i] > majors[j] })
+
+	for _, major := range majors {
+		versions := majorVersions[major]
+		printInfo("Go %s.x:", major)
+		shown := versions
+		if len(versions) > 5 {
+			shown = versions[:5]
+		}
+		for _, v := range shown {
+			printInfo("  %s", v)
+		}
+		if len(versions) > 5 {
+			printInfo("  ... and %d more", len(versions)-5)
+		}
+		printInfo("")
+	}
+
+	printInfo("Usage examples:")
+	printInfo("  version: \"1.24\"         # Latest Go 1.24.x")
+	printInfo("  version: \"1.23\"         # Latest Go 1.23.x")
+	printInfo("  version: \"1.24.2\"       # Exact version")
+
+	return nil
+}
+
 // showToolInfo shows detailed information about a tool
 func showToolInfo(toolName string) error {
 	manager, err := tools.NewManager()
@@ -442,6 +508,12 @@ func showToolInfo(toolName string) error {
 			printInfo("Latest: %s", versions[0])
 		}
 	case "mvnd":
+		if versions, ok := info["versions"].([]string); ok {
+			printInfo("")
+			printInfo("Available Versions: %d", len(versions))
+			printInfo("Latest: %s", versions[0])
+		}
+	case "go":
 		if versions, ok := info["versions"].([]string); ok {
 			printInfo("")
 			printInfo("Available Versions: %d", len(versions))
