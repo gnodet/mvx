@@ -120,9 +120,18 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Test wrapper
+      - name: Test wrapper (Unix)
+        if: runner.os != 'Windows'
         run: |
           # Test wrapper with released version
           mkdir -p .mvx
           echo "mvxVersion=0.3.0" > .mvx/mvx.properties
           ./mvx version
+
+      - name: Test wrapper (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          # Test wrapper with released version
+          New-Item -ItemType Directory -Force -Path ".mvx"
+          echo "mvxVersion=0.3.0" | Out-File -FilePath ".mvx\mvx.properties" -Encoding ascii
+          .\mvx.cmd version
