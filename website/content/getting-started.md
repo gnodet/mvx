@@ -42,6 +42,22 @@ mvx init
 
 ### 2. Configure Your Tools
 
+#### Option A: Add Tools Using Commands (Recommended)
+
+Use the `mvx tools add` command to easily add tools:
+
+```bash
+# Add tools one by one
+mvx tools add java 21
+mvx tools add maven 3.9.6
+mvx tools add node lts
+
+# Add Java with specific distribution
+mvx tools add java 17 zulu
+```
+
+#### Option B: Edit Configuration Manually
+
 Edit `.mvx/config.json5` to specify your project's requirements:
 
 ```json5

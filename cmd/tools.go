@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/gnodet/mvx/pkg/config"
 	"github.com/gnodet/mvx/pkg/tools"
 	"github.com/spf13/cobra"
 )
@@ -19,7 +20,8 @@ var toolsCmd = &cobra.Command{
 Subcommands:
   list       List available tools and their versions
   search     Search for specific tool versions
-  info       Show detailed information about a tool`,
+  info       Show detailed information about a tool
+  add        Add a tool to the project configuration`,
 
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) == 0 {
@@ -53,6 +55,20 @@ Subcommands:
 				os.Exit(1)
 			}
 			if err := showToolInfo(args[1]); err != nil {
+				printError("%v", err)
+				os.Exit(1)
+			}
+		case "add":
+			if len(args) < 3 {
+				printError("add requires a tool name and version")
+				printError("Usage: mvx tools add <tool> <version> [distribution]")
+				os.Exit(1)
+			}
+			distribution := ""
+			if len(args) >= 4 {
+				distribution = args[3]
+			}
+			if err := addTool(args[1], args[2], distribution); err != nil {
 				printError("%v", err)
 				os.Exit(1)
 			}
@@ -162,6 +178,13 @@ func listTools() error {
 	printInfo("  mvx tools search node        # Search Node.js versions")
 	printInfo("  mvx tools search go          # Search Go versions")
 	printInfo("  mvx tools info java          # Show Java details")
+	printInfo("")
+	printInfo("Add tools to your project:")
+	printInfo("  mvx tools add java 21        # Add Java 21 (Temurin)")
+	printInfo("  mvx tools add java 17 zulu   # Add Java 17 (Azul Zulu)")
+	printInfo("  mvx tools add maven 4.0.0-rc-4  # Add Maven 4.0.0-rc-4")
+	printInfo("  mvx tools add node lts       # Add Node.js LTS")
+	printInfo("  mvx tools add go 1.23.1      # Add Go 1.23.1")
 
 	return nil
 }
@@ -522,4 +545,185 @@ func showToolInfo(toolName string) error {
 	}
 
 	return nil
+}
+
+// addTool adds a tool to the project configuration
+func addTool(toolName, version, distribution string) error {
+	// Find project root
+	projectRoot, err := findProjectRoot()
+	if err != nil {
+		return fmt.Errorf("failed to find project root: %w", err)
+	}
+
+	// Load existing configuration
+	cfg, err := config.LoadConfig(projectRoot)
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	// Validate tool name
+	manager, err := tools.NewManager()
+	if err != nil {
+		return fmt.Errorf("failed to create tool manager: %w", err)
+	}
+
+	registry := manager.GetRegistry()
+
+	// Validate that the tool exists
+	switch toolName {
+	case "java", "maven", "mvnd", "node", "go":
+		// Valid tools
+	default:
+		return fmt.Errorf("unknown tool: %s (supported: java, maven, mvnd, node, go)", toolName)
+	}
+
+	// Validate version exists for the tool
+	if err := validateToolVersion(registry, toolName, version, distribution); err != nil {
+		return err
+	}
+
+	// Initialize tools map if it doesn't exist
+	if cfg.Tools == nil {
+		cfg.Tools = make(map[string]config.ToolConfig)
+	}
+
+	// Create tool configuration
+	toolConfig := config.ToolConfig{
+		Version: version,
+	}
+
+	// Add distribution if specified and applicable
+	if distribution != "" {
+		if toolName == "java" {
+			toolConfig.Distribution = distribution
+		} else {
+			printWarning("Distribution '%s' ignored for tool '%s' (only applicable to Java)", distribution, toolName)
+		}
+	}
+
+	// Check if tool already exists
+	if existingConfig, exists := cfg.Tools[toolName]; exists {
+		printInfo("Tool '%s' already configured with version '%s'", toolName, existingConfig.Version)
+		printInfo("Updating to version '%s'", version)
+	}
+
+	// Add/update the tool
+	cfg.Tools[toolName] = toolConfig
+
+	// Save the configuration
+	if err := config.SaveConfig(cfg, projectRoot); err != nil {
+		return fmt.Errorf("failed to save configuration: %w", err)
+	}
+
+	printSuccess("✅ Added %s %s to project configuration", toolName, version)
+	if distribution != "" && toolName == "java" {
+		printSuccess("   Distribution: %s", distribution)
+	}
+
+	printInfo("")
+	printInfo("To install the tool, run: mvx install")
+
+	return nil
+}
+
+// validateToolVersion validates that a version exists for the given tool
+func validateToolVersion(registry *tools.ToolRegistry, toolName, version, distribution string) error {
+	switch toolName {
+	case "java":
+		// For Java, we need to validate the distribution if specified
+		dist := distribution
+		if dist == "" {
+			dist = "temurin" // Default distribution
+		}
+
+		// Check if distribution exists
+		distributions := registry.GetJavaDistributions()
+		validDist := false
+		for _, d := range distributions {
+			if d.Name == dist {
+				validDist = true
+				break
+			}
+		}
+		if !validDist {
+			return fmt.Errorf("unknown Java distribution: %s", dist)
+		}
+
+		// For Java, we allow version patterns like "21", "17", "11" which resolve to latest
+		// So we don't need strict validation here - the tool manager will resolve it
+		printInfo("🔍 Java %s (%s) - version will be resolved during installation", version, dist)
+		return nil
+
+	case "maven":
+		versions, err := registry.GetMavenVersions()
+		if err != nil {
+			return fmt.Errorf("failed to get Maven versions: %w", err)
+		}
+
+		// Check if exact version exists
+		for _, v := range versions {
+			if v == version {
+				return nil
+			}
+		}
+
+		printInfo("🔍 Maven %s - version will be resolved during installation", version)
+		return nil
+
+	case "mvnd":
+		versions, err := registry.GetMvndVersions()
+		if err != nil {
+			return fmt.Errorf("failed to get mvnd versions: %w", err)
+		}
+
+		// Check if exact version exists
+		for _, v := range versions {
+			if v == version {
+				return nil
+			}
+		}
+
+		printInfo("🔍 Maven Daemon %s - version will be resolved during installation", version)
+		return nil
+
+	case "node":
+		versions, err := registry.GetNodeVersions()
+		if err != nil {
+			return fmt.Errorf("failed to get Node.js versions: %w", err)
+		}
+
+		// For Node.js, we allow patterns like "lts", "20", "22.5.1"
+		// Check for exact match or pattern
+		if version == "lts" || version == "latest" {
+			return nil
+		}
+
+		for _, v := range versions {
+			if v == version {
+				return nil
+			}
+		}
+
+		printInfo("🔍 Node.js %s - version will be resolved during installation", version)
+		return nil
+
+	case "go":
+		versions, err := registry.GetGoVersions()
+		if err != nil {
+			return fmt.Errorf("failed to get Go versions: %w", err)
+		}
+
+		// Check if exact version exists
+		for _, v := range versions {
+			if v == version {
+				return nil
+			}
+		}
+
+		printInfo("🔍 Go %s - version will be resolved during installation", version)
+		return nil
+
+	default:
+		return fmt.Errorf("unknown tool: %s", toolName)
+	}
 }

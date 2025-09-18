@@ -98,6 +98,18 @@ func printError(format string, args ...interface{}) {
 	fmt.Fprintf(os.Stderr, "Error: "+format+"\n", args...)
 }
 
+func printWarning(format string, args ...interface{}) {
+	if !quiet {
+		fmt.Fprintf(os.Stderr, "Warning: "+format+"\n", args...)
+	}
+}
+
+func printSuccess(format string, args ...interface{}) {
+	if !quiet {
+		fmt.Printf(format+"\n", args...)
+	}
+}
+
 // Helper to find project root (directory containing .mvx/)
 func findProjectRoot() (string, error) {
 	dir, err := os.Getwd()

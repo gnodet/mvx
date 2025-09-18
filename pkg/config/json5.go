@@ -197,3 +197,180 @@ func ParseJSON5(data []byte, target interface{}) error {
 
 	return nil
 }
+
+// FormatAsJSON5 formats a configuration struct as JSON5 with proper formatting
+func FormatAsJSON5(cfg *Config) (string, error) {
+	// First marshal to JSON to get the structure
+	jsonData, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal config to JSON: %w", err)
+	}
+
+	// Add header comment
+	result := "{\n"
+	result += "  // mvx project configuration\n"
+	result += "  // See https://github.com/gnodet/mvx for documentation\n\n"
+
+	// Parse the JSON structure and format as JSON5
+	var data map[string]interface{}
+	if err := json.Unmarshal(jsonData, &data); err != nil {
+		return "", fmt.Errorf("failed to unmarshal JSON: %w", err)
+	}
+
+	// Format each section
+	sections := []string{"project", "tools", "environment", "commands"}
+	first := true
+
+	for _, section := range sections {
+		if value, exists := data[section]; exists && value != nil {
+			if !first {
+				result += ",\n\n"
+			}
+			first = false
+
+			switch section {
+			case "project":
+				result += "  // Project metadata\n"
+				result += formatProjectSection(value)
+			case "tools":
+				result += "  // Tool versions and configurations\n"
+				result += formatToolsSection(value)
+			case "environment":
+				result += "  // Environment variables\n"
+				result += formatEnvironmentSection(value)
+			case "commands":
+				result += "  // Custom commands\n"
+				result += formatCommandsSection(value)
+			}
+		}
+	}
+
+	result += "\n}\n"
+	return result, nil
+}
+
+// formatProjectSection formats the project section
+func formatProjectSection(value interface{}) string {
+	project, ok := value.(map[string]interface{})
+	if !ok {
+		return ""
+	}
+
+	result := "  project: {\n"
+	if name, exists := project["name"]; exists && name != nil {
+		result += fmt.Sprintf("    name: %q,\n", name)
+	}
+	if desc, exists := project["description"]; exists && desc != nil {
+		result += fmt.Sprintf("    description: %q\n", desc)
+	}
+	result += "  }"
+	return result
+}
+
+// formatToolsSection formats the tools section
+func formatToolsSection(value interface{}) string {
+	tools, ok := value.(map[string]interface{})
+	if !ok {
+		return ""
+	}
+
+	result := "  tools: {\n"
+	first := true
+
+	for toolName, toolData := range tools {
+		if !first {
+			result += ",\n"
+		}
+		first = false
+
+		if toolConfig, ok := toolData.(map[string]interface{}); ok {
+			result += fmt.Sprintf("    %s: {\n", toolName)
+
+			if version, exists := toolConfig["version"]; exists && version != nil {
+				result += fmt.Sprintf("      version: %q", version)
+			}
+
+			if dist, exists := toolConfig["distribution"]; exists && dist != nil && dist != "" {
+				result += fmt.Sprintf(",\n      distribution: %q", dist)
+			}
+
+			result += "\n    }"
+		}
+	}
+
+	result += "\n  }"
+	return result
+}
+
+// formatEnvironmentSection formats the environment section
+func formatEnvironmentSection(value interface{}) string {
+	env, ok := value.(map[string]interface{})
+	if !ok {
+		return ""
+	}
+
+	result := "  environment: {\n"
+	first := true
+
+	for key, val := range env {
+		if !first {
+			result += ",\n"
+		}
+		first = false
+		result += fmt.Sprintf("    %s: %q", key, val)
+	}
+
+	result += "\n  }"
+	return result
+}
+
+// formatCommandsSection formats the commands section
+func formatCommandsSection(value interface{}) string {
+	commands, ok := value.(map[string]interface{})
+	if !ok {
+		return ""
+	}
+
+	result := "  commands: {\n"
+	first := true
+
+	for cmdName, cmdData := range commands {
+		if !first {
+			result += ",\n\n"
+		}
+		first = false
+
+		if cmdConfig, ok := cmdData.(map[string]interface{}); ok {
+			// Quote command names that contain special characters
+			quotedName := cmdName
+			if strings.ContainsAny(cmdName, "-. ") {
+				quotedName = fmt.Sprintf("%q", cmdName)
+			}
+			result += fmt.Sprintf("    %s: {\n", quotedName)
+
+			if desc, exists := cmdConfig["description"]; exists && desc != nil && desc != "" {
+				result += fmt.Sprintf("      description: %q,\n", desc)
+			}
+
+			if script, exists := cmdConfig["script"]; exists && script != nil && script != "" {
+				result += fmt.Sprintf("      script: %q", script)
+			}
+
+			// Add other fields if they exist
+			if wd, exists := cmdConfig["working_dir"]; exists && wd != nil && wd != "" {
+				result += fmt.Sprintf(",\n      working_dir: %q", wd)
+			}
+
+			if override, exists := cmdConfig["override"]; exists && override != nil {
+				if overrideBool, ok := override.(bool); ok && overrideBool {
+					result += ",\n      override: true"
+				}
+			}
+
+			result += "\n    }"
+		}
+	}
+
+	result += "\n  }"
+	return result
+}

@@ -1,27 +1,42 @@
 {
+  // mvx project configuration
+  // See https://github.com/gnodet/mvx for documentation
+
+  // Project metadata
   project: {
-    name: "mvx"
+    name: "mvx",
+    description: ""
   },
+
+  // Tool versions and configurations
   tools: {
-    go: {
-      version: "1.24.2"
+    java: {
+      version: "17",
+      distribution: "zulu"
     },
     maven: {
-      version: "3.9.6"
+      version: "4.0.0-rc-4"
     },
-    java: {
-      version: "21"
+    node: {
+      version: "lts"
+    },
+    go: {
+      version: "1.24.2"
     }
   },
+
+  // Custom commands
   commands: {
     hello: {
       description: "Say hello",
       script: "echo Hello from mvx! && mvn -v"
     },
+
     "website-build": {
       description: "Build the website using ROQ",
       script: "cd website && mvn quarkus\\:build"
     },
+
     "website-serve": {
       description: "Serve the website using ROQ dev mode",
       script: "cd website && mvn quarkus\\:dev -Dquarkus.http.port=8081"

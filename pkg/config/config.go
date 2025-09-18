@@ -114,6 +114,32 @@ func loadConfigFile(path string) (*Config, error) {
 	return &config, nil
 }
 
+// SaveConfig saves configuration to the project directory in JSON5 format
+func SaveConfig(cfg *Config, projectRoot string) error {
+	mvxDir := filepath.Join(projectRoot, ".mvx")
+
+	// Ensure .mvx directory exists
+	if err := os.MkdirAll(mvxDir, 0755); err != nil {
+		return fmt.Errorf("failed to create .mvx directory: %w", err)
+	}
+
+	// Use JSON5 format as the default
+	configPath := filepath.Join(mvxDir, "config.json5")
+
+	// Convert config to JSON5 format
+	content, err := FormatAsJSON5(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to format configuration as JSON5: %w", err)
+	}
+
+	// Write to file
+	if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+		return fmt.Errorf("failed to write configuration file: %w", err)
+	}
+
+	return nil
+}
+
 // Validate checks if the configuration is valid
 func (c *Config) Validate() error {
 	if c.Project.Name == "" {

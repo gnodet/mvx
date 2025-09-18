@@ -8,6 +8,35 @@ layout: page
 
 mvx supports a wide range of development tools across different programming languages and ecosystems. Each tool is automatically downloaded, installed, and configured for your project.
 
+## Adding Tools to Your Project
+
+The easiest way to add tools to your project is using the `mvx tools add` command:
+
+```bash
+# Add Java 21 (default Temurin distribution)
+mvx tools add java 21
+
+# Add Java 17 with specific distribution
+mvx tools add java 17 zulu
+
+# Add Maven 4.0.0-rc-4
+mvx tools add maven 4.0.0-rc-4
+
+# Add Node.js LTS
+mvx tools add node lts
+
+# Add Go 1.23.1
+mvx tools add go 1.23.1
+```
+
+**Benefits:**
+- ✅ **Validates** the tool and version exist
+- ✅ **Updates** your `.mvx/config.json5` automatically
+- ✅ **Preserves** existing configuration and formatting
+- ✅ **Adds comments** and proper JSON5 structure
+
+## Supported Tools
+
 ## Java Ecosystem
 
 ### Java (OpenJDK)
