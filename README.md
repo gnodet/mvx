@@ -38,7 +38,7 @@ curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-mvx.sh | ba
 **Install development version (latest features, may be unstable):**
 
 ```bash
-MVX_VERSION=main curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-mvx.sh | bash
+curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-mvx.sh | MVX_VERSION=main bash
 ```
 
 **Use mvx without global installation:**
@@ -80,7 +80,7 @@ curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-mvx.sh | ba
 **Install development version:**
 
 ```bash
-MVX_VERSION=main curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-mvx.sh | bash
+curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-mvx.sh | MVX_VERSION=main bash
 ```
 
 **Use mvx without global installation:**
