@@ -84,5 +84,10 @@
       script: "go fmt ./... && go vet ./... && go test ./...",
       working_dir: ".",
     },
+
+    hello: {
+      description: "Say hello from mvx",
+      script: "echo '👋 Hello from mvx custom command!'",
+    },
   },
 }

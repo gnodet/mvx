@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/gnodet/mvx/pkg/config"
+	"github.com/gnodet/mvx/pkg/executor"
+	"github.com/gnodet/mvx/pkg/tools"
 	"github.com/spf13/cobra"
 )
 
@@ -46,6 +49,12 @@ For more information, visit: https://github.com/gnodet/mvx`,
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() error {
+	// Add dynamic custom commands before execution
+	if err := addCustomCommands(); err != nil {
+		// If we can't load custom commands, continue with built-in commands only
+		printVerbose("Failed to load custom commands: %v", err)
+	}
+
 	return rootCmd.Execute()
 }
 
@@ -112,4 +121,83 @@ func findProjectRoot() (string, error) {
 
 	// If no .mvx directory found, use current directory
 	return os.Getwd()
+}
+
+// addCustomCommands dynamically adds custom commands from configuration as top-level commands
+func addCustomCommands() error {
+	// Try to find project root and load configuration
+	projectRoot, err := findProjectRoot()
+	if err != nil {
+		return err // No project root found, skip custom commands
+	}
+
+	// Load configuration
+	cfg, err := config.LoadConfig(projectRoot)
+	if err != nil {
+		return err // No configuration found, skip custom commands
+	}
+
+	// Create tool manager and executor
+	manager, err := tools.NewManager()
+	if err != nil {
+		return err
+	}
+
+	exec := executor.NewExecutor(cfg, manager, projectRoot)
+
+	// Add each custom command as a top-level command
+	for cmdName, cmdConfig := range cfg.Commands {
+		// Skip built-in commands unless they have override flag
+		if isBuiltinCommand(cmdName) && !cmdConfig.Override {
+			continue
+		}
+
+		// Create a new cobra command for this custom command
+		customCmd := createCustomCommand(cmdName, cmdConfig, exec)
+		rootCmd.AddCommand(customCmd)
+	}
+
+	return nil
+}
+
+// createCustomCommand creates a cobra command for a custom command
+func createCustomCommand(cmdName string, cmdConfig config.CommandConfig, exec *executor.Executor) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   cmdName + " [args...]",
+		Short: cmdConfig.Description,
+		Long:  fmt.Sprintf("%s\n\nThis is a custom command defined in your .mvx/config file.", cmdConfig.Description),
+		Run: func(cmd *cobra.Command, args []string) {
+			if err := exec.ExecuteCommand(cmdName, args); err != nil {
+				printError("%v", err)
+				os.Exit(1)
+			}
+		},
+	}
+
+	// Add arguments if defined
+	for _, arg := range cmdConfig.Args {
+		if arg.Required {
+			cmd.MarkFlagRequired(arg.Name)
+		}
+	}
+
+	return cmd
+}
+
+// isBuiltinCommand checks if a command name is a built-in mvx command
+func isBuiltinCommand(commandName string) bool {
+	builtinCommands := map[string]bool{
+		"build":            true,
+		"test":             true,
+		"setup":            true,
+		"init":             true,
+		"tools":            true,
+		"version":          true,
+		"help":             true,
+		"completion":       true,
+		"info":             true,
+		"update-bootstrap": true,
+		"run":              true, // Don't override the run command itself
+	}
+	return builtinCommands[commandName]
 }
