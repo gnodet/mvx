@@ -71,7 +71,7 @@ layout: index
             <div class="quick-start-step">
                 <div class="step-number">1</div>
                 <h3>Install</h3>
-                <pre><code class="language-bash">curl -fsSL https://github.com/gnodet/mvx/raw/main/install.sh | sh</code></pre>
+                <pre><code class="language-bash">curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-mvx.sh | sh</code></pre>
             </div>
             <div class="quick-start-step">
                 <div class="step-number">2</div>

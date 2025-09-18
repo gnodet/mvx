@@ -15,7 +15,7 @@ mvx is a universal build environment bootstrap tool that automatically manages d
 Download and install mvx globally:
 
 ```bash
-curl -fsSL https://github.com/gnodet/mvx/raw/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-mvx.sh | sh
 ```
 
 This installs mvx to `~/.mvx/bin/mvx` and adds it to your PATH.
