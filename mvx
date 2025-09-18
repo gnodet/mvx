@@ -316,7 +316,7 @@ find_mvx_binary() {
 
     # Need to download
     if [ "$verbosity" = "verbose" ]; then
-        echo "mvx $version not found, downloading..."
+        echo "mvx $version not found, downloading..." >&2
     fi
 
     ensure_dir "$cache_dir"
