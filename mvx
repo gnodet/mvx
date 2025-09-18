@@ -75,7 +75,7 @@ download_file() {
     local output="$2"
     local temp_file="${output}.tmp"
 
-    echo "Downloading from: $url"
+    echo "Downloading from: $url" >&2
 
     # Clean up any existing temp file
     rm -f "$temp_file"
@@ -329,7 +329,7 @@ find_mvx_binary() {
 
     local download_url="$DOWNLOAD_URL/download/v$version/$binary_name"
 
-    echo "Downloading mvx $version for $platform..."
+    echo "Downloading mvx $version for $platform..." >&2
     if download_file "$download_url" "$cached_binary"; then
         chmod +x "$cached_binary"
 
