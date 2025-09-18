@@ -32,14 +32,16 @@
       script: "echo Hello from mvx! && mvn -v"
     },
 
-    "website-build": {
+    "website build": {
       description: "Build the website using ROQ",
-      script: "cd website && mvn quarkus\\:build"
+      script: "cd website && mvn quarkus\\:build",
+      override: true
     },
 
-    "website-serve": {
+    "website serve": {
       description: "Serve the website using ROQ dev mode",
-      script: "cd website && mvn quarkus\\:dev -Dquarkus.http.port=8081"
+      script: "cd website && mvn quarkus\\:dev -Dquarkus.http.port=8081",
+      override: true
     }
   }
 }

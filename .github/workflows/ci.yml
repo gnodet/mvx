@@ -60,6 +60,16 @@ jobs:
       - name: Test binary
         run: ./mvx-binary version
 
+      - name: Run integration tests
+        run: |
+          cd test
+          go test -v -timeout=5m ./...
+
+      - name: Run benchmarks
+        run: |
+          cd test
+          go test -bench=. -benchtime=3s ./...
+
       - name: Build for all platforms
         run: make build-all
 

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/gnodet/mvx/pkg/config"
+	"github.com/gnodet/mvx/pkg/executor"
 	"github.com/gnodet/mvx/pkg/tools"
 	"github.com/spf13/cobra"
 )
@@ -18,27 +19,56 @@ var websiteCmd = &cobra.Command{
 
 var websiteBuildCmd = &cobra.Command{
 	Use:   "build",
-	Short: "Build the website (npm run build)",
-	RunE:  func(cmd *cobra.Command, args []string) error { return runWebsiteNpm("build") },
-}
-
-var websiteDevCmd = &cobra.Command{
-	Use:   "dev",
-	Short: "Run website dev server (npm run start-with-snippets)",
-	RunE:  func(cmd *cobra.Command, args []string) error { return runWebsiteNpm("start-with-snippets") },
+	Short: "Build the website",
+	RunE:  func(cmd *cobra.Command, args []string) error { return runWebsiteCommand("build", args) },
 }
 
 var websiteServeCmd = &cobra.Command{
 	Use:   "serve",
-	Short: "Serve built website (npm run serve)",
-	RunE:  func(cmd *cobra.Command, args []string) error { return runWebsiteNpm("serve") },
+	Short: "Serve the website",
+	RunE:  func(cmd *cobra.Command, args []string) error { return runWebsiteCommand("serve", args) },
 }
 
 func init() {
 	websiteCmd.AddCommand(websiteBuildCmd)
-	websiteCmd.AddCommand(websiteDevCmd)
 	websiteCmd.AddCommand(websiteServeCmd)
 	rootCmd.AddCommand(websiteCmd)
+}
+
+// runWebsiteCommand runs a website subcommand, checking for overrides first
+func runWebsiteCommand(subcommand string, args []string) error {
+	projectRoot, err := findProjectRoot()
+	if err != nil {
+		return fmt.Errorf("failed to find project root: %w", err)
+	}
+
+	// Try to load configuration to check for overrides
+	cfg, err := config.LoadConfig(projectRoot)
+	if err != nil {
+		// No config found, fall back to default behavior
+		return runWebsiteNpm(subcommand)
+	}
+
+	// Create tool manager and executor
+	manager, err := tools.NewManager()
+	if err != nil {
+		return fmt.Errorf("failed to create tool manager: %w", err)
+	}
+
+	exec := executor.NewExecutor(cfg, manager, projectRoot)
+
+	// Check for override command (e.g., "website build", "website serve")
+	overrideCommandName := fmt.Sprintf("website %s", subcommand)
+	if cmdConfig, exists := cfg.Commands[overrideCommandName]; exists && cmdConfig.Override {
+		printInfo("🔨 Running overridden website %s command", subcommand)
+		if cmdConfig.Description != "" {
+			printInfo("   %s", cmdConfig.Description)
+		}
+		return exec.ExecuteCommand(overrideCommandName, args)
+	}
+
+	// No override found, use default behavior
+	return runWebsiteNpm(subcommand)
 }
 
 func runWebsiteNpm(subcmd string) error {

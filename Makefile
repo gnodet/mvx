@@ -154,6 +154,28 @@ test-mvx: build
 	@./mvx version || echo "mvx test completed"
 	@rm -f ./mvx.exe ./mvx-binary-local
 
+# Run unit tests
+.PHONY: test
+test:
+	@echo "Running unit tests..."
+	go test -v ./...
+
+# Run integration tests
+.PHONY: test-integration
+test-integration: build
+	@echo "Running integration tests..."
+	cd test && go test -v -timeout=5m ./...
+
+# Run benchmarks
+.PHONY: benchmark
+benchmark: build
+	@echo "Running benchmarks..."
+	cd test && go test -bench=. -benchtime=3s ./...
+
+# Run all tests
+.PHONY: test-all
+test-all: test test-integration benchmark
+
 # Show help
 .PHONY: help
 help:
