@@ -124,9 +124,15 @@ jobs:
       - name: Test wrapper (Windows)
         if: runner.os == 'Windows'
         run: |
+          # Check what binary was actually built
+          Get-ChildItem -Name "mvx-binary*"
           # Ensure dev binary is available for wrapper
           New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.mvx\dev"
-          Copy-Item "mvx-binary.exe" "$env:USERPROFILE\.mvx\dev\mvx.exe"
+          if (Test-Path "mvx-binary.exe") {
+            Copy-Item "mvx-binary.exe" "$env:USERPROFILE\.mvx\dev\mvx.exe"
+          } else {
+            Copy-Item "mvx-binary" "$env:USERPROFILE\.mvx\dev\mvx.exe"
+          }
           New-Item -ItemType Directory -Force -Path ".mvx"
           echo "dev" | Out-File -FilePath ".mvx\version" -Encoding ascii
           .\mvx.cmd version
