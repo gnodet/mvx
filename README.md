@@ -2,6 +2,8 @@
 
 > A universal build environment bootstrap tool that goes beyond Maven
 
+📖 **[Documentation & Website](https://gnodet.github.io/mvx/)** | 🚀 **[Getting Started](https://gnodet.github.io/mvx/getting-started/)** | 🛠️ **[Tools](https://gnodet.github.io/mvx/tools/)**
+
 ## 🎯 Goals
 
 **mvx** aims to solve the fundamental challenge of project setup and build environment management. While Maven Wrapper revolutionized Maven distribution, modern development requires more:
