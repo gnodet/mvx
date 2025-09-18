@@ -113,11 +113,20 @@ jobs:
       - name: Test wrapper (Unix)
         if: runner.os != 'Windows'
         run: |
+          # Ensure dev binary is available for wrapper
+          mkdir -p ~/.mvx/dev
+          cp mvx-binary ~/.mvx/dev/mvx
+          chmod +x ~/.mvx/dev/mvx
+          mkdir -p .mvx
           echo "dev" > .mvx/version
           ./mvx version
 
       - name: Test wrapper (Windows)
         if: runner.os == 'Windows'
         run: |
-          echo "dev" > .mvx/version
-          ./mvx.cmd version
+          # Ensure dev binary is available for wrapper
+          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.mvx\dev"
+          Copy-Item "mvx-binary.exe" "$env:USERPROFILE\.mvx\dev\mvx.exe"
+          New-Item -ItemType Directory -Force -Path ".mvx"
+          echo "dev" | Out-File -FilePath ".mvx\version" -Encoding ascii
+          .\mvx.cmd version
