@@ -17,6 +17,12 @@ all: build
 .PHONY: build
 build:
 	$(STATIC_FLAGS) go build $(LDFLAGS) -o mvx-binary .
+	@echo "Installing global development binary..."
+	@mkdir -p ~/.mvx/dev
+	@cp mvx-binary ~/.mvx/dev/mvx
+	@chmod +x ~/.mvx/dev/mvx
+	@echo "✅ Global development binary installed at ~/.mvx/dev/mvx"
+	@echo "   All projects using 'mvxVersion=dev' will now use this binary automatically"
 
 # Build for multiple platforms (static binaries)
 .PHONY: build-all
@@ -62,6 +68,12 @@ lint:
 .PHONY: dev
 dev:
 	go build -race $(LDFLAGS) -o mvx-dev .
+	@echo "Installing global development binary..."
+	@mkdir -p ~/.mvx/dev
+	@cp mvx-dev ~/.mvx/dev/mvx
+	@chmod +x ~/.mvx/dev/mvx
+	@echo "✅ Global development binary installed at ~/.mvx/dev/mvx"
+	@echo "   All projects using 'mvxVersion=dev' will now use this binary automatically"
 
 
 

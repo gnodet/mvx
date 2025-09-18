@@ -84,9 +84,9 @@ if [ "$BOOTSTRAP_VERSION" = "main" ]; then
     echo "   To build locally:"
     echo "     git clone https://github.com/gnodet/mvx.git"
     echo "     cd mvx && make build"
-    echo "     cp mvx /path/to/this/project/mvx-dev"
     echo ""
-    echo "   The bootstrap will automatically use mvx-dev if present."
+    echo "   The build automatically installs to ~/.mvx/dev/mvx and all projects"
+    echo "   using 'mvxVersion=dev' will automatically use this binary."
 else
     # Remove 'v' prefix if present for version number
     VERSION_NUMBER=$(echo "$BOOTSTRAP_VERSION" | sed 's/^v//')
