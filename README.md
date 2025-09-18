@@ -43,12 +43,14 @@ MVX_VERSION=main curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/in
 ```
 
 The bootstrap automatically:
-- Downloads the correct mvx version for your project
+
+- Downloads the correct mvx Go binary for your project
 - Caches binaries to avoid re-downloading
 - Works on Linux, macOS, and Windows
 - Requires no global installation
+- Creates lightweight shell/batch scripts in your project
 
-See [WRAPPER.md](WRAPPER.md) for detailed documentation.
+See [BOOTSTRAP.md](BOOTSTRAP.md) for detailed documentation.
 
 ## 📦 Installation
 
@@ -123,16 +125,18 @@ make test
 
 ## 🎯 Shell Completion
 
-mvx supports shell completion for commands and arguments:
+mvx supports shell completion for commands and arguments across multiple shells (bash, zsh, fish, powershell):
 
 ### Zsh Completion
 
 **For current session:**
+
 ```bash
 source <(./mvx completion zsh)
 ```
 
 **For permanent setup (recommended):**
+
 ```bash
 # Create completion directory if it doesn't exist
 mkdir -p ~/.zsh/completions
@@ -151,16 +155,27 @@ source ~/.zshrc
 ### Bash Completion
 
 **For current session:**
+
 ```bash
 source <(./mvx completion bash)
 ```
 
 **For permanent setup:**
+
 ```bash
 # Add to ~/.bashrc
 echo 'source <(./mvx completion bash)' >> ~/.bashrc
 source ~/.bashrc
 ```
+
+### Other Shells
+
+mvx also supports completion for:
+
+- **Fish**: `./mvx completion fish`
+- **PowerShell**: `./mvx completion powershell`
+
+See `./mvx completion [shell] --help` for setup instructions.
 
 ### Test Completion
 
@@ -173,86 +188,145 @@ source ~/.bashrc
 ## 🔧 Core Principles
 
 ### 1. **Self-Contained**
-- Single shell script with no external dependencies
-- Downloads and manages tools as needed
+
+- Bootstrap scripts with no external dependencies
+- Downloads and manages Go binaries and tools as needed
 - Caches everything locally for offline work
 
 ### 2. **Configurable**
+
 - Project-specific tool versions and commands
 - Environment variable management
 - Extensible command system
 
 ### 3. **Universal**
+
 - Started with Maven but works with any build system
 - Language-agnostic tool management
 - Ecosystem-aware (npm, pip, cargo, etc.)
 
 ### 4. **Developer-Friendly**
+
 - Intuitive command names and help system
 - Rich debugging and verbose modes
 - IDE integration support
 
 ## 🏗️ Architecture
 
-```
+mvx uses a bootstrap system similar to Maven Wrapper, providing zero-dependency project setup:
+
+```text
 ~/.mvx/                           # Global cache directory
 ├── versions/                     # Cached mvx versions
 │   ├── 1.0.0/
-│   │   └── mvx                  # Go binary
+│   │   ├── mvx                  # Go binary (Unix/Linux/macOS)
+│   │   └── mvx.exe              # Go binary (Windows)
 │   └── 1.1.0/
 ├── tools/                        # Downloaded tools cache
 │   ├── maven/
 │   │   ├── 3.9.6/
 │   │   └── 4.0.0/
-│   ├── java/
-│   │   ├── temurin-21/
-│   │   └── graalvm-21/
-│   └── node/
+│   ├── mvnd/
+│   │   └── 1.0.2/
+│   └── java/
+│       ├── temurin-21/
+│       └── graalvm-21/
 └── config/                       # Global configuration
 
 project/                          # Project directory
-├── mvx                          # Single Go binary
-├── mvx.exe                      # Windows binary
+├── mvx                          # Bootstrap script (Unix/Linux/macOS)
+├── mvx.cmd                      # Bootstrap script (Windows)
+├── mvx-dev                      # Local development binary (optional)
 ├── .mvx/
-│   ├── config.json5             # Project configuration (JSON5)
-│   ├── config.yml               # Or YAML format
-│   ├── version                  # mvx version to use
-│   └── local/                   # Project-specific cache
+│   ├── mvx.properties           # Bootstrap configuration
+│   ├── config.json5             # Project configuration (JSON5) - planned
+│   ├── config.yml               # Or YAML format - planned
+│   └── local/                   # Project-specific cache - planned
 └── your-project-files...
 ```
 
-## 📋 Planned Features
+### Bootstrap System
 
-### Tool Management
-- [x] Maven bootstrap functionality (baseline)
-- [ ] Java version management (OpenJDK, GraalVM, etc.)
+The bootstrap scripts (`mvx` and `mvx.cmd`) are **shell/batch scripts** (not binaries) that automatically:
+
+- Detect your platform and architecture
+- Check for local development binaries first (`mvx-dev`, `mvx-dev.exe`)
+- Download and cache the appropriate mvx **Go binary** version
+- Execute commands with the correct binary
+- Provide self-update capabilities
+
+**Key distinction**: The `mvx` and `mvx.cmd` files in your project are lightweight bootstrap scripts, while the actual mvx functionality is provided by Go binaries that are downloaded and cached automatically.
+
+## 📋 Features
+
+### ✅ Implemented Features
+
+#### Bootstrap & Distribution
+
+- [x] Cross-platform bootstrap scripts (Unix/Windows)
+- [x] Automatic binary download and caching
+- [x] Version management via `.mvx/mvx.properties`
+- [x] Local development binary support (`mvx-dev`)
+- [x] Self-update capabilities (`mvx update-bootstrap`)
+- [x] Platform detection (Linux, macOS, Windows, ARM64/x64)
+
+#### Core Commands
+
+- [x] `mvx version` - Version information and diagnostics
+- [x] `mvx init` - Initialize mvx configuration in projects
+- [x] `mvx setup` - Install tools and configure environment
+- [x] `mvx build` - Execute configured build commands
+- [x] `mvx test` - Execute configured test commands
+- [x] `mvx run` - Execute custom commands from configuration
+- [x] `mvx tools` - Tool management and discovery
+- [x] `mvx info` - Detailed command information
+
+#### Configuration System
+
+- [x] JSON5 configuration format support
+- [x] YAML configuration format support
+- [x] Project-specific tool definitions
+- [x] Custom command definitions with arguments
+- [x] Multiline script support
+- [x] Command-specific environment variables
+- [x] Working directory specification
+- [x] Tool requirement validation
+- [x] Global environment variable management
+- [x] Configurable tool versions
+
+#### Tool Management
+
+- [x] **Java Development Kit** - Multiple distributions (Temurin, GraalVM, Oracle, Corretto, Liberica, Zulu, Microsoft)
+- [x] **Apache Maven** - All versions (3.x, 4.x including pre-releases)
+- [x] **Maven Daemon (mvnd)** - High-performance Maven alternative
+- [x] Tool installation and caching
+- [x] Environment setup and PATH management
+- [x] Version resolution (latest, major.minor, exact versions)
+
+#### Developer Experience
+
+- [x] Shell completion (bash, zsh, fish, powershell)
+- [x] Verbose and quiet modes
+- [x] Built-in help system
+- [x] Command validation and error handling
+
+### 🚧 Planned Features
+
+#### Extended Tool Support
+
 - [ ] Node.js and npm/yarn support
 - [ ] Python and pip/poetry support
-- [ ] Go toolchain support
-- [ ] Rust and Cargo support
-- [ ] Custom tool definitions
+- [ ] Custom tool definitions and installers
 
-### Command System
-- [ ] JSON5 and YAML configuration parsing
-- [ ] Configurable command definitions
-- [ ] Built-in help and documentation
+#### Enhanced Commands
+
 - [ ] Command aliases and shortcuts
 - [ ] Conditional commands (platform/environment specific)
-- [ ] Command composition and pipelines
 
-### Environment Management
-- [ ] Environment variable configuration
-- [ ] PATH management
-- [ ] Shell integration (bash, zsh, fish)
-- [ ] IDE configuration generation (VS Code, IntelliJ)
+#### Security & Performance
 
-### Advanced Features
-- [ ] Parallel tool downloads
 - [ ] Checksum verification for security
-- [ ] Offline mode support
-- [ ] CI/CD integration helpers
-- [ ] Container/Docker support
-- [ ] Build metrics and performance tracking
+- [ ] Parallel tool downloads
 
 ## 🛠️ Implementation
 
@@ -263,6 +337,7 @@ project/                          # Project directory
 ### Configuration Format Detection
 
 mvx automatically detects the configuration format:
+
 - `.mvx/config.json5` → JSON5 format
 - `.mvx/config.yml` or `.mvx/config.yaml` → YAML format
 - Falls back to JSON5 if both exist
@@ -270,18 +345,21 @@ mvx automatically detects the configuration format:
 ## 🎯 Use Cases
 
 ### For Project Maintainers
+
 - Eliminate "how to build" documentation
 - Ensure consistent development environments
 - Simplify onboarding for new contributors
 - Reduce support burden for environment issues
 
 ### For Developers
+
 - One command to set up any project
 - No need to install project-specific tools globally
 - Consistent experience across different projects
 - Easy switching between project environments
 
 ### For Teams
+
 - Standardized development workflows
 - Reproducible builds across environments
 - Simplified CI/CD setup
@@ -314,10 +392,9 @@ mvx supports both **JSON5** and **YAML** configuration formats, inspired by [Mav
       version: "4.0.0",
     },
 
-    // Node.js only needed for frontend builds
-    node: {
-      version: "20.x",
-      required_for: ["frontend", "docs"],
+    // Maven Daemon for faster builds
+    mvnd: {
+      version: "1.0.2",
     },
   },
 
@@ -372,10 +449,9 @@ tools:
   maven:
     version: "4.0.0"
 
-  # Node.js only needed for frontend builds
-  node:
-    version: "20.x"
-    required_for: [frontend, docs]
+  # Maven Daemon for faster builds
+  mvnd:
+    version: "1.0.2"
 
 environment:
   # Increase memory for large builds
@@ -406,22 +482,36 @@ commands:
 
 We're starting with the Maven ecosystem (building on Maven Wrapper's success) and expanding from there. The goal is to create a tool that feels familiar to Maven users but works universally.
 
+### Current Implementation
+
+The project currently includes:
+
+- **Bootstrap Scripts**: `mvx` (Unix/Linux/macOS) and `mvx.cmd` (Windows) - shell/batch scripts that download and execute the appropriate Go binary
+- **Development Binary**: `mvx-dev` - a local Go binary for development (ARM64 macOS in this repository)
+- **Configuration**: `.mvx/mvx.properties` - bootstrap configuration file
+- **Installer**: `install-mvx.sh` - script to install bootstrap files in any project
+
+The bootstrap system is fully functional and provides:
+
+- Automatic platform detection
+- Binary caching in `~/.mvx/versions/`
+- Version management via `.mvx/mvx.properties`
+- Self-update capabilities (`./mvx update-bootstrap`)
+- Development binary support for local testing
+
 ### Roadmap
 
-**Phase 1: Maven Foundation** (Q1 2025)
-- [ ] Enhanced Maven bootstrap with tool management
-- [ ] Basic Java version detection and management
-- [ ] Simple command configuration system
+**Phase 1: Maven Foundation** (Q1 2025) ✅ **COMPLETED**
+
+- [x] Enhanced Maven bootstrap with tool management
+- [x] Java version detection and management (multiple distributions)
+- [x] Command configuration system (JSON5/YAML)
 
 **Phase 2: Multi-Tool Support** (Q2 2025)
+
 - [ ] Node.js and npm integration
 - [ ] Python and pip support
-- [ ] Environment variable management
-
-**Phase 3: Advanced Features** (Q3 2025)
-- [ ] IDE integration
-- [ ] CI/CD helpers
-- [ ] Performance optimizations
+- [ ] Security improvements (checksum verification)
 
 ## 🤝 Contributing
 
@@ -435,6 +525,7 @@ This project is just getting started! We're looking for:
 ## 📚 Inspiration
 
 mvx builds on the success of:
+
 - **Maven Wrapper** - Proved that self-contained bootstrap works
 - **Maven Mason** - Demonstrated multi-format configuration support
 - **asdf/mise** - Demonstrated multi-tool version management

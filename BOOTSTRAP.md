@@ -2,6 +2,8 @@
 
 The mvx bootstrap provides a way to use mvx in any project without requiring users to install mvx separately. This is similar to how Maven Wrapper (`mvnw`) works for Maven projects.
 
+The bootstrap consists of lightweight shell/batch scripts that automatically download and execute the appropriate mvx Go binary for your platform.
+
 ## 🚀 Quick Start
 
 Once you have the bootstrap files in your project, users can simply run:
@@ -19,6 +21,7 @@ mvx.cmd test
 ```
 
 The bootstrap will automatically:
+
 1. Check for local development binaries in the project directory
 2. Check for a cached version in `~/.mvx/versions/`
 3. Download the appropriate binary from GitHub releases if needed
@@ -67,10 +70,10 @@ make dev             # Rebuild
 
 The bootstrap consists of these files:
 
-- **`mvx`** - Unix/Linux/macOS shell script
-- **`mvx.cmd`** - Windows batch script  
+- **`mvx`** - Unix/Linux/macOS shell script (bootstrap, not a binary)
+- **`mvx.cmd`** - Windows batch script (bootstrap, not a binary)
 - **`.mvx/mvx.properties`** - Configuration file
-- **`.mvx/version`** - Simple version file (alternative to properties)
+- **`mvx-dev`** - Local development binary (optional, for development)
 
 ## ⚙️ Configuration
 
@@ -99,13 +102,13 @@ mvxVersion=latest
 
 For simplicity, you can just put the version in `.mvx/version`:
 
-```
+```text
 1.0.0
 ```
 
 or
 
-```
+```text
 latest
 ```
 
@@ -124,7 +127,7 @@ The bootstrap automatically detects your platform and downloads the appropriate 
 
 Downloaded binaries are cached in `~/.mvx/versions/{version}/` to avoid re-downloading:
 
-```
+```text
 ~/.mvx/
 ├── versions/
 │   ├── 1.0.0/
@@ -153,11 +156,12 @@ To add the mvx bootstrap to your project:
    - `.mvx/version` (optional)
 
 2. **Make the Unix script executable**:
+
    ```bash
    chmod +x mvx
    ```
 
-3. **Configure the version** in `.mvx/wrapper/mvx-wrapper.properties` or `.mvx/version`
+3. **Configure the version** in `.mvx/mvx.properties`
 
 4. **Commit the files** to your repository
 
@@ -190,6 +194,7 @@ To add the mvx bootstrap to your project:
 ### Download Issues
 
 If downloads fail:
+
 1. Check your internet connection
 2. Verify the version exists in GitHub releases
 3. Check if you're behind a corporate firewall
@@ -198,6 +203,7 @@ If downloads fail:
 ### Permission Issues
 
 On Unix systems, make sure the script is executable:
+
 ```bash
 chmod +x mvx
 ```
@@ -205,6 +211,7 @@ chmod +x mvx
 ### Version Resolution
 
 To see what version is being resolved:
+
 ```bash
 # The bootstrap will show version information before executing
 ./mvx version
