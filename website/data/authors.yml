@@ -1,0 +1,11 @@
+# Authors data for mvx documentation
+# This file provides author information for blog posts and documentation
+
+# Default author for mvx project
+gnodet:
+  name: "Guillaume Nodet"
+  bio: "Creator of mvx"
+  avatar: "https://github.com/gnodet.png"
+  github: "gnodet"
+  website: "https://gnodet.github.io/"
+

@@ -1,93 +1,30 @@
 {
-  // mvx configuration for mvx project itself
-  // This allows mvx to build itself using its own tool management
-
   project: {
-    name: "mvx",
-    description: "Universal build tool and environment manager",
+    name: "mvx"
   },
-
   tools: {
-    // Go toolchain for building mvx
     go: {
-      version: "1.24.2", // Use specific Go version (exact match)
+      version: "1.24.2"
     },
+    maven: {
+      version: "3.9.6"
+    },
+    java: {
+      version: "21"
+    }
   },
-
-  environment: {
-    // Go build environment
-    CGO_ENABLED: "0",  // Static builds
-    GOOS: "",          // Will be set by platform detection
-    GOARCH: "",        // Will be set by platform detection
-  },
-
   commands: {
-    build: {
-      description: "Build mvx binary with hooks",
-      pre: "echo '🚀 Starting mvx build...'",
-      script: "go build -ldflags \"-s -w\" -o mvx-binary .",
-      post: "echo '✅ Build completed successfully!'",
-      working_dir: ".",
-    },
-
-    dev: {
-      description: "Build development version with race detection",
-      script: "go build -race -o mvx-dev .",
-      working_dir: ".",
-    },
-
-    test: {
-      description: "Run all tests with custom behavior",
-      override: true,
-      script: "echo '🧪 Running custom test suite...' && go test -v ./...",
-      working_dir: ".",
-    },
-
-    fmt: {
-      description: "Format Go code",
-      script: "go fmt ./...",
-      working_dir: ".",
-    },
-
-    vet: {
-      description: "Run Go vet",
-      script: "go vet ./...",
-      working_dir: ".",
-    },
-
-    deps: {
-      description: "Download and tidy dependencies",
-      script: "go mod download && go mod tidy",
-      working_dir: ".",
-    },
-
-    clean: {
-      description: "Clean build artifacts",
-      script: "rm -f mvx-binary mvx-dev mvx-test && go clean",
-      working_dir: ".",
-    },
-
-    "build-all": {
-      description: "Build for all platforms",
-      script: "mkdir -p dist && GOOS=linux GOARCH=amd64 go build -ldflags \"-s -w\" -o dist/mvx-linux-amd64 . && GOOS=linux GOARCH=arm64 go build -ldflags \"-s -w\" -o dist/mvx-linux-arm64 . && GOOS=darwin GOARCH=amd64 go build -ldflags \"-s -w\" -o dist/mvx-darwin-amd64 . && GOOS=darwin GOARCH=arm64 go build -ldflags \"-s -w\" -o dist/mvx-darwin-arm64 . && GOOS=windows GOARCH=amd64 go build -ldflags \"-s -w\" -o dist/mvx-windows-amd64.exe .",
-      working_dir: ".",
-    },
-
-    install: {
-      description: "Install global development binary",
-      script: "go build -ldflags \"-s -w\" -o mvx-binary . && mkdir -p ~/.mvx/dev && cp mvx-binary ~/.mvx/dev/mvx && chmod +x ~/.mvx/dev/mvx && echo '✅ Global development binary installed at ~/.mvx/dev/mvx'",
-      working_dir: ".",
-    },
-
-    check: {
-      description: "Run all checks (fmt, vet, test)",
-      script: "go fmt ./... && go vet ./... && go test ./...",
-      working_dir: ".",
-    },
-
     hello: {
-      description: "Say hello from mvx",
-      script: "echo '👋 Hello from mvx custom command!'",
+      description: "Say hello",
+      script: "echo Hello from mvx! && mvn -v"
     },
-  },
+    "website-build": {
+      description: "Build the website using ROQ",
+      script: "cd website && mvn quarkus\\:build"
+    },
+    "website-serve": {
+      description: "Serve the website using ROQ dev mode",
+      script: "cd website && mvn quarkus\\:dev -Dquarkus.http.port=8081"
+    }
+  }
 }

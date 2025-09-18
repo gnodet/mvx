@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{page.title}</title>
+
+    <!-- CSS Files -->
+    <link rel="stylesheet" href="{site.url}css/docusaurus-style.css">
+    <link rel="stylesheet" href="{site.url}css/layout.css">
+    <!-- Note: No Prism.js CSS for index page -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+</head>
+<body class="index-page">
+    <div class="layout">
+        <!-- Header -->
+        <header class="header">
+            <nav class="navbar">
+                <div class="navbar-container">
+                <a href="{site.url}" class="navbar-brand">
+                    <img src="{site.url}images/mvx-logo.svg" alt="mvx" class="navbar-logo">
+                    <span class="navbar-title">mvx</span>
+                </a>
+
+                <ul class="navbar-nav">
+                    <li><a href="{site.url}getting-started/">Documentation</a></li>
+                </ul>
+                <a href="https://github.com/gnodet/mvx" class="navbar-github">GitHub</a>
+                </div>
+            </nav>
+        </header>
+
+        <div class="main-wrapper">
+            <!-- Main Content -->
+            <main class="main-content">
+                <div class="content-wrapper">
+                    {#insert /}
+                </div>
+            </main>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-container">
+                <div class="footer-grid">
+                    <div class="footer-section">
+                        <h4>Docs</h4>
+                        <ul>
+                            <li><a href="{site.url}getting-started/">Getting Started</a></li>
+                            <li><a href="{site.url}configuration/">Configuration</a></li>
+                            <li><a href="{site.url}tools/">Supported tools</a></li>
+                            <li><a href="{site.url}commands/">Commands</a></li>
+                        </ul>
+                    </div>
+                    <div class="footer-section">
+                        <h4>Community</h4>
+                        <ul>
+                            <li><a href="https://github.com/gnodet/mvx/issues">GitHub Issues</a></li>
+                            <li><a href="https://github.com/gnodet/mvx/discussions">Discussions</a></li>
+                            <li><a href="https://github.com/gnodet/mvx">GitHub</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="footer-bottom">
+                    <p>Copyright © 2025 Guillaume Nodet. Built with ROQ.</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- JavaScript Files -->
+    <!-- Note: No Prism.js scripts for index page -->
+
+    <!-- Layout functionality -->
+    <script src="{site.url}js/layout.js"></script>
+</body>
+</html>

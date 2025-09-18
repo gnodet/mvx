@@ -1,0 +1,68 @@
+name: Deploy Website
+
+on:
+  push:
+    branches: [ master, main ]
+    paths:
+      - 'website/**'
+      - '.github/workflows/deploy-website.yml'
+
+# Allow one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: 0 # Fetch all history for proper git info
+    
+    - name: Setup Java
+      uses: actions/setup-java@v5
+      with:
+        distribution: 'temurin'
+        java-version: '21'
+        cache: 'maven'
+
+    - name: Build website with Javadocs
+      shell: bash
+      run: |
+        # Fetch GitHub Pages URL
+        OWNER=$(echo "$GITHUB_REPOSITORY" | cut -d '/' -f 1)
+        REPO=$(echo "$GITHUB_REPOSITORY" | cut -d '/' -f 2)
+        SITE_URL="https://${OWNER}.github.io"
+        SITE_PATH="/${REPO}/"
+        echo "SITE_URL=$SITE_URL" >> $GITHUB_ENV
+        echo "SITE_PATH=$SITE_PATH" >> $GITHUB_ENV
+        echo "GITHUB_REPOSITORY=$GITHUB_REPOSITORY SITE_DIR=$SITE_DIR SITE_URL=$SITE_URL SITE_PATH=$SITE_PATH"
+        QUARKUS_ROQ_GENERATOR_BATCH=true ./mvnw -f website clean package quarkus:run \
+            -DskipTests -Pinclude-javadocs \
+            -Dquarkus.http.root-path=$SITE_PATH \
+            -Dsite.url=$SITE_URL
+    
+    - name: Upload build artifacts
+      uses: actions/upload-pages-artifact@v4
+      with:
+        path: website/target/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
