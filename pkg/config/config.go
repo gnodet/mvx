@@ -29,6 +29,16 @@ type ToolConfig struct {
 	Distribution string            `json:"distribution,omitempty" yaml:"distribution,omitempty"`
 	RequiredFor  []string          `json:"required_for,omitempty" yaml:"required_for,omitempty"`
 	Options      map[string]string `json:"options,omitempty" yaml:"options,omitempty"`
+	Checksum     *ChecksumConfig   `json:"checksum,omitempty" yaml:"checksum,omitempty"`
+}
+
+// ChecksumConfig represents checksum verification configuration
+type ChecksumConfig struct {
+	Type     string `json:"type,omitempty" yaml:"type,omitempty"`         // sha256, etc.
+	Value    string `json:"value,omitempty" yaml:"value,omitempty"`       // direct checksum value
+	URL      string `json:"url,omitempty" yaml:"url,omitempty"`           // URL to fetch checksum from
+	Filename string `json:"filename,omitempty" yaml:"filename,omitempty"` // filename to look for in checksum file
+	Required bool   `json:"required,omitempty" yaml:"required,omitempty"` // whether checksum verification is required
 }
 
 // CommandConfig represents a command definition

@@ -9,20 +9,25 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/gnodet/mvx/pkg/config"
 )
 
-// DownloadConfig contains configuration for robust downloads
+// DownloadConfig contains configuration for robust downloads with checksum verification
 type DownloadConfig struct {
-	URL           string
-	DestPath      string
-	MaxRetries    int
-	RetryDelay    time.Duration
-	Timeout       time.Duration
-	ExpectedType  string // Expected content type
-	MinSize       int64  // Minimum expected file size
-	MaxSize       int64  // Maximum expected file size
-	ValidateMagic bool   // Whether to validate magic bytes
-	ToolName      string // Name of the tool being downloaded (for progress reporting)
+	URL              string
+	DestPath         string
+	MaxRetries       int
+	RetryDelay       time.Duration
+	Timeout          time.Duration
+	ExpectedType     string // Expected content type
+	MinSize          int64  // Minimum expected file size
+	MaxSize          int64  // Maximum expected file size
+	ValidateMagic    bool   // Whether to validate magic bytes
+	ToolName         string // Name of the tool being downloaded (for progress reporting)
+	Version          string // Tool version for checksum verification
+	Config           config.ToolConfig
+	ChecksumRegistry *ChecksumRegistry
 }
 
 // DefaultDownloadConfig returns a default download configuration
@@ -159,6 +164,11 @@ func attemptDownload(config *DownloadConfig) (*DownloadResult, error) {
 		if err := validateFileFormat(tempFile.Name(), config.URL); err != nil {
 			return nil, fmt.Errorf("file validation failed: %w", err)
 		}
+	}
+
+	// Verify checksum if checksum registry is available
+	if config.ChecksumRegistry != nil {
+		verifyChecksum(tempFile.Name(), config)
 	}
 
 	// Create destination directory
@@ -343,4 +353,76 @@ func DiagnoseDownloadError(url string, err error) string {
 
 	// Generic fallback
 	return fmt.Sprintf("Download failed from %s: %s", url, errStr)
+}
+
+// verifyChecksum verifies the checksum of a downloaded file
+func verifyChecksum(filePath string, config *DownloadConfig) {
+	if config.ChecksumRegistry == nil {
+		return
+	}
+
+	// Get checksum information
+	checksumInfo, hasChecksum := config.ChecksumRegistry.GetChecksumFromConfig(
+		config.ToolName, config.Version, config.Config)
+
+	if !hasChecksum {
+		// Try to get checksum from known patterns or APIs
+		filename := filepath.Base(filePath)
+
+		// Special handling for Java (Adoptium API)
+		if config.ToolName == "java" {
+			if javaChecksum, err := config.ChecksumRegistry.GetJavaChecksumFromAPI(config.Version, "amd64", "linux"); err == nil {
+				checksumInfo = javaChecksum
+				hasChecksum = true
+			}
+		}
+
+		// Special handling for Node.js (SHASUMS256.txt)
+		if config.ToolName == "node" && !hasChecksum {
+			if nodeChecksum, err := config.ChecksumRegistry.GetNodeChecksumFromSHASUMS(config.Version, filename); err == nil {
+				checksumInfo = nodeChecksum
+				hasChecksum = true
+			}
+		}
+
+		// Fallback to URL patterns for other tools
+		if !hasChecksum {
+			checksumURL := config.ChecksumRegistry.GetChecksumURL(config.ToolName, config.Version, filename)
+			if checksumURL != "" {
+				checksumInfo = ChecksumInfo{
+					Type:     SHA256,
+					URL:      checksumURL,
+					Filename: filename,
+				}
+				hasChecksum = true
+			}
+		}
+	}
+
+	if !hasChecksum {
+		if config.ChecksumRegistry.SupportsChecksumVerification(config.ToolName) {
+			fmt.Printf("⚠️  No checksum available for %s %s\n", config.ToolName, config.Version)
+			fmt.Printf("   Consider adding checksum verification to your configuration for enhanced security.\n")
+		}
+		return
+	}
+
+	// Check if checksum verification is required
+	isRequired := config.ChecksumRegistry.IsChecksumRequired(config.Config)
+
+	// Create checksum verifier
+	verifier := NewChecksumVerifier()
+
+	if isRequired {
+		// Strict verification - fail on error
+		if err := verifier.VerifyFile(filePath, checksumInfo); err != nil {
+			// Remove the downloaded file on checksum failure
+			os.Remove(filePath)
+			panic(fmt.Sprintf("Checksum verification failed (required): %v", err))
+		}
+		fmt.Printf("✅ Checksum verified successfully (required)\n")
+	} else {
+		// Optional verification - warn on error
+		verifier.VerifyFileWithWarning(filePath, checksumInfo)
+	}
 }

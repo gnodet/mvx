@@ -95,7 +95,36 @@ The `tools` section defines which development tools your project needs:
     },
     maven: {
       version: "3.9.6",
-      settings: "custom-settings.xml"  // Optional: custom settings file
+      settings: "custom-settings.xml",  // Optional: custom settings file
+      checksum: {                       // Optional: checksum verification
+        type: "sha512",                 // sha256 or sha512
+        required: true                  // Fail on verification errors
+      }
+    }
+  }
+}
+```
+
+### Security Configuration
+
+Enable checksum verification for enhanced security:
+
+```json5
+{
+  tools: {
+    maven: {
+      version: "3.9.6",
+      checksum: {
+        required: true  // Mandatory checksum verification
+      }
+    },
+    mvnd: {
+      version: "1.0.2",
+      checksum: {
+        type: "sha512",
+        value: "abc123def456...",  // Custom checksum
+        required: true
+      }
     }
   }
 }

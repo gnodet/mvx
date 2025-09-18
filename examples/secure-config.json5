@@ -1,0 +1,86 @@
+{
+  // mvx secure configuration example
+  // This example demonstrates checksum verification for enhanced security
+
+  project: {
+    name: "secure-project",
+    description: "Example project with checksum verification enabled"
+  },
+
+  tools: {
+    // Java with required checksum verification (uses Adoptium API)
+    java: {
+      version: "21",
+      distribution: "temurin",
+      checksum: {
+        required: true  // Uses Adoptium API for automatic checksum verification
+      }
+    },
+
+    // Maven with required checksum verification
+    maven: {
+      version: "3.9.6",
+      checksum: {
+        required: true  // Installation will fail if checksum verification fails
+      }
+    },
+
+    // Maven Daemon with custom checksum
+    mvnd: {
+      version: "1.0.2",
+      checksum: {
+        type: "sha512",
+        // This is an example checksum - replace with actual value
+        value: "abc123def456789...",
+        required: true
+      }
+    },
+
+    // Node.js with required checksum verification (uses SHASUMS256.txt)
+    node: {
+      version: "22.14.0",
+      checksum: {
+        required: true  // Uses official Node.js SHASUMS256.txt files
+      }
+    },
+
+    // Go with checksum URL (when implemented)
+    go: {
+      version: "1.21.0",
+      checksum: {
+        url: "https://go.dev/dl/checksums.txt",
+        filename: "go1.21.0.linux-amd64.tar.gz",
+        required: false  // Optional verification
+      }
+    }
+  },
+
+  // Environment variables for secure builds
+  environment: {
+    // Enable verbose logging for security auditing
+    MVX_VERBOSE: "true",
+    
+    // Secure Java options
+    JAVA_OPTS: "-Djava.security.manager -Djava.security.policy=security.policy"
+  },
+
+  commands: {
+    // Secure build command
+    "secure-build": {
+      description: "Build with security verification",
+      script: "mvn clean verify -Dsecurity.check=true"
+    },
+
+    // Verify tool checksums manually
+    "verify-tools": {
+      description: "Manually verify tool checksums",
+      script: "echo 'Verifying tool checksums...' && mvn --version && mvnd --version"
+    },
+
+    // Security audit command
+    "security-audit": {
+      description: "Run security audit",
+      script: "mvn dependency:check -DfailBuildOnCVSS=7"
+    }
+  }
+}

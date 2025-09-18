@@ -38,7 +38,7 @@ func (g *GoTool) Install(version string, cfg config.ToolConfig) error {
 
 	// Download and extract
 	fmt.Printf("  ⏳ Downloading Go %s...\n", version)
-	if err := g.downloadAndExtract(downloadURL, installDir); err != nil {
+	if err := g.downloadAndExtract(downloadURL, installDir, version, cfg); err != nil {
 		return fmt.Errorf("failed to download and extract: %w", err)
 	}
 
@@ -140,8 +140,8 @@ func (g *GoTool) getDownloadURL(version string) string {
 	return fmt.Sprintf("https://go.dev/dl/%s", filename)
 }
 
-// downloadAndExtract downloads and extracts a Go archive
-func (g *GoTool) downloadAndExtract(url, destDir string) error {
+// downloadAndExtract downloads and extracts a Go archive with checksum verification
+func (g *GoTool) downloadAndExtract(url, destDir, version string, cfg config.ToolConfig) error {
 	// Create temporary file for download
 	tmpFile, err := os.CreateTemp("", "go-*.archive")
 	if err != nil {
@@ -150,14 +150,17 @@ func (g *GoTool) downloadAndExtract(url, destDir string) error {
 	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
 
-	// Configure robust download
+	// Configure robust download with checksum verification
 	config := DefaultDownloadConfig(url, tmpFile.Name())
 	config.ExpectedType = "application" // Accept various application types
 	config.MinSize = 50 * 1024 * 1024   // Minimum 50MB for Go distributions
 	config.MaxSize = 200 * 1024 * 1024  // Maximum 200MB for Go distributions
 	config.ToolName = "go"              // For progress reporting
+	config.Version = version            // For checksum verification
+	config.Config = cfg                 // Tool configuration
+	config.ChecksumRegistry = g.manager.GetChecksumRegistry()
 
-	// Perform robust download
+	// Perform robust download with checksum verification
 	result, err := RobustDownload(config)
 	if err != nil {
 		return fmt.Errorf("Go download failed: %s", DiagnoseDownloadError(url, err))

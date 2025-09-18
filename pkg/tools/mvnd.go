@@ -37,7 +37,7 @@ func (m *MvndTool) Install(version string, cfg config.ToolConfig) error {
 
 	// Download and extract
 	fmt.Printf("  ⏳ Downloading Maven Daemon %s...\n", version)
-	if err := m.downloadAndExtract(downloadURL, installDir); err != nil {
+	if err := m.downloadAndExtract(downloadURL, installDir, version, cfg); err != nil {
 		return fmt.Errorf("failed to download and extract: %w", err)
 	}
 
@@ -151,8 +151,8 @@ func (m *MvndTool) getPlatformString() string {
 	}
 }
 
-// downloadAndExtract downloads and extracts a zip file
-func (m *MvndTool) downloadAndExtract(url, destDir string) error {
+// downloadAndExtract downloads and extracts a zip file with checksum verification
+func (m *MvndTool) downloadAndExtract(url, destDir, version string, cfg config.ToolConfig) error {
 	// Create temporary file for download
 	tmpFile, err := os.CreateTemp("", "mvnd-*.zip")
 	if err != nil {
@@ -161,14 +161,17 @@ func (m *MvndTool) downloadAndExtract(url, destDir string) error {
 	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
 
-	// Configure robust download
+	// Configure robust download with checksum verification
 	config := DefaultDownloadConfig(url, tmpFile.Name())
 	config.ExpectedType = "application" // Accept various application types
 	config.MinSize = 10 * 1024 * 1024   // Minimum 10MB for Maven Daemon distributions
 	config.MaxSize = 100 * 1024 * 1024  // Maximum 100MB for Maven Daemon distributions
 	config.ToolName = "mvnd"            // For progress reporting
+	config.Version = version            // For checksum verification
+	config.Config = cfg                 // Tool configuration
+	config.ChecksumRegistry = m.manager.GetChecksumRegistry()
 
-	// Perform robust download
+	// Perform robust download with checksum verification
 	result, err := RobustDownload(config)
 	if err != nil {
 		return fmt.Errorf("Maven Daemon download failed: %s", DiagnoseDownloadError(url, err))

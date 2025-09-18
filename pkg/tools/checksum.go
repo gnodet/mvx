@@ -1,0 +1,174 @@
+package tools
+
+import (
+	"crypto/sha256"
+	"crypto/sha512"
+	"encoding/hex"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+)
+
+// ChecksumType represents the type of checksum algorithm
+type ChecksumType string
+
+const (
+	// SHA256 represents SHA-256 checksum
+	SHA256 ChecksumType = "sha256"
+	// SHA512 represents SHA-512 checksum
+	SHA512 ChecksumType = "sha512"
+)
+
+// ChecksumInfo contains checksum information for a file
+type ChecksumInfo struct {
+	Type     ChecksumType `json:"type" yaml:"type"`
+	Value    string       `json:"value" yaml:"value"`
+	URL      string       `json:"url,omitempty" yaml:"url,omitempty"`
+	Filename string       `json:"filename,omitempty" yaml:"filename,omitempty"`
+}
+
+// ChecksumVerifier handles checksum verification for downloaded files
+type ChecksumVerifier struct {
+	client *http.Client
+}
+
+// NewChecksumVerifier creates a new checksum verifier
+func NewChecksumVerifier() *ChecksumVerifier {
+	return &ChecksumVerifier{
+		client: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+	}
+}
+
+// VerifyFile verifies a file against the provided checksum information
+func (cv *ChecksumVerifier) VerifyFile(filePath string, checksum ChecksumInfo) error {
+	if checksum.Value == "" && checksum.URL == "" {
+		return fmt.Errorf("no checksum value or URL provided")
+	}
+
+	// Get expected checksum value
+	expectedChecksum := checksum.Value
+	if expectedChecksum == "" && checksum.URL != "" {
+		var err error
+		expectedChecksum, err = cv.fetchChecksumFromURL(checksum.URL, checksum.Filename)
+		if err != nil {
+			return fmt.Errorf("failed to fetch checksum from URL: %w", err)
+		}
+	}
+
+	// Calculate actual checksum
+	actualChecksum, err := cv.calculateChecksum(filePath, checksum.Type)
+	if err != nil {
+		return fmt.Errorf("failed to calculate checksum: %w", err)
+	}
+
+	// Compare checksums (case-insensitive)
+	if !strings.EqualFold(expectedChecksum, actualChecksum) {
+		return fmt.Errorf("checksum mismatch: expected %s, got %s", expectedChecksum, actualChecksum)
+	}
+
+	return nil
+}
+
+// calculateChecksum calculates the checksum of a file
+func (cv *ChecksumVerifier) calculateChecksum(filePath string, checksumType ChecksumType) (string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	switch checksumType {
+	case SHA256:
+		hasher := sha256.New()
+		if _, err := io.Copy(hasher, file); err != nil {
+			return "", fmt.Errorf("failed to read file: %w", err)
+		}
+		return hex.EncodeToString(hasher.Sum(nil)), nil
+	case SHA512:
+		hasher := sha512.New()
+		if _, err := io.Copy(hasher, file); err != nil {
+			return "", fmt.Errorf("failed to read file: %w", err)
+		}
+		return hex.EncodeToString(hasher.Sum(nil)), nil
+	default:
+		return "", fmt.Errorf("unsupported checksum type: %s", checksumType)
+	}
+}
+
+// fetchChecksumFromURL fetches checksum from a remote URL
+func (cv *ChecksumVerifier) fetchChecksumFromURL(url, filename string) (string, error) {
+	resp, err := cv.client.Get(url)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch checksum URL: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("checksum URL returned status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read checksum response: %w", err)
+	}
+
+	content := string(body)
+
+	// If filename is specified, parse the checksum file format
+	if filename != "" {
+		return cv.parseChecksumFile(content, filename)
+	}
+
+	// Otherwise, assume the entire content is the checksum
+	return strings.TrimSpace(content), nil
+}
+
+// parseChecksumFile parses a checksum file and extracts the checksum for a specific filename
+// Supports formats like: "checksum  filename" or "checksum *filename"
+func (cv *ChecksumVerifier) parseChecksumFile(content, filename string) (string, error) {
+	lines := strings.Split(content, "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// Split on whitespace
+		parts := strings.Fields(line)
+		if len(parts) < 2 {
+			continue
+		}
+
+		checksum := parts[0]
+		fileInLine := parts[1]
+
+		// Remove leading asterisk if present (binary mode indicator)
+		if strings.HasPrefix(fileInLine, "*") {
+			fileInLine = fileInLine[1:]
+		}
+
+		// Check if this line matches our filename
+		if fileInLine == filename {
+			return checksum, nil
+		}
+	}
+
+	return "", fmt.Errorf("checksum not found for file %s", filename)
+}
+
+// VerifyFileWithWarning verifies a file with checksum, but only warns if verification fails
+func (cv *ChecksumVerifier) VerifyFileWithWarning(filePath string, checksum ChecksumInfo) {
+	if err := cv.VerifyFile(filePath, checksum); err != nil {
+		fmt.Printf("⚠️  Checksum verification failed: %v\n", err)
+		fmt.Printf("   File: %s\n", filePath)
+		fmt.Printf("   This could indicate a corrupted download or security issue.\n")
+	} else {
+		fmt.Printf("✅ Checksum verified successfully\n")
+	}
+}

@@ -96,7 +96,7 @@ func (j *JavaTool) Install(version string, cfg config.ToolConfig) error {
 
 	// Download and extract
 	fmt.Printf("  ⏳ Downloading Java %s (%s)...\n", version, distribution)
-	if err := j.downloadAndExtract(downloadURL, installDir); err != nil {
+	if err := j.downloadAndExtract(downloadURL, installDir, version, cfg); err != nil {
 		return fmt.Errorf("failed to download and extract: %w", err)
 	}
 
@@ -433,8 +433,8 @@ func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, rel
 	return downloadURL, nil
 }
 
-// downloadAndExtract downloads and extracts a tar.gz file
-func (j *JavaTool) downloadAndExtract(url, destDir string) error {
+// downloadAndExtract downloads and extracts a tar.gz file with checksum verification
+func (j *JavaTool) downloadAndExtract(url, destDir, version string, cfg config.ToolConfig) error {
 	// Create temporary file for download
 	tmpFile, err := os.CreateTemp("", "java-*.tar.gz")
 	if err != nil {
@@ -443,14 +443,17 @@ func (j *JavaTool) downloadAndExtract(url, destDir string) error {
 	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
 
-	// Configure robust download
+	// Configure robust download with checksum verification
 	config := DefaultDownloadConfig(url, tmpFile.Name())
 	config.ExpectedType = "application" // Accept various application types
 	config.MinSize = 50 * 1024 * 1024   // Minimum 50MB for Java distributions
 	config.MaxSize = 500 * 1024 * 1024  // Maximum 500MB for Java distributions
 	config.ToolName = "java"            // For progress reporting
+	config.Version = version            // For checksum verification
+	config.Config = cfg                 // Tool configuration
+	config.ChecksumRegistry = j.manager.GetChecksumRegistry()
 
-	// Perform robust download
+	// Perform robust download with checksum verification
 	result, err := RobustDownload(config)
 	if err != nil {
 		return fmt.Errorf("Java download failed: %s", DiagnoseDownloadError(url, err))
@@ -460,6 +463,13 @@ func (j *JavaTool) downloadAndExtract(url, destDir string) error {
 
 	// Close temp file before extraction
 	tmpFile.Close()
+
+	// Open the downloaded file for extraction
+	file, err := os.Open(tmpFile.Name())
+	if err != nil {
+		return fmt.Errorf("failed to open downloaded file: %w", err)
+	}
+	defer file.Close()
 
 	// Extract the downloaded archive
 	return j.extractTarGz(tmpFile.Name(), destDir)

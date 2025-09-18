@@ -12,9 +12,10 @@ import (
 
 // Manager handles tool installation and management
 type Manager struct {
-	cacheDir string
-	tools    map[string]Tool
-	registry *ToolRegistry
+	cacheDir         string
+	tools            map[string]Tool
+	registry         *ToolRegistry
+	checksumRegistry *ChecksumRegistry
 }
 
 // InstallOptions contains options for tool installation
@@ -63,9 +64,10 @@ func NewManager() (*Manager, error) {
 	}
 
 	manager := &Manager{
-		cacheDir: cacheDir,
-		tools:    make(map[string]Tool),
-		registry: NewToolRegistry(),
+		cacheDir:         cacheDir,
+		tools:            make(map[string]Tool),
+		registry:         NewToolRegistry(),
+		checksumRegistry: NewChecksumRegistry(),
 	}
 
 	// Register built-in tools
@@ -382,4 +384,9 @@ func (m *Manager) resolveVersion(toolName string, toolConfig config.ToolConfig) 
 // GetRegistry returns the tool registry
 func (m *Manager) GetRegistry() *ToolRegistry {
 	return m.registry
+}
+
+// GetChecksumRegistry returns the checksum registry
+func (m *Manager) GetChecksumRegistry() *ChecksumRegistry {
+	return m.checksumRegistry
 }
