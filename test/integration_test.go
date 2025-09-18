@@ -45,24 +45,15 @@ func TestMvxBinary(t *testing.T) {
 }
 
 func findMvxBinary(t *testing.T) string {
-	// Try different possible locations
-	candidates := []string{
-		"../mvx-binary",
-		"./mvx-binary",
-		"../dist/mvx-linux-amd64",
-		"../dist/mvx-darwin-amd64",
-		"../dist/mvx-darwin-arm64",
+	// Use the wrapper script which will download the released version
+	wrapper := "../mvx"
+	if _, err := os.Stat(wrapper); err == nil {
+		abs, _ := filepath.Abs(wrapper)
+		t.Logf("Using mvx wrapper: %s", abs)
+		return abs
 	}
 
-	for _, candidate := range candidates {
-		if _, err := os.Stat(candidate); err == nil {
-			abs, _ := filepath.Abs(candidate)
-			t.Logf("Using mvx binary: %s", abs)
-			return abs
-		}
-	}
-
-	t.Fatal("Could not find mvx binary. Run 'make build' first.")
+	t.Fatal("Could not find mvx wrapper script.")
 	return ""
 }
 

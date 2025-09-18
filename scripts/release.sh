@@ -77,18 +77,18 @@ fi
 
 # Run tests
 info "Running tests..."
-if ! make test; then
+if ! ./mvx test; then
     error "Tests failed"
 fi
 success "Tests passed"
 
 # Build all platforms
 info "Building binaries for all platforms..."
-if ! make clean; then
+if ! ./mvx clean; then
     error "Clean failed"
 fi
 
-if ! make release-build; then
+if ! ./mvx build-all; then
     error "Build failed"
 fi
 success "Built binaries for all platforms"

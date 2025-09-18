@@ -54,11 +54,13 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Build for current platform
-        run: make build
+      - name: Setup mvx for testing
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-wrapper.sh | bash
+          echo "mvxVersion=0.3.0" > .mvx/mvx.properties
 
       - name: Test binary
-        run: ./mvx-binary version
+        run: ./mvx version
 
       - name: Run integration tests
         run: |
@@ -70,16 +72,21 @@ jobs:
           cd test
           go test -bench=. -benchtime=3s ./...
 
+      - name: Setup mvx
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-wrapper.sh | bash
+          echo "mvxVersion=0.3.0" > .mvx/mvx.properties
+
       - name: Build for all platforms
-        run: make build-all
+        run: ./mvx build-all
 
       - name: Generate checksums
-        run: make checksums
+        run: ./mvx checksums
 
       - name: Test wrapper
         run: |
-          # Set a specific version to avoid GitHub API calls
-          echo "dev" > .mvx/version
+          # Test wrapper with released version
+          echo "mvxVersion=0.3.0" > .mvx/mvx.properties
           ./mvx version
 
       - name: Upload build artifacts
@@ -107,32 +114,8 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
-      - name: Build local binary
-        run: make build
-
-      - name: Test wrapper (Unix)
-        if: runner.os != 'Windows'
+      - name: Test wrapper
         run: |
-          # Ensure dev binary is available for wrapper
-          mkdir -p ~/.mvx/dev
-          cp mvx-binary ~/.mvx/dev/mvx
-          chmod +x ~/.mvx/dev/mvx
-          mkdir -p .mvx
-          echo "dev" > .mvx/version
+          # Test wrapper with released version
+          echo "mvxVersion=0.3.0" > .mvx/mvx.properties
           ./mvx version
-
-      - name: Test wrapper (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          # Check what binary was actually built
-          Get-ChildItem -Name "mvx-binary*"
-          # Ensure dev binary is available for wrapper
-          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.mvx\dev"
-          if (Test-Path "mvx-binary.exe") {
-            Copy-Item "mvx-binary.exe" "$env:USERPROFILE\.mvx\dev\mvx.exe"
-          } else {
-            Copy-Item "mvx-binary" "$env:USERPROFILE\.mvx\dev\mvx.exe"
-          }
-          New-Item -ItemType Directory -Force -Path ".mvx"
-          echo "dev" | Out-File -FilePath ".mvx\version" -Encoding ascii
-          .\mvx.cmd version

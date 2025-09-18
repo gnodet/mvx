@@ -353,7 +353,7 @@ find_mvx_binary() {
             echo "" >&2
             echo "   1. Clone and build mvx:" >&2
             echo "      git clone https://github.com/gnodet/mvx.git" >&2
-            echo "      cd mvx && make build" >&2
+            echo "      cd mvx && ./mvx build" >&2
             echo "" >&2
             echo "   2. The build automatically installs to ~/.mvx/dev/mvx" >&2
             echo "      All projects using 'mvxVersion=dev' will use this binary" >&2

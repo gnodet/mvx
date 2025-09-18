@@ -35,7 +35,7 @@ The bootstrap is designed to work seamlessly with locally compiled binaries for 
 
 ```bash
 # Build a development binary
-make dev          # Creates ./mvx-dev (with race detection)
+./mvx build       # Creates ./mvx-binary
 
 # Use the wrapper - it automatically finds your development binary
 ./mvx version
@@ -51,7 +51,7 @@ The bootstrap automatically detects and uses `./mvx-dev` for development.
 
 ```bash
 # 1. Build your changes
-make dev
+./mvx build
 
 # 2. Test with wrapper immediately
 ./mvx version        # Uses your development binary
@@ -60,7 +60,7 @@ make dev
 
 # 3. Make changes and rebuild
 # Edit code...
-make dev             # Rebuild
+./mvx build          # Rebuild
 ./mvx test           # Test again
 
 # 4. No need to install or update anything!

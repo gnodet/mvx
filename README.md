@@ -156,19 +156,19 @@ cd mvx
 **Build for current platform:**
 
 ```bash
-make build
+./mvx build
 ```
 
 **Build for all platforms:**
 
 ```bash
-make build-all
+./mvx build-all
 ```
 
 **Run tests:**
 
 ```bash
-make test
+./mvx test
 ```
 
 ## 🎯 Shell Completion

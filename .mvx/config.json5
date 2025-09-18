@@ -28,7 +28,7 @@
   // Custom commands
   commands: {
     build: {
-      description: "Build mvx binary (use make build for platform-optimized builds)",
+      description: "Build mvx binary with platform-optimized settings",
       script: "go build -o mvx-binary .",
       override: true
     },
@@ -40,13 +40,13 @@
     },
 
     "build-all": {
-      description: "Build for all platforms (use make build-all for now)",
-      script: "make build-all"
+      description: "Build for all platforms",
+      script: "./scripts/build-all.sh"
     },
 
     checksums: {
-      description: "Generate checksums for release binaries (use make checksums for now)",
-      script: "make checksums"
+      description: "Generate checksums for release binaries",
+      script: "./scripts/checksums.sh"
     },
 
     clean: {

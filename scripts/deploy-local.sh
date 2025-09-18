@@ -73,7 +73,7 @@ info "Method: $METHOD"
 # Build the binary if it doesn't exist or is older than source
 if [ ! -f "mvx-dev" ] || [ "main.go" -nt "mvx-dev" ]; then
     info "Building development mvx binary..."
-    make dev
+    ./mvx build
     success "Built mvx-dev"
 fi
 
