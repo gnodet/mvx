@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/gnodet/mvx/pkg/config"
 )
@@ -162,8 +163,11 @@ func (m *MvndTool) downloadAndExtract(url, destDir string) error {
 	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
 
-	// Download file
-	resp, err := http.Get(url)
+	// Download file with timeout
+	client := &http.Client{
+		Timeout: 300 * time.Second, // 5 minute timeout
+	}
+	resp, err := client.Get(url)
 	if err != nil {
 		return fmt.Errorf("failed to download from %s: %w", url, err)
 	}

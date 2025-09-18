@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/gnodet/mvx/pkg/config"
 )
@@ -278,7 +279,10 @@ func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, rel
 		version, distribution, osName, arch, releaseStatus)
 
 	// Get package information
-	resp, err := http.Get(url)
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+	resp, err := client.Get(url)
 	if err != nil {
 		logVerbose("HTTP request failed: %v", err)
 		return "", fmt.Errorf("failed to query Disco API: %w", err)
@@ -368,8 +372,11 @@ func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, rel
 
 // downloadAndExtract downloads and extracts a tar.gz file
 func (j *JavaTool) downloadAndExtract(url, destDir string) error {
-	// Download file
-	resp, err := http.Get(url)
+	// Download file with timeout
+	client := &http.Client{
+		Timeout: 300 * time.Second, // 5 minute timeout
+	}
+	resp, err := client.Get(url)
 	if err != nil {
 		return fmt.Errorf("failed to download: %w", err)
 	}

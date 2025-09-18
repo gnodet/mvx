@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -57,7 +58,10 @@ func getLatestRelease() (*GitHubRelease, error) {
 
 	printVerbose("Fetching latest release from: %s", url)
 
-	resp, err := http.Get(url)
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+	resp, err := client.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch release information: %w", err)
 	}
@@ -108,7 +112,10 @@ func getCurrentVersion() (string, error) {
 func downloadFile(url, filepath string) error {
 	printVerbose("Downloading %s to %s", url, filepath)
 
-	resp, err := http.Get(url)
+	client := &http.Client{
+		Timeout: 300 * time.Second, // 5 minute timeout for file downloads
+	}
+	resp, err := client.Get(url)
 	if err != nil {
 		return fmt.Errorf("failed to download %s: %w", url, err)
 	}
