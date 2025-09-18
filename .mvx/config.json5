@@ -39,6 +39,47 @@
       override: true
     },
 
+    "build-all": {
+      description: "Build for all platforms (use make build-all for now)",
+      script: "make build-all"
+    },
+
+    checksums: {
+      description: "Generate checksums for release binaries (use make checksums for now)",
+      script: "make checksums"
+    },
+
+    clean: {
+      description: "Clean build artifacts",
+      script: "rm -f mvx-binary mvx-dev && rm -rf dist/ && rm -rf .mvx/local/ .mvx/tools/ .mvx/versions/",
+      override: true
+    },
+
+    fmt: {
+      description: "Format code",
+      script: "go fmt ./..."
+    },
+
+    lint: {
+      description: "Run linter",
+      script: "golangci-lint run"
+    },
+
+    deps: {
+      description: "Download dependencies",
+      script: "go mod download && go mod tidy"
+    },
+
+    "test-integration": {
+      description: "Run integration tests",
+      script: "cd test && go test -v -timeout=5m ./..."
+    },
+
+    benchmark: {
+      description: "Run benchmarks",
+      script: "cd test && go test -bench=. -benchtime=3s ./..."
+    },
+
     hello: {
       description: "Say hello",
       script: "echo Hello from mvx! && mvn -v"
