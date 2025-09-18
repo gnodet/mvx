@@ -75,6 +75,17 @@ if exist ".\mvx-dev.exe" (
     goto :eof
 )
 
+rem Check for global development binary (shared across all projects)
+set GLOBAL_DEV_BINARY=%HOME_DIR%\.mvx\dev\mvx.exe
+if exist "%GLOBAL_DEV_BINARY%" (
+    if "%VERBOSITY%"=="verbose" (
+        echo Using global development binary: %GLOBAL_DEV_BINARY%
+        echo.
+    )
+    "%GLOBAL_DEV_BINARY%" %*
+    goto :eof
+)
+
 rem Resolve version (handle "latest")
 set RESOLVED_VERSION=%MVX_VERSION_TO_USE%
 if "%MVX_VERSION_TO_USE%"=="latest" (
