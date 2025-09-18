@@ -57,10 +57,15 @@ jobs:
       - name: Setup mvx for testing
         run: |
           curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-wrapper.sh | bash
+          mkdir -p .mvx
           echo "mvxVersion=0.3.0" > .mvx/mvx.properties
+          echo "Debug: mvx.properties content:"
+          cat .mvx/mvx.properties
 
       - name: Test binary
-        run: ./mvx version
+        run: |
+          echo "Debug: Testing mvx version with verbose output"
+          ./mvx -v version
 
       - name: Run integration tests
         run: |
@@ -75,6 +80,7 @@ jobs:
       - name: Setup mvx
         run: |
           curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-wrapper.sh | bash
+          mkdir -p .mvx
           echo "mvxVersion=0.3.0" > .mvx/mvx.properties
 
       - name: Build for all platforms
@@ -117,5 +123,6 @@ jobs:
       - name: Test wrapper
         run: |
           # Test wrapper with released version
+          mkdir -p .mvx
           echo "mvxVersion=0.3.0" > .mvx/mvx.properties
           ./mvx version
