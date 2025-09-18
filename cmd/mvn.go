@@ -52,15 +52,21 @@ Examples:
 			return err
 		}
 		var env []string
-		for k, v := range envMap { env = append(env, fmt.Sprintf("%s=%s", k, v)) }
+		for k, v := range envMap {
+			env = append(env, fmt.Sprintf("%s=%s", k, v))
+		}
 		// Preserve existing environment variables
 		env = append(env, os.Environ()...)
 
 		mvnTool, _ := mgr.GetTool("maven")
 		bin, err := mvnTool.GetBinPath(toolCfg.Version, toolCfg)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		mvnExe := filepath.Join(bin, "mvn")
-		if isWindows() { mvnExe += ".cmd" }
+		if isWindows() {
+			mvnExe += ".cmd"
+		}
 
 		c := exec.Command(mvnExe, args...)
 		c.Dir = projectRoot
@@ -73,4 +79,3 @@ Examples:
 }
 
 func init() { rootCmd.AddCommand(mvnCmd) }
-

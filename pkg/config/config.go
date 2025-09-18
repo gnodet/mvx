@@ -39,6 +39,13 @@ type CommandConfig struct {
 	Requires    []string           `json:"requires,omitempty" yaml:"requires,omitempty"`
 	Args        []CommandArgConfig `json:"args,omitempty" yaml:"args,omitempty"`
 	Environment map[string]string  `json:"environment,omitempty" yaml:"environment,omitempty"`
+
+	// Hooks for built-in commands
+	Pre  string `json:"pre,omitempty" yaml:"pre,omitempty"`   // Script to run before built-in command
+	Post string `json:"post,omitempty" yaml:"post,omitempty"` // Script to run after built-in command
+
+	// Override built-in command behavior
+	Override bool `json:"override,omitempty" yaml:"override,omitempty"` // If true, replace built-in command entirely
 }
 
 // CommandArgConfig represents a command argument
@@ -122,12 +129,38 @@ func (c *Config) Validate() error {
 
 	// Validate command configurations
 	for cmdName, cmdConfig := range c.Commands {
-		if cmdConfig.Script == "" {
-			return fmt.Errorf("command %s: script is required", cmdName)
+		// For override commands or custom commands, script is required
+		if cmdConfig.Override || !isBuiltinCommand(cmdName) {
+			if cmdConfig.Script == "" {
+				return fmt.Errorf("command %s: script is required", cmdName)
+			}
+		}
+		// For built-in commands with hooks, at least one of pre/post/script should be present
+		if isBuiltinCommand(cmdName) && !cmdConfig.Override {
+			if cmdConfig.Script == "" && cmdConfig.Pre == "" && cmdConfig.Post == "" {
+				return fmt.Errorf("command %s: at least one of script, pre, or post is required for built-in command hooks", cmdName)
+			}
 		}
 	}
 
 	return nil
+}
+
+// isBuiltinCommand checks if a command name is a built-in mvx command
+func isBuiltinCommand(commandName string) bool {
+	builtinCommands := map[string]bool{
+		"build":            true,
+		"test":             true,
+		"setup":            true,
+		"init":             true,
+		"tools":            true,
+		"version":          true,
+		"help":             true,
+		"completion":       true,
+		"info":             true,
+		"update-bootstrap": true,
+	}
+	return builtinCommands[commandName]
 }
 
 // GetRequiredTools returns a list of tools required for a specific command
@@ -147,5 +180,27 @@ func (c *Config) GetRequiredTools(commandName string) []string {
 // GetToolConfig returns the configuration for a specific tool
 func (c *Config) GetToolConfig(toolName string) (ToolConfig, bool) {
 	config, exists := c.Tools[toolName]
+	return config, exists
+}
+
+// HasCommandOverride checks if a built-in command is overridden
+func (c *Config) HasCommandOverride(commandName string) bool {
+	if cmd, exists := c.Commands[commandName]; exists {
+		return cmd.Override && isBuiltinCommand(commandName)
+	}
+	return false
+}
+
+// HasCommandHooks checks if a built-in command has pre/post hooks
+func (c *Config) HasCommandHooks(commandName string) bool {
+	if cmd, exists := c.Commands[commandName]; exists {
+		return isBuiltinCommand(commandName) && !cmd.Override && (cmd.Pre != "" || cmd.Post != "")
+	}
+	return false
+}
+
+// GetCommandConfig returns the configuration for a specific command
+func (c *Config) GetCommandConfig(commandName string) (CommandConfig, bool) {
+	config, exists := c.Commands[commandName]
 	return config, exists
 }

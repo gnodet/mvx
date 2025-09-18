@@ -85,10 +85,12 @@ func runTests(args []string) error {
 		}
 	}
 
-	// Validate and execute command
-	if err := exec.ValidateCommand(commandName); err != nil {
-		return err
-	}
-
-	return exec.ExecuteCommand(commandName, args)
+	// Execute test command with hooks/overrides support
+	return exec.ExecuteBuiltinCommand(commandName, args, func(args []string) error {
+		// Default built-in test behavior
+		if err := exec.ValidateCommand(commandName); err != nil {
+			return err
+		}
+		return exec.ExecuteCommand(commandName, args)
+	})
 }

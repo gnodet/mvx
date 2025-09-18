@@ -58,7 +58,6 @@ func SetVersionInfo(v, c, d string) {
 
 func isWindows() bool { return runtime.GOOS == "windows" }
 
-
 func init() {
 	// Global flags
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")

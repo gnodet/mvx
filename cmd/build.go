@@ -79,10 +79,12 @@ func buildProject(args []string) error {
 		}
 	}
 
-	// Execute build command
-	if err := exec.ValidateCommand("build"); err != nil {
-		return err
-	}
-
-	return exec.ExecuteCommand("build", args)
+	// Execute build command with hooks/overrides support
+	return exec.ExecuteBuiltinCommand("build", args, func(args []string) error {
+		// Default built-in build behavior
+		if err := exec.ValidateCommand("build"); err != nil {
+			return err
+		}
+		return exec.ExecuteCommand("build", args)
+	})
 }

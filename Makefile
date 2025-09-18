@@ -7,20 +7,45 @@ DATE ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Build flags
 LDFLAGS = -ldflags "-s -w -X main.Version=$(VERSION) -X main.Commit=$(COMMIT) -X main.Date=$(DATE)"
-STATIC_FLAGS = CGO_ENABLED=0
+
+# Platform-specific build flags
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+    # Use CGO on macOS to avoid security restrictions
+    BUILD_FLAGS = CGO_ENABLED=1
+    STATIC_FLAGS = CGO_ENABLED=0
+else
+    # Use static builds on other platforms
+    BUILD_FLAGS = CGO_ENABLED=0
+    STATIC_FLAGS = CGO_ENABLED=0
+endif
 
 # Default target
 .PHONY: all
 all: build
 
-# Build the binary (static)
+# Build the binary (platform-optimized)
 .PHONY: build
 build:
-	$(STATIC_FLAGS) go build $(LDFLAGS) -o mvx-binary .
+	$(BUILD_FLAGS) go build $(LDFLAGS) -o mvx-binary .
 	@echo "Installing global development binary..."
 	@mkdir -p ~/.mvx/dev
 	@cp mvx-binary ~/.mvx/dev/mvx
 	@chmod +x ~/.mvx/dev/mvx
+	@echo "✅ Global development binary installed at ~/.mvx/dev/mvx"
+	@echo "   All projects using 'mvxVersion=dev' will now use this binary automatically"
+
+# Build with code signing (optional, for distribution)
+.PHONY: build-signed
+build-signed:
+	$(BUILD_FLAGS) go build $(LDFLAGS) -o mvx-binary .
+	@echo "Code signing binary for macOS..."
+	@codesign --force --deep --sign - mvx-binary 2>/dev/null || echo "Warning: Code signing failed"
+	@echo "Installing global development binary..."
+	@mkdir -p ~/.mvx/dev
+	@cp mvx-binary ~/.mvx/dev/mvx
+	@chmod +x ~/.mvx/dev/mvx
+	@codesign --force --deep --sign - ~/.mvx/dev/mvx 2>/dev/null || echo "Warning: Code signing failed"
 	@echo "✅ Global development binary installed at ~/.mvx/dev/mvx"
 	@echo "   All projects using 'mvxVersion=dev' will now use this binary automatically"
 

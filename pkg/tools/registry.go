@@ -299,6 +299,12 @@ func (r *ToolRegistry) GetGoVersions() ([]string, error) {
 		// Fallback to known versions if API is unavailable
 		return r.getFallbackGoVersions(), nil
 	}
+
+	// If API returned empty results, use fallback
+	if len(versions) == 0 {
+		return r.getFallbackGoVersions(), nil
+	}
+
 	return version.SortVersions(versions), nil
 }
 

@@ -19,19 +19,19 @@ var websiteCmd = &cobra.Command{
 var websiteBuildCmd = &cobra.Command{
 	Use:   "build",
 	Short: "Build the website (npm run build)",
-	RunE: func(cmd *cobra.Command, args []string) error { return runWebsiteNpm("build") },
+	RunE:  func(cmd *cobra.Command, args []string) error { return runWebsiteNpm("build") },
 }
 
 var websiteDevCmd = &cobra.Command{
 	Use:   "dev",
 	Short: "Run website dev server (npm run start-with-snippets)",
-	RunE: func(cmd *cobra.Command, args []string) error { return runWebsiteNpm("start-with-snippets") },
+	RunE:  func(cmd *cobra.Command, args []string) error { return runWebsiteNpm("start-with-snippets") },
 }
 
 var websiteServeCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Serve built website (npm run serve)",
-	RunE: func(cmd *cobra.Command, args []string) error { return runWebsiteNpm("serve") },
+	RunE:  func(cmd *cobra.Command, args []string) error { return runWebsiteNpm("serve") },
 }
 
 func init() {
@@ -43,23 +43,35 @@ func init() {
 
 func runWebsiteNpm(subcmd string) error {
 	projectRoot, err := findProjectRoot()
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	cfg, err := config.LoadConfig(projectRoot)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	mgr, err := tools.NewManager()
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	// Ensure Node is configured
 	if _, ok := cfg.Tools["node"]; !ok {
 		return fmt.Errorf("no Node.js tool configured. Add tools.node to .mvx/config and run 'mvx setup'")
 	}
 
-	if err := mgr.InstallTools(cfg); err != nil { return err }
+	if err := mgr.InstallTools(cfg); err != nil {
+		return err
+	}
 	envMap, err := mgr.SetupEnvironment(cfg)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	var env []string
-	for k, v := range envMap { env = append(env, fmt.Sprintf("%s=%s", k, v)) }
+	for k, v := range envMap {
+		env = append(env, fmt.Sprintf("%s=%s", k, v))
+	}
 	env = append(env, os.Environ()...)
 
 	workDir := filepath.Join(projectRoot, "website")
@@ -68,7 +80,9 @@ func runWebsiteNpm(subcmd string) error {
 	}
 
 	npm := "npm"
-	if isWindows() { npm = "npm.cmd" }
+	if isWindows() {
+		npm = "npm.cmd"
+	}
 
 	// Install deps for build/dev
 	if subcmd == "build" || subcmd == "start-with-snippets" || subcmd == "dev" {
@@ -78,7 +92,9 @@ func runWebsiteNpm(subcmd string) error {
 		ci.Stdout = os.Stdout
 		ci.Stderr = os.Stderr
 		ci.Stdin = os.Stdin
-		if err := ci.Run(); err != nil { return err }
+		if err := ci.Run(); err != nil {
+			return err
+		}
 	}
 
 	c := exec.Command(npm, "run", subcmd)
@@ -89,4 +105,3 @@ func runWebsiteNpm(subcmd string) error {
 	c.Stdin = os.Stdin
 	return c.Run()
 }
-

@@ -60,6 +60,85 @@ func (e *Executor) ExecuteCommand(commandName string, args []string) error {
 	return e.executeScript(script, workDir, env)
 }
 
+// ExecuteBuiltinCommand executes a built-in command with optional hooks and overrides
+func (e *Executor) ExecuteBuiltinCommand(commandName string, args []string, builtinFunc func([]string) error) error {
+	// Check if command is overridden
+	if e.config.HasCommandOverride(commandName) {
+		cmdConfig, _ := e.config.GetCommandConfig(commandName)
+		fmt.Printf("🔨 Running overridden command: %s\n", commandName)
+		if cmdConfig.Description != "" {
+			fmt.Printf("   %s\n", cmdConfig.Description)
+		}
+		return e.ExecuteCommand(commandName, args)
+	}
+
+	// Check if command has hooks
+	if e.config.HasCommandHooks(commandName) {
+		return e.executeWithHooks(commandName, args, builtinFunc)
+	}
+
+	// Execute built-in command normally
+	return builtinFunc(args)
+}
+
+// executeWithHooks executes a built-in command with pre/post hooks
+func (e *Executor) executeWithHooks(commandName string, args []string, builtinFunc func([]string) error) error {
+	cmdConfig, _ := e.config.GetCommandConfig(commandName)
+
+	// Setup environment
+	env, err := e.setupEnvironment(cmdConfig)
+	if err != nil {
+		return fmt.Errorf("failed to setup environment: %w", err)
+	}
+
+	// Determine working directory
+	workDir := e.projectRoot
+	if cmdConfig.WorkingDir != "" {
+		workDir = filepath.Join(e.projectRoot, cmdConfig.WorkingDir)
+	}
+
+	fmt.Printf("🔨 Running command with hooks: %s\n", commandName)
+	if cmdConfig.Description != "" {
+		fmt.Printf("   %s\n", cmdConfig.Description)
+	}
+
+	// Execute pre-hook
+	if cmdConfig.Pre != "" {
+		fmt.Printf("   ⚡ Running pre-hook...\n")
+		preScript := e.processScript(cmdConfig.Pre, args)
+		if err := e.executeScript(preScript, workDir, env); err != nil {
+			return fmt.Errorf("pre-hook failed: %w", err)
+		}
+	}
+
+	// Execute built-in command or custom script
+	if cmdConfig.Script != "" {
+		// Custom script instead of built-in
+		fmt.Printf("   🔧 Running custom script...\n")
+		script := e.processScript(cmdConfig.Script, args)
+		if err := e.executeScript(script, workDir, env); err != nil {
+			return fmt.Errorf("custom script failed: %w", err)
+		}
+	} else {
+		// Built-in command
+		fmt.Printf("   🏗️  Running built-in command...\n")
+		if err := builtinFunc(args); err != nil {
+			return fmt.Errorf("built-in command failed: %w", err)
+		}
+	}
+
+	// Execute post-hook
+	if cmdConfig.Post != "" {
+		fmt.Printf("   ⚡ Running post-hook...\n")
+		postScript := e.processScript(cmdConfig.Post, args)
+		if err := e.executeScript(postScript, workDir, env); err != nil {
+			return fmt.Errorf("post-hook failed: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // ListCommands returns available commands from configuration
 func (e *Executor) ListCommands() map[string]string {
 	commands := make(map[string]string)
