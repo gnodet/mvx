@@ -74,19 +74,42 @@ download_file() {
     local url="$1"
     local output="$2"
     local temp_file="${output}.tmp"
-    
+
     echo "Downloading from: $url"
-    
+
+    # Clean up any existing temp file
+    rm -f "$temp_file"
+
     if command -v curl >/dev/null 2>&1; then
-        curl -fsSL --progress-bar -o "$temp_file" "$url"
+        if ! curl -fsSL --progress-bar -o "$temp_file" "$url"; then
+            rm -f "$temp_file"
+            return 1
+        fi
     elif command -v wget >/dev/null 2>&1; then
-        wget -q --show-progress -O "$temp_file" "$url"
+        if ! wget -q --show-progress -O "$temp_file" "$url"; then
+            rm -f "$temp_file"
+            return 1
+        fi
     else
         echo "Error: Neither curl nor wget is available for downloading" >&2
         return 1
     fi
-    
-    mv "$temp_file" "$output"
+
+    # Verify the download was successful and file exists
+    if [ ! -f "$temp_file" ] || [ ! -s "$temp_file" ]; then
+        echo "Error: Download failed or file is empty" >&2
+        rm -f "$temp_file"
+        return 1
+    fi
+
+    # Move temp file to final location
+    if ! mv "$temp_file" "$output"; then
+        echo "Error: Failed to move downloaded file to final location" >&2
+        rm -f "$temp_file"
+        return 1
+    fi
+
+    return 0
 }
 
 # Get the latest version from GitHub API
@@ -306,6 +329,14 @@ find_mvx_binary() {
     echo "Downloading mvx $version for $platform..."
     if download_file "$download_url" "$cached_binary"; then
         chmod +x "$cached_binary"
+
+        # Verify the binary is executable and exists
+        if [ ! -f "$cached_binary" ] || [ ! -x "$cached_binary" ]; then
+            echo "Error: Downloaded binary is not executable" >&2
+            rm -f "$cached_binary"
+            return 1
+        fi
+
         echo "$cached_binary"
         return 0
     else
