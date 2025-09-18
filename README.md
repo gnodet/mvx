@@ -29,16 +29,29 @@ No more "works on my machine" - every developer gets the exact same environment.
 
 Just like Maven Wrapper (`mvnw`), mvx provides bootstrap scripts that automatically download and run the appropriate mvx version for your project:
 
+**Install latest stable release:**
+
 ```bash
-# Install mvx in your project (one-time setup) - installs latest stable release
 curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-mvx.sh | bash
+```
 
-# For development version (latest features, may be unstable)
+**Install development version (latest features, may be unstable):**
+
+```bash
 MVX_VERSION=main curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-mvx.sh | bash
+```
 
-# Now anyone can use mvx without installing it
+**Use mvx without global installation:**
+
+```bash
 ./mvx setup
+```
+
+```bash
 ./mvx build
+```
+
+```bash
 ./mvx test
 ```
 
@@ -58,16 +71,29 @@ See [BOOTSTRAP.md](BOOTSTRAP.md) for detailed documentation.
 
 The easiest way to use mvx is via the bootstrap scripts:
 
+**Install latest stable release:**
+
 ```bash
-# Install mvx in your project (latest stable release)
 curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-mvx.sh | bash
+```
 
-# For development version (latest features, may be unstable)
+**Install development version:**
+
+```bash
 MVX_VERSION=main curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-mvx.sh | bash
+```
 
-# Use mvx without global installation
+**Use mvx without global installation:**
+
+```bash
 ./mvx setup
+```
+
+```bash
 ./mvx build
+```
+
+```bash
 ./mvx test
 ```
 
@@ -75,20 +101,30 @@ MVX_VERSION=main curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/in
 
 Download the appropriate binary for your platform from [GitHub Releases](https://github.com/gnodet/mvx/releases):
 
+**Linux x64:**
+
 ```bash
-# Linux x64
 curl -fsSL https://github.com/gnodet/mvx/releases/latest/download/mvx-linux-amd64 -o mvx
 chmod +x mvx
+```
 
-# macOS x64
+**macOS x64 (Intel):**
+
+```bash
 curl -fsSL https://github.com/gnodet/mvx/releases/latest/download/mvx-darwin-amd64 -o mvx
 chmod +x mvx
+```
 
-# macOS ARM64 (Apple Silicon)
+**macOS ARM64 (Apple Silicon):**
+
+```bash
 curl -fsSL https://github.com/gnodet/mvx/releases/latest/download/mvx-darwin-arm64 -o mvx
 chmod +x mvx
+```
 
-# Windows x64
+**Windows x64:**
+
+```bash
 curl -fsSL https://github.com/gnodet/mvx/releases/latest/download/mvx-windows-amd64.exe -o mvx.exe
 ```
 
@@ -108,18 +144,28 @@ All binaries are statically linked and have no external dependencies.
 
 Requirements: Go 1.24+
 
+**Clone the repository:**
+
 ```bash
-# Clone the repository
 git clone https://github.com/gnodet/mvx.git
 cd mvx
+```
 
-# Build for current platform
+**Build for current platform:**
+
+```bash
 make build
+```
 
-# Build for all platforms
+**Build for all platforms:**
+
+```bash
 make build-all
+```
 
-# Run tests
+**Run tests:**
+
+```bash
 make test
 ```
 
