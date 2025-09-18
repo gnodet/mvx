@@ -75,6 +75,18 @@ fi
 if [ "$BOOTSTRAP_VERSION" = "main" ]; then
     echo "📝 Setting version to 'dev' for main branch in mvx.properties"
     sed -i.bak "s/^mvxVersion=.*/mvxVersion=dev/" .mvx/mvx.properties && rm -f .mvx/mvx.properties.bak
+
+    echo ""
+    echo "⚠️  Development version requires local build:"
+    echo "   Since you're using the development version, you'll need to build mvx locally"
+    echo "   or the bootstrap will fail when trying to download a 'dev' binary."
+    echo ""
+    echo "   To build locally:"
+    echo "     git clone https://github.com/gnodet/mvx.git"
+    echo "     cd mvx && make build"
+    echo "     cp mvx /path/to/this/project/mvx-dev"
+    echo ""
+    echo "   The bootstrap will automatically use mvx-dev if present."
 else
     # Remove 'v' prefix if present for version number
     VERSION_NUMBER=$(echo "$BOOTSTRAP_VERSION" | sed 's/^v//')

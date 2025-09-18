@@ -300,6 +300,7 @@ find_mvx_binary() {
     local version="$1"
     local platform="$2"
     local home_dir="$3"
+    local verbosity="$4"
 
     # Check cached version
     local cache_dir="$home_dir/.mvx/versions/$version"
@@ -314,7 +315,9 @@ find_mvx_binary() {
     fi
 
     # Need to download
-    echo "mvx $version not found, downloading..."
+    if [ "$verbosity" = "verbose" ]; then
+        echo "mvx $version not found, downloading..."
+    fi
 
     ensure_dir "$cache_dir"
 
@@ -340,7 +343,27 @@ find_mvx_binary() {
         echo "$cached_binary"
         return 0
     else
-        echo "Error: Failed to download mvx binary" >&2
+        echo "Error: Failed to download mvx binary from $download_url" >&2
+
+        # Provide helpful guidance for development version
+        if [ "$version" = "dev" ] || [ "$version" = "main" ]; then
+            echo "" >&2
+            echo "💡 You're using the development version, but no 'dev' binary is available." >&2
+            echo "   To use mvx in development mode, you need to build it locally:" >&2
+            echo "" >&2
+            echo "   1. Clone and build mvx:" >&2
+            echo "      git clone https://github.com/gnodet/mvx.git" >&2
+            echo "      cd mvx && make build" >&2
+            echo "" >&2
+            echo "   2. Copy the binary to your project as 'mvx-dev':" >&2
+            echo "      cp mvx /path/to/your/project/mvx-dev" >&2
+            echo "" >&2
+            echo "   3. The bootstrap will automatically use the local mvx-dev binary" >&2
+            echo "" >&2
+            echo "   Alternatively, use the latest stable release:" >&2
+            echo "      echo 'mvxVersion=latest' > .mvx/mvx.properties" >&2
+        fi
+
         return 1
     fi
 }
@@ -423,7 +446,7 @@ main() {
         check_for_updates "$home_dir" "$resolved_version" &
     fi
 
-    mvx_binary=$(find_mvx_binary "$resolved_version" "$platform" "$home_dir")
+    mvx_binary=$(find_mvx_binary "$resolved_version" "$platform" "$home_dir" "$verbosity")
     if [ $? -ne 0 ]; then
         exit 1
     fi
