@@ -66,19 +66,20 @@ jobs:
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: 0
+          # Use CGO_ENABLED=1 for macOS to avoid security restrictions, 0 for others
+          CGO_ENABLED: ${{ matrix.goos == 'darwin' && '1' || '0' }}
         run: |
           BINARY_NAME="mvx-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix }}"
-          
+
           go build \
             -ldflags "-s -w -X main.Version=${{ steps.version.outputs.version_no_v }} -X main.Commit=${{ github.sha }} -X main.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             -o "dist/${BINARY_NAME}" \
             .
-          
+
           # Create checksums
           cd dist
           sha256sum "${BINARY_NAME}" > "${BINARY_NAME}.sha256"
-          
+
           echo "Built: ${BINARY_NAME}"
           ls -la "${BINARY_NAME}"*
 

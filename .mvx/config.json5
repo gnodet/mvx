@@ -27,6 +27,18 @@
 
   // Custom commands
   commands: {
+    build: {
+      description: "Build mvx binary (use make build for platform-optimized builds)",
+      script: "go build -o mvx-binary .",
+      override: true
+    },
+
+    test: {
+      description: "Run all tests",
+      script: "go test -v ./...",
+      override: true
+    },
+
     hello: {
       description: "Say hello",
       script: "echo Hello from mvx! && mvn -v"
