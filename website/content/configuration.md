@@ -175,15 +175,16 @@ Define custom commands that become available as `./mvx <command>`:
 
 ### Platform-Specific Commands
 
+> **Note**: Platform-specific script syntax is not yet implemented. See [issue #21](https://github.com/gnodet/mvx/issues/21) for planned cross-platform script support.
+
+For now, use conditional logic within scripts:
+
 ```json5
 {
   commands: {
     "start-db": {
-      description: "Start database",
-      script: {
-        windows: "start-db.bat",
-        unix: "./start-db.sh"
-      }
+      description: "Start database (cross-platform)",
+      script: "if [[ \"$OSTYPE\" == \"msys\" ]]; then ./start-db.bat; else ./start-db.sh; fi"
     }
   }
 }
