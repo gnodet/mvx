@@ -14,7 +14,7 @@ import (
 var setupCmd = &cobra.Command{
 	Use:   "setup",
 	Short: "Setup the build environment",
-	Long: `Setup the build environment by installing all required tools and 
+	Long: `Setup the build environment by installing all required tools and
 configuring the environment as specified in the mvx configuration.
 
 This command will:
@@ -23,9 +23,17 @@ This command will:
   - Set up environment variables
   - Verify the installation
 
+By default, tools are downloaded in parallel for faster setup. You can control
+this behavior with the --parallel and --sequential flags.
+
 Examples:
-  mvx setup                   # Setup everything
-  mvx setup --tools-only      # Only install tools, skip environment setup`,
+  mvx setup                   # Setup everything with parallel downloads
+  mvx setup --tools-only      # Only install tools, skip environment setup
+  mvx setup --parallel 5      # Use 5 concurrent downloads
+  mvx setup --sequential      # Install tools one by one
+
+Environment Variables:
+  MVX_PARALLEL_DOWNLOADS      # Default number of parallel downloads (default: 3)`,
 
 	Run: func(cmd *cobra.Command, args []string) {
 		// Set verbose environment variable for tools package
@@ -41,11 +49,15 @@ Examples:
 }
 
 var (
-	toolsOnly bool
+	toolsOnly         bool
+	parallelDownloads int
+	sequentialInstall bool
 )
 
 func init() {
 	setupCmd.Flags().BoolVar(&toolsOnly, "tools-only", false, "only install tools, skip environment setup")
+	setupCmd.Flags().IntVar(&parallelDownloads, "parallel", 0, "number of parallel downloads (0 = auto, 1 = sequential)")
+	setupCmd.Flags().BoolVar(&sequentialInstall, "sequential", false, "install tools sequentially instead of in parallel")
 }
 
 func setupEnvironment() error {
@@ -77,9 +89,27 @@ func setupEnvironment() error {
 		return fmt.Errorf("failed to create tool manager: %w", err)
 	}
 
-	// Install tools
+	// Install tools with options
 	printInfo("📦 Installing tools...")
-	if err := manager.InstallTools(cfg); err != nil {
+
+	// Configure installation options
+	opts := &tools.InstallOptions{
+		MaxConcurrent: parallelDownloads,
+		Parallel:      !sequentialInstall,
+		Verbose:       verbose,
+	}
+
+	// Use default concurrency if not specified
+	if parallelDownloads == 0 {
+		opts.MaxConcurrent = tools.GetDefaultConcurrency()
+	}
+
+	// Override parallel setting if sequential flag is set
+	if sequentialInstall {
+		opts.Parallel = false
+	}
+
+	if err := manager.InstallToolsWithOptions(cfg, opts); err != nil {
 		return fmt.Errorf("failed to install tools: %w", err)
 	}
 

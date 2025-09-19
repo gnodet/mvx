@@ -4,13 +4,11 @@ import (
 	"archive/zip"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/gnodet/mvx/pkg/config"
 )
@@ -149,21 +147,23 @@ func (n *NodeTool) downloadAndExtract(url, destDir string) error {
 	defer os.Remove(tmp.Name())
 	defer tmp.Close()
 
-	client := &http.Client{
-		Timeout: 300 * time.Second, // 5 minute timeout
-	}
-	resp, err := client.Get(url)
+	// Configure robust download
+	config := DefaultDownloadConfig(url, tmp.Name())
+	config.ExpectedType = "application" // Accept various application types
+	config.MinSize = 10 * 1024 * 1024   // Minimum 10MB for Node.js distributions
+	config.MaxSize = 100 * 1024 * 1024  // Maximum 100MB for Node.js distributions
+	config.ToolName = "node"            // For progress reporting
+
+	// Perform robust download
+	result, err := RobustDownload(config)
 	if err != nil {
-		return err
+		return fmt.Errorf("Node.js download failed: %s", DiagnoseDownloadError(url, err))
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("download failed: %d from %s", resp.StatusCode, url)
-	}
-	if _, err := io.Copy(tmp, resp.Body); err != nil {
-		return err
-	}
-	_ = tmp.Close()
+
+	fmt.Printf("  📦 Downloaded %d bytes from %s\n", result.Size, result.FinalURL)
+
+	// Close temp file before extraction
+	tmp.Close()
 
 	if strings.HasSuffix(url, ".zip") {
 		return extractZipFile(tmp.Name(), destDir)

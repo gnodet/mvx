@@ -146,6 +146,17 @@ func testProjectInit(t *testing.T, mvxBinary string) {
 		t.Fatalf("Failed to change to temp dir: %v", err)
 	}
 
+	// Create .mvx directory and properties file to avoid "latest" version resolution issues in CI
+	err = os.MkdirAll(".mvx", 0755)
+	if err != nil {
+		t.Fatalf("Failed to create .mvx directory: %v", err)
+	}
+
+	err = os.WriteFile(".mvx/mvx.properties", []byte("mvxVersion=0.3.0\n"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create mvx.properties: %v", err)
+	}
+
 	// Initialize project
 	cmd := exec.Command(mvxBinary, "init", "--format", "json5")
 	output, err := cmd.CombinedOutput()
@@ -200,6 +211,17 @@ func testToolsAdd(t *testing.T, mvxBinary string) {
 				t.Logf("Warning: Could not make mvx-dev executable: %v", err)
 			}
 		}
+	}
+
+	// Create .mvx directory and properties file to avoid "latest" version resolution issues in CI
+	err = os.MkdirAll(".mvx", 0755)
+	if err != nil {
+		t.Fatalf("Failed to create .mvx directory: %v", err)
+	}
+
+	err = os.WriteFile(".mvx/mvx.properties", []byte("mvxVersion=0.3.0\n"), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create mvx.properties: %v", err)
 	}
 
 	// Initialize project first
@@ -280,8 +302,8 @@ func testCustomCommands(t *testing.T, mvxBinary string) {
 	t.Skip("Custom commands test skipped - works manually but has issues in test environment")
 }
 
-// findMvxBinaryForBenchmark is a version of findMvxBinary that works with benchmarks
-func findMvxBinaryForBenchmark(b *testing.B) string {
+// findMvxBinaryForBench is a version of findMvxBinary for benchmarks
+func findMvxBinaryForBench(b *testing.B) string {
 	// Use the wrapper script which will download the released version
 	wrapper := "../mvx"
 	if _, err := os.Stat(wrapper); err == nil {
@@ -296,27 +318,27 @@ func findMvxBinaryForBenchmark(b *testing.B) string {
 
 // Benchmark tests for performance regression detection
 func BenchmarkMvxVersion(b *testing.B) {
-	mvxBinary := findMvxBinaryForBenchmark(b)
+	mvxBinary := findMvxBinaryForBench(b)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		cmd := exec.Command(mvxBinary, "version")
-		_, err := cmd.CombinedOutput()
+		output, err := cmd.CombinedOutput()
 		if err != nil {
-			b.Fatalf("mvx version failed: %v", err)
+			b.Fatalf("mvx version failed: %v\nOutput: %s", err, output)
 		}
 	}
 }
 
 func BenchmarkMvxToolsList(b *testing.B) {
-	mvxBinary := findMvxBinaryForBenchmark(b)
+	mvxBinary := findMvxBinaryForBench(b)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		cmd := exec.Command(mvxBinary, "tools", "list")
-		_, err := cmd.CombinedOutput()
+		output, err := cmd.CombinedOutput()
 		if err != nil {
-			b.Fatalf("mvx tools list failed: %v", err)
+			b.Fatalf("mvx tools list failed: %v\nOutput: %s", err, output)
 		}
 	}
 }

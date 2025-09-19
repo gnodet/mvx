@@ -5,13 +5,11 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/gnodet/mvx/pkg/config"
 )
@@ -152,27 +150,22 @@ func (g *GoTool) downloadAndExtract(url, destDir string) error {
 	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
 
-	// Download file with timeout
-	client := &http.Client{
-		Timeout: 300 * time.Second, // 5 minute timeout
-	}
-	resp, err := client.Get(url)
+	// Configure robust download
+	config := DefaultDownloadConfig(url, tmpFile.Name())
+	config.ExpectedType = "application" // Accept various application types
+	config.MinSize = 50 * 1024 * 1024   // Minimum 50MB for Go distributions
+	config.MaxSize = 200 * 1024 * 1024  // Maximum 200MB for Go distributions
+	config.ToolName = "go"              // For progress reporting
+
+	// Perform robust download
+	result, err := RobustDownload(config)
 	if err != nil {
-		return fmt.Errorf("failed to download: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("download failed with status: %s", resp.Status)
+		return fmt.Errorf("Go download failed: %s", DiagnoseDownloadError(url, err))
 	}
 
-	// Copy to temporary file
-	_, err = io.Copy(tmpFile, resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to save download: %w", err)
-	}
+	fmt.Printf("  📦 Downloaded %d bytes from %s\n", result.Size, result.FinalURL)
 
-	// Close temp file before reading
+	// Close temp file before extraction
 	tmpFile.Close()
 
 	// Extract archive based on file extension

@@ -4,13 +4,11 @@ import (
 	"archive/zip"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/gnodet/mvx/pkg/config"
 )
@@ -163,27 +161,22 @@ func (m *MvndTool) downloadAndExtract(url, destDir string) error {
 	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
 
-	// Download file with timeout
-	client := &http.Client{
-		Timeout: 300 * time.Second, // 5 minute timeout
-	}
-	resp, err := client.Get(url)
+	// Configure robust download
+	config := DefaultDownloadConfig(url, tmpFile.Name())
+	config.ExpectedType = "application" // Accept various application types
+	config.MinSize = 10 * 1024 * 1024   // Minimum 10MB for Maven Daemon distributions
+	config.MaxSize = 100 * 1024 * 1024  // Maximum 100MB for Maven Daemon distributions
+	config.ToolName = "mvnd"            // For progress reporting
+
+	// Perform robust download
+	result, err := RobustDownload(config)
 	if err != nil {
-		return fmt.Errorf("failed to download from %s: %w", url, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("download failed with status %d from %s", resp.StatusCode, url)
+		return fmt.Errorf("Maven Daemon download failed: %s", DiagnoseDownloadError(url, err))
 	}
 
-	// Copy to temporary file
-	_, err = io.Copy(tmpFile, resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to save download: %w", err)
-	}
+	fmt.Printf("  📦 Downloaded %d bytes from %s\n", result.Size, result.FinalURL)
 
-	// Close file before extracting
+	// Close temp file before extraction
 	tmpFile.Close()
 
 	// Extract zip file
