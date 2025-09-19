@@ -39,27 +39,23 @@ func (m *MavenTool) Install(version string, cfg config.ToolConfig) error {
 
 	// Check if we should use system Maven instead of downloading
 	if useSystemMaven() {
-		logVerbose("%s=true, attempting to use system Maven", getSystemToolEnvVar("maven"))
+		logVerbose("%s=true, forcing use of system Maven", getSystemToolEnvVar("maven"))
 
 		detector := getSystemMavenDetector()
 		systemMavenHome, err := detector.GetSystemHome()
 		if err != nil {
-			logVerbose("System Maven not available: %v", err)
-			fmt.Printf("  ⚠️  System Maven not available (%v), falling back to download\n", err)
-		} else {
-			systemVersion, err := detector.GetSystemVersion(systemMavenHome)
-			if err != nil {
-				logVerbose("Could not determine system Maven version: %v", err)
-				fmt.Printf("  ⚠️  Could not determine system Maven version (%v), falling back to download\n", err)
-			} else if !detector.IsVersionCompatible(systemVersion, version) {
-				logVerbose("System Maven version %s does not match requested version %s", systemVersion, version)
-				fmt.Printf("  ⚠️  System Maven version %s does not match requested version %s, falling back to download\n", systemVersion, version)
-			} else {
-				// Use system Maven by creating a symlink
-				fmt.Printf("  🔗 Using system Maven %s from %s\n", systemVersion, systemMavenHome)
-				return detector.CreateSystemLink(systemMavenHome, installDir)
-			}
+			return fmt.Errorf("MVX_USE_SYSTEM_MAVEN=true but system Maven not available: %v", err)
 		}
+
+		systemVersion, err := detector.GetSystemVersion(systemMavenHome)
+		if err != nil {
+			logVerbose("Could not determine system Maven version: %v", err)
+			fmt.Printf("  🔗 Using system Maven from %s (version detection failed)\n", systemMavenHome)
+		} else {
+			fmt.Printf("  🔗 Using system Maven %s from %s\n", systemVersion, systemMavenHome)
+		}
+
+		return detector.CreateSystemLink(systemMavenHome, installDir)
 	}
 
 	// Create installation directory
@@ -81,18 +77,16 @@ func (m *MavenTool) Install(version string, cfg config.ToolConfig) error {
 
 // IsInstalled checks if the specified version is installed
 func (m *MavenTool) IsInstalled(version string, cfg config.ToolConfig) bool {
-	// If using system Maven, check if system Maven is available and compatible
+	// If using system Maven, check if system Maven is available (no version compatibility check)
 	if useSystemMaven() {
 		detector := getSystemMavenDetector()
 		if systemMavenHome, err := detector.GetSystemHome(); err == nil {
-			if systemVersion, err := detector.GetSystemVersion(systemMavenHome); err == nil {
-				if detector.IsVersionCompatible(systemVersion, version) {
-					logVerbose("System Maven %s is available and compatible with requested version %s", systemVersion, version)
-					return true
-				}
-			}
+			logVerbose("System Maven is available at %s (MVX_USE_SYSTEM_MAVEN=true)", systemMavenHome)
+			return true
+		} else {
+			logVerbose("System Maven not available: %v", err)
+			return false
 		}
-		// If system Maven is not available or compatible, fall through to check downloaded version
 	}
 
 	installDir := m.manager.GetToolVersionDir("maven", version, "")
@@ -107,18 +101,15 @@ func (m *MavenTool) IsInstalled(version string, cfg config.ToolConfig) bool {
 
 // GetPath returns the installation path for the specified version
 func (m *MavenTool) GetPath(version string, cfg config.ToolConfig) (string, error) {
-	// If using system Maven, return system Maven home if available and compatible
+	// If using system Maven, return system Maven home if available (no version compatibility check)
 	if useSystemMaven() {
 		detector := getSystemMavenDetector()
 		if systemMavenHome, err := detector.GetSystemHome(); err == nil {
-			if systemVersion, err := detector.GetSystemVersion(systemMavenHome); err == nil {
-				if detector.IsVersionCompatible(systemVersion, version) {
-					logVerbose("Using system Maven %s from %s", systemVersion, systemMavenHome)
-					return systemMavenHome, nil
-				}
-			}
+			logVerbose("Using system Maven from %s (MVX_USE_SYSTEM_MAVEN=true)", systemMavenHome)
+			return systemMavenHome, nil
+		} else {
+			return "", fmt.Errorf("MVX_USE_SYSTEM_MAVEN=true but system Maven not available: %v", err)
 		}
-		// If system Maven is not available or compatible, fall through to check downloaded version
 	}
 
 	installDir := m.manager.GetToolVersionDir("maven", version, "")

@@ -313,9 +313,11 @@ export MVX_RETRY_DELAY="5s"
 
 ```bash
 # Force use of system-installed tools (no version checking, no fallback)
-export MVX_USE_SYSTEM_JAVA=true
-export MVX_USE_SYSTEM_MAVEN=true
-export MVX_USE_SYSTEM_NODE=true
+export MVX_USE_SYSTEM_JAVA=true   # Implemented
+export MVX_USE_SYSTEM_MAVEN=true  # Implemented
+export MVX_USE_SYSTEM_NODE=true   # Coming soon
+export MVX_USE_SYSTEM_GO=true     # Coming soon
+export MVX_USE_SYSTEM_PYTHON=true # Coming soon
 
 # Control parallel downloads (default: 4)
 export MVX_PARALLEL_DOWNLOADS=2

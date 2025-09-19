@@ -146,10 +146,10 @@ export MVX_USE_SYSTEM_MAVEN=true
 
 When `MVX_USE_SYSTEM_MAVEN=true` is set:
 
-- ✅ **Uses existing Maven**: mvx will use Maven from `MAVEN_HOME`, `M2_HOME`, or PATH
-- ✅ **Version validation**: Ensures the system Maven version matches the requested version
+- ✅ **Always uses system Maven**: mvx will use Maven from `MAVEN_HOME`, `M2_HOME`, or PATH
+- ✅ **No version checking**: Uses system Maven regardless of version differences
 - ✅ **Faster setup**: No time spent downloading Maven in CI environments
-- ✅ **Fallback behavior**: If system Maven is unavailable or incompatible, falls back to downloading
+- ✅ **Strict behavior**: Fails if system Maven is unavailable (no fallback to download)
 
 **Detection Order:**
 1. `MAVEN_HOME` environment variable
