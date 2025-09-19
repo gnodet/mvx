@@ -129,25 +129,16 @@ Commands can execute multiple steps:
 
 ### Platform-Specific Commands
 
-Define different scripts for different platforms:
+> **Note**: Platform-specific script syntax is not yet implemented. See [issue #21](https://github.com/gnodet/mvx/issues/21) for planned cross-platform script support.
+
+For now, use platform detection within scripts:
 
 ```json5
 {
   commands: {
-    "start-db": {
-      description: "Start database",
-      script: {
-        windows: "start-db.bat",
-        unix: "./start-db.sh"
-      }
-    },
     "open-logs": {
       description: "Open log directory",
-      script: {
-        windows: "explorer logs",
-        macos: "open logs",
-        linux: "xdg-open logs"
-      }
+      script: "if [[ \"$OSTYPE\" == \"msys\" || \"$OSTYPE\" == \"win32\" ]]; then explorer logs; elif [[ \"$OSTYPE\" == \"darwin\"* ]]; then open logs; else xdg-open logs; fi"
     }
   }
 }
