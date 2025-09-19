@@ -1,14 +1,23 @@
 package tools
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/gnodet/mvx/pkg/config"
+	"github.com/gnodet/mvx/pkg/version"
 )
+
+// VersionCacheEntry represents a cached version resolution
+type VersionCacheEntry struct {
+	ResolvedVersion string    `json:"resolved_version"`
+	Timestamp       time.Time `json:"timestamp"`
+}
 
 // Manager handles tool installation and management
 type Manager struct {
@@ -16,6 +25,8 @@ type Manager struct {
 	tools            map[string]Tool
 	registry         *ToolRegistry
 	checksumRegistry *ChecksumRegistry
+	versionCache     map[string]VersionCacheEntry
+	cacheMutex       sync.RWMutex
 }
 
 // InstallOptions contains options for tool installation
@@ -68,7 +79,11 @@ func NewManager() (*Manager, error) {
 		tools:            make(map[string]Tool),
 		registry:         NewToolRegistry(),
 		checksumRegistry: NewChecksumRegistry(),
+		versionCache:     make(map[string]VersionCacheEntry),
 	}
+
+	// Load version cache from disk
+	manager.loadVersionCache()
 
 	// Register built-in tools
 	manager.RegisterTool(&JavaTool{manager: manager})
@@ -335,12 +350,21 @@ func (m *Manager) SetupEnvironment(cfg *config.Config) (map[string]string, error
 			continue // Skip unknown tools
 		}
 
-		if !tool.IsInstalled(toolConfig.Version, toolConfig) {
+		// Resolve version to check installation status
+		resolvedVersion, err := m.resolveVersion(toolName, toolConfig)
+		if err != nil {
+			continue // Skip tools with resolution errors
+		}
+
+		resolvedConfig := toolConfig
+		resolvedConfig.Version = resolvedVersion
+
+		if !tool.IsInstalled(resolvedVersion, resolvedConfig) {
 			continue // Skip uninstalled tools
 		}
 
 		// Get tool path
-		toolPath, err := tool.GetPath(toolConfig.Version, toolConfig)
+		toolPath, err := tool.GetPath(resolvedVersion, resolvedConfig)
 		if err != nil {
 			continue
 		}
@@ -426,27 +450,68 @@ func (m *Manager) SetupProjectEnvironment(cfg *config.Config, projectPath string
 
 // resolveVersion resolves a version specification to a concrete version
 func (m *Manager) resolveVersion(toolName string, toolConfig config.ToolConfig) (string, error) {
-	switch toolName {
-	case "java":
-		distribution := toolConfig.Distribution
-		if distribution == "" {
-			distribution = "temurin" // Default distribution
-		}
-		return m.registry.ResolveJavaVersion(toolConfig.Version, distribution)
-	case "maven":
-		return m.registry.ResolveMavenVersion(toolConfig.Version)
-	case "mvnd":
-		return m.registry.ResolveMvndVersion(toolConfig.Version)
-	case "node":
-		return m.registry.ResolveNodeVersion(toolConfig.Version)
-	case "go":
-		return m.registry.ResolveGoVersion(toolConfig.Version)
-	case "python":
-		return m.registry.ResolvePythonVersion(toolConfig.Version)
-	default:
-		// For unknown tools, return version as-is
+	// Fast path: Check if version is already concrete (no resolution needed)
+	if m.isConcreteVersion(toolName, toolConfig.Version) {
 		return toolConfig.Version, nil
 	}
+
+	distribution := toolConfig.Distribution
+
+	// Check cache first
+	if cached, found := m.getCachedVersion(toolName, toolConfig.Version, distribution); found {
+		return cached, nil
+	}
+
+	// Resolve version using registry
+	var resolved string
+	var err error
+
+	switch toolName {
+	case "java":
+		resolved, err = m.registry.ResolveJavaVersion(toolConfig.Version, distribution)
+	case "maven":
+		resolved, err = m.registry.ResolveMavenVersion(toolConfig.Version)
+	case "mvnd":
+		resolved, err = m.registry.ResolveMvndVersion(toolConfig.Version)
+	case "node":
+		resolved, err = m.registry.ResolveNodeVersion(toolConfig.Version)
+	case "go":
+		resolved, err = m.registry.ResolveGoVersion(toolConfig.Version)
+	case "python":
+		resolved, err = m.registry.ResolvePythonVersion(toolConfig.Version)
+	default:
+		// For unknown tools, return version as-is
+		resolved = toolConfig.Version
+	}
+
+	if err != nil {
+		return "", err
+	}
+
+	// Cache the resolved version
+	m.setCachedVersion(toolName, toolConfig.Version, distribution, resolved)
+
+	return resolved, nil
+}
+
+// isConcreteVersion checks if a version specification is already concrete and doesn't need resolution
+func (m *Manager) isConcreteVersion(toolName, versionSpec string) bool {
+	// Handle special cases that always need resolution
+	switch versionSpec {
+	case "latest", "lts", "":
+		return false
+	}
+
+	// Try to parse as version specification
+	spec, err := version.ParseSpec(versionSpec)
+	if err != nil {
+		// If we can't parse it, assume it needs resolution
+		return false
+	}
+
+	// Only "exact" constraint versions are concrete
+	// "exact" means full major.minor.patch[-pre][+build] format
+	return spec.Constraint == "exact"
 }
 
 // GetRegistry returns the tool registry
@@ -457,4 +522,128 @@ func (m *Manager) GetRegistry() *ToolRegistry {
 // GetChecksumRegistry returns the checksum registry
 func (m *Manager) GetChecksumRegistry() *ChecksumRegistry {
 	return m.checksumRegistry
+}
+
+// loadVersionCache loads the version resolution cache from disk
+func (m *Manager) loadVersionCache() {
+	m.cacheMutex.Lock()
+	defer m.cacheMutex.Unlock()
+
+	cacheFile := filepath.Join(m.cacheDir, "version_cache.json")
+	data, err := os.ReadFile(cacheFile)
+	if err != nil {
+		// Cache file doesn't exist or can't be read, start with empty cache
+		return
+	}
+
+	var cache map[string]VersionCacheEntry
+	if err := json.Unmarshal(data, &cache); err != nil {
+		// Invalid cache file, start with empty cache
+		return
+	}
+
+	// Filter out expired entries (older than 24 hours)
+	now := time.Now()
+	for key, entry := range cache {
+		if now.Sub(entry.Timestamp) < 24*time.Hour {
+			m.versionCache[key] = entry
+		}
+	}
+}
+
+// saveVersionCache saves the version resolution cache to disk
+func (m *Manager) saveVersionCache() {
+	m.cacheMutex.RLock()
+	defer m.cacheMutex.RUnlock()
+
+	cacheFile := filepath.Join(m.cacheDir, "version_cache.json")
+	data, err := json.MarshalIndent(m.versionCache, "", "  ")
+	if err != nil {
+		return // Silently fail on cache save errors
+	}
+
+	os.WriteFile(cacheFile, data, 0644)
+}
+
+// getCachedVersion retrieves a cached version resolution
+func (m *Manager) getCachedVersion(toolName, versionSpec, distribution string) (string, bool) {
+	m.cacheMutex.RLock()
+	defer m.cacheMutex.RUnlock()
+
+	key := fmt.Sprintf("%s:%s:%s", toolName, versionSpec, distribution)
+	entry, exists := m.versionCache[key]
+	if !exists {
+		return "", false
+	}
+
+	// Check if cache entry is still valid (less than 24 hours old)
+	if time.Since(entry.Timestamp) > 24*time.Hour {
+		return "", false
+	}
+
+	return entry.ResolvedVersion, true
+}
+
+// setCachedVersion stores a version resolution in cache
+func (m *Manager) setCachedVersion(toolName, versionSpec, distribution, resolvedVersion string) {
+	m.cacheMutex.Lock()
+	defer m.cacheMutex.Unlock()
+
+	key := fmt.Sprintf("%s:%s:%s", toolName, versionSpec, distribution)
+	m.versionCache[key] = VersionCacheEntry{
+		ResolvedVersion: resolvedVersion,
+		Timestamp:       time.Now(),
+	}
+
+	// Save cache to disk asynchronously
+	go m.saveVersionCache()
+}
+
+// InstallSpecificTools installs only the specified tools from configuration
+func (m *Manager) InstallSpecificTools(cfg *config.Config, toolNames []string) error {
+	if len(toolNames) == 0 {
+		return nil
+	}
+
+	for _, toolName := range toolNames {
+		toolConfig, exists := cfg.Tools[toolName]
+		if !exists {
+			return fmt.Errorf("tool %s not configured", toolName)
+		}
+
+		if err := m.InstallTool(toolName, toolConfig); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// EnsureToolInstalled ensures a specific tool is installed without checking others
+func (m *Manager) EnsureToolInstalled(cfg *config.Config, toolName string) error {
+	toolConfig, exists := cfg.Tools[toolName]
+	if !exists {
+		return fmt.Errorf("tool %s not configured", toolName)
+	}
+
+	tool, err := m.GetTool(toolName)
+	if err != nil {
+		return err
+	}
+
+	// Resolve version specification to concrete version
+	resolvedVersion, err := m.resolveVersion(toolName, toolConfig)
+	if err != nil {
+		return fmt.Errorf("failed to resolve version for %s: %w", toolName, err)
+	}
+
+	// Update config with resolved version for checking
+	resolvedConfig := toolConfig
+	resolvedConfig.Version = resolvedVersion
+
+	if tool.IsInstalled(resolvedVersion, resolvedConfig) {
+		return nil // Already installed
+	}
+
+	return m.InstallTool(toolName, toolConfig)
 }

@@ -509,6 +509,10 @@ func (r *ToolRegistry) fetchNodeIndex() ([]nodeIndexEntry, error) {
 
 // ResolveJavaVersion resolves a Java version specification to a concrete version
 func (r *ToolRegistry) ResolveJavaVersion(versionSpec, distribution string) (string, error) {
+	if distribution == "" {
+		distribution = "temurin" // Default distribution
+	}
+
 	availableVersions, err := r.GetJavaVersions(distribution)
 	if err != nil {
 		return "", err
