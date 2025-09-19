@@ -262,7 +262,19 @@ func (m *MavenTool) ListVersions() ([]string, error) {
 
 // getDownloadURL returns the download URL for the specified version
 func (m *MavenTool) getDownloadURL(version string) string {
-	// Use Apache archive for all Maven distributions
+	// For recent releases, try dist.apache.org first (CDN-backed)
+	// Fall back to archive.apache.org in downloadAndExtract if needed
+	if strings.HasPrefix(version, "4.") {
+		// Maven 4.x versions - try dist first for recent releases
+		return fmt.Sprintf("https://dist.apache.org/repos/dist/release/maven/maven-4/%s/binaries/apache-maven-%s-bin.zip", version, version)
+	}
+
+	// Maven 3.x versions - try dist first for recent releases
+	return fmt.Sprintf("https://dist.apache.org/repos/dist/release/maven/maven-3/%s/binaries/apache-maven-%s-bin.zip", version, version)
+}
+
+// getArchiveDownloadURL returns the fallback archive URL for the specified version
+func (m *MavenTool) getArchiveDownloadURL(version string) string {
 	if strings.HasPrefix(version, "4.") {
 		// Maven 4.x versions are in the Maven 4 archive
 		return fmt.Sprintf("https://archive.apache.org/dist/maven/maven-4/%s/binaries/apache-maven-%s-bin.zip", version, version)
@@ -272,8 +284,30 @@ func (m *MavenTool) getDownloadURL(version string) string {
 	return fmt.Sprintf("https://archive.apache.org/dist/maven/maven-3/%s/binaries/apache-maven-%s-bin.zip", version, version)
 }
 
-// downloadAndExtract downloads and extracts a zip file with checksum verification
+// downloadAndExtract downloads and extracts Maven with fallback URL support
 func (m *MavenTool) downloadAndExtract(url, destDir, version string, cfg config.ToolConfig) error {
+	// Try primary URL first (dist.apache.org)
+	err := m.attemptDownloadAndExtract(url, destDir, version, cfg, "dist")
+	if err == nil {
+		return nil
+	}
+
+	// If primary URL fails, try archive URL as fallback
+	fmt.Printf("  🔄 Primary download failed, trying archive fallback...\n")
+	archiveURL := m.getArchiveDownloadURL(version)
+	if archiveURL != url {
+		err = m.attemptDownloadAndExtract(archiveURL, destDir, version, cfg, "archive")
+		if err == nil {
+			fmt.Printf("  ✅ Successfully downloaded from archive fallback\n")
+			return nil
+		}
+	}
+
+	return fmt.Errorf("Maven download failed from both dist and archive: %w", err)
+}
+
+// attemptDownloadAndExtract performs a single download attempt
+func (m *MavenTool) attemptDownloadAndExtract(url, destDir, version string, cfg config.ToolConfig, source string) error {
 	// Create temporary file for download
 	tmpFile, err := os.CreateTemp("", "maven-*.zip")
 	if err != nil {
@@ -281,6 +315,8 @@ func (m *MavenTool) downloadAndExtract(url, destDir, version string, cfg config.
 	}
 	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
+
+	fmt.Printf("  ⏳ Downloading Maven %s from %s...\n", version, source)
 
 	// Configure robust download with checksum verification
 	config := DefaultDownloadConfig(url, tmpFile.Name())
@@ -295,10 +331,10 @@ func (m *MavenTool) downloadAndExtract(url, destDir, version string, cfg config.
 	// Perform robust download with checksum verification
 	result, err := RobustDownload(config)
 	if err != nil {
-		return fmt.Errorf("Maven download failed: %s", DiagnoseDownloadError(url, err))
+		return fmt.Errorf("Maven download failed from %s: %s", source, DiagnoseDownloadError(url, err))
 	}
 
-	fmt.Printf("  📦 Downloaded %d bytes from %s\n", result.Size, result.FinalURL)
+	fmt.Printf("  📦 Downloaded %d bytes from %s (%s)\n", result.Size, result.FinalURL, source)
 
 	// Close temp file before extraction
 	tmpFile.Close()

@@ -127,6 +127,15 @@ func (m *MvndTool) getDownloadURL(version string) string {
 	// Determine platform-specific archive name
 	platform := m.getPlatformString()
 
+	// Try dist first for recent releases (CDN-backed)
+	return fmt.Sprintf("https://dist.apache.org/repos/dist/release/maven/mvnd/%s/maven-mvnd-%s-%s.zip", version, version, platform)
+}
+
+// getArchiveDownloadURL returns the fallback archive URL for the specified version
+func (m *MvndTool) getArchiveDownloadURL(version string) string {
+	// Determine platform-specific archive name
+	platform := m.getPlatformString()
+
 	// mvnd archives are in the Apache archive
 	return fmt.Sprintf("https://archive.apache.org/dist/maven/mvnd/%s/maven-mvnd-%s-%s.zip", version, version, platform)
 }
@@ -151,8 +160,30 @@ func (m *MvndTool) getPlatformString() string {
 	}
 }
 
-// downloadAndExtract downloads and extracts a zip file with checksum verification
+// downloadAndExtract downloads and extracts Maven Daemon with fallback URL support
 func (m *MvndTool) downloadAndExtract(url, destDir, version string, cfg config.ToolConfig) error {
+	// Try primary URL first (dist.apache.org)
+	err := m.attemptDownloadAndExtract(url, destDir, version, cfg, "dist")
+	if err == nil {
+		return nil
+	}
+
+	// If primary URL fails, try archive URL as fallback
+	fmt.Printf("  🔄 Primary download failed, trying archive fallback...\n")
+	archiveURL := m.getArchiveDownloadURL(version)
+	if archiveURL != url {
+		err = m.attemptDownloadAndExtract(archiveURL, destDir, version, cfg, "archive")
+		if err == nil {
+			fmt.Printf("  ✅ Successfully downloaded from archive fallback\n")
+			return nil
+		}
+	}
+
+	return fmt.Errorf("Maven Daemon download failed from both dist and archive: %w", err)
+}
+
+// attemptDownloadAndExtract performs a single download attempt
+func (m *MvndTool) attemptDownloadAndExtract(url, destDir, version string, cfg config.ToolConfig, source string) error {
 	// Create temporary file for download
 	tmpFile, err := os.CreateTemp("", "mvnd-*.zip")
 	if err != nil {
@@ -160,6 +191,8 @@ func (m *MvndTool) downloadAndExtract(url, destDir, version string, cfg config.T
 	}
 	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
+
+	fmt.Printf("  ⏳ Downloading Maven Daemon %s from %s...\n", version, source)
 
 	// Configure robust download with checksum verification
 	config := DefaultDownloadConfig(url, tmpFile.Name())
@@ -174,10 +207,10 @@ func (m *MvndTool) downloadAndExtract(url, destDir, version string, cfg config.T
 	// Perform robust download with checksum verification
 	result, err := RobustDownload(config)
 	if err != nil {
-		return fmt.Errorf("Maven Daemon download failed: %s", DiagnoseDownloadError(url, err))
+		return fmt.Errorf("Maven Daemon download failed from %s: %s", source, DiagnoseDownloadError(url, err))
 	}
 
-	fmt.Printf("  📦 Downloaded %d bytes from %s\n", result.Size, result.FinalURL)
+	fmt.Printf("  📦 Downloaded %d bytes from %s (%s)\n", result.Size, result.FinalURL, source)
 
 	// Close temp file before extraction
 	tmpFile.Close()

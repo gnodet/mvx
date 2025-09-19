@@ -2,11 +2,13 @@ package tools
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,16 +32,41 @@ type DownloadConfig struct {
 	ChecksumRegistry *ChecksumRegistry
 }
 
+// getTimeoutFromEnv returns a timeout from environment variable or default value
+func getTimeoutFromEnv(envVar string, defaultTimeout time.Duration) time.Duration {
+	if timeoutStr := os.Getenv(envVar); timeoutStr != "" {
+		if timeout, err := time.ParseDuration(timeoutStr); err == nil && timeout > 0 {
+			return timeout
+		}
+	}
+	return defaultTimeout
+}
+
+// getMaxRetries returns the maximum number of download retries from environment or default
+func getMaxRetries() int {
+	if retriesStr := os.Getenv("MVX_MAX_RETRIES"); retriesStr != "" {
+		if retries, err := strconv.Atoi(retriesStr); err == nil && retries >= 0 {
+			return retries
+		}
+	}
+	return 3 // Default: 3 retries
+}
+
+// getRetryDelay returns the delay between retries from environment or default
+func getRetryDelay() time.Duration {
+	return getTimeoutFromEnv("MVX_RETRY_DELAY", 2*time.Second) // Default: 2 seconds between retries
+}
+
 // DefaultDownloadConfig returns a default download configuration
 func DefaultDownloadConfig(url, destPath string) *DownloadConfig {
 	return &DownloadConfig{
 		URL:           url,
 		DestPath:      destPath,
-		MaxRetries:    3,
-		RetryDelay:    2 * time.Second,
-		Timeout:       300 * time.Second,
-		MinSize:       1024,       // At least 1KB
-		MaxSize:       2147483648, // Max 2GB
+		MaxRetries:    getMaxRetries(),
+		RetryDelay:    getRetryDelay(),
+		Timeout:       getTimeoutFromEnv("MVX_DOWNLOAD_TIMEOUT", 600*time.Second), // Default: 10 minutes for slow servers
+		MinSize:       1024,                                                       // At least 1KB
+		MaxSize:       2147483648,                                                 // Max 2GB
 		ValidateMagic: true,
 	}
 }
@@ -92,9 +119,14 @@ func attemptDownload(config *DownloadConfig) (*DownloadResult, error) {
 	defer os.Remove(tempFile.Name())
 	defer tempFile.Close()
 
-	// Create HTTP client with timeout
+	// Create HTTP client with granular timeouts for better handling of slow servers
 	client := &http.Client{
-		Timeout: config.Timeout,
+		Transport: &http.Transport{
+			TLSHandshakeTimeout:   getTimeoutFromEnv("MVX_TLS_TIMEOUT", 120*time.Second),      // TLS handshake timeout (configurable for slow Apache servers)
+			ResponseHeaderTimeout: getTimeoutFromEnv("MVX_RESPONSE_TIMEOUT", 120*time.Second), // Time to receive response headers (configurable for slow servers)
+			IdleConnTimeout:       getTimeoutFromEnv("MVX_IDLE_TIMEOUT", 90*time.Second),      // Keep-alive timeout (configurable)
+		},
+		// Use context timeout instead of global client timeout for better control
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 10 {
 				return fmt.Errorf("too many redirects")
@@ -103,8 +135,11 @@ func attemptDownload(config *DownloadConfig) (*DownloadResult, error) {
 		},
 	}
 
-	// Create request
-	req, err := http.NewRequest("GET", config.URL, nil)
+	// Create request with context timeout for the entire operation
+	ctx, cancel := context.WithTimeout(context.Background(), config.Timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", config.URL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -112,12 +147,20 @@ func attemptDownload(config *DownloadConfig) (*DownloadResult, error) {
 	// Set user agent
 	req.Header.Set("User-Agent", "mvx/1.0 (https://github.com/gnodet/mvx)")
 
-	// Perform request
+	// Perform request with progress indication for slow servers
+	toolPrefix := ""
+	if config.ToolName != "" {
+		toolPrefix = fmt.Sprintf("[%s] ", config.ToolName)
+	}
+	fmt.Printf("  🌐 %sConnecting to server...\n", toolPrefix)
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP request failed: %w", err)
 	}
 	defer resp.Body.Close()
+
+	fmt.Printf("  📡 %sServer responded, starting download...\n", toolPrefix)
 
 	// Check status code
 	if resp.StatusCode != http.StatusOK {

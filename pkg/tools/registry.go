@@ -21,7 +21,7 @@ type ToolRegistry struct {
 func NewToolRegistry() *ToolRegistry {
 	return &ToolRegistry{
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: getTimeoutFromEnv("MVX_REGISTRY_TIMEOUT", 120*time.Second), // Default: 2 minutes for slow Apache servers
 		},
 	}
 }
