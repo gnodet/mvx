@@ -240,6 +240,8 @@ You can override built-in mvx commands:
 
 ## Environment Variables
 
+### Custom Environment Variables
+
 Set environment variables for your commands:
 
 ```json5
@@ -259,6 +261,70 @@ Set environment variables for your commands:
     }
   }
 }
+```
+
+### mvx System Environment Variables
+
+mvx recognizes several environment variables to control its behavior:
+
+#### Timeout Configuration
+
+Configure timeouts for downloads and network operations (useful for slow networks or CI/CD):
+
+```bash
+# TLS handshake timeout (default: 2 minutes)
+export MVX_TLS_TIMEOUT="5m"
+
+# Response header timeout (default: 2 minutes)
+export MVX_RESPONSE_TIMEOUT="3m"
+
+# Idle connection timeout (default: 90 seconds)
+export MVX_IDLE_TIMEOUT="2m"
+
+# Overall download timeout (default: 10 minutes)
+export MVX_DOWNLOAD_TIMEOUT="20m"
+
+# Checksum verification timeout (default: 2 minutes)
+export MVX_CHECKSUM_TIMEOUT="10m"
+
+# API registry timeout (default: 2 minutes)
+export MVX_REGISTRY_TIMEOUT="8m"
+```
+
+#### Download Retry Configuration
+
+Configure retry behavior for failed downloads:
+
+```bash
+# Maximum number of download retries (default: 3)
+export MVX_MAX_RETRIES="5"
+
+# Delay between retry attempts (default: 2 seconds)
+export MVX_RETRY_DELAY="5s"
+```
+
+**When to use timeout configuration:**
+- **Slow networks**: Increase timeouts in environments with poor connectivity
+- **CI/CD systems**: Configure longer timeouts for reliable builds
+- **Corporate networks**: Handle proxy delays and security scanning
+- **Apache servers**: Some Apache servers (like archive.apache.org) can be slow
+
+#### Other System Variables
+
+```bash
+# Use system-installed tools when available
+export MVX_USE_SYSTEM_JAVA=true
+export MVX_USE_SYSTEM_MAVEN=true
+export MVX_USE_SYSTEM_NODE=true
+
+# Control parallel downloads (default: 4)
+export MVX_PARALLEL_DOWNLOADS=2
+
+# Enable verbose logging
+export MVX_VERBOSE=true
+
+# Disable color output
+export MVX_NO_COLOR=true
 ```
 
 ## Working Directory

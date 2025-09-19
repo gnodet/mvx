@@ -25,7 +25,7 @@ func NewChecksumRegistry() *ChecksumRegistry {
 	registry := &ChecksumRegistry{
 		knownChecksums: make(map[string]map[string]ChecksumInfo),
 		client: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: getTimeoutFromEnv("MVX_REGISTRY_TIMEOUT", 120*time.Second), // Default: 2 minutes for slow Apache servers
 		},
 	}
 

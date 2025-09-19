@@ -40,7 +40,7 @@ type ChecksumVerifier struct {
 func NewChecksumVerifier() *ChecksumVerifier {
 	return &ChecksumVerifier{
 		client: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: getTimeoutFromEnv("MVX_CHECKSUM_TIMEOUT", 120*time.Second), // Default: 2 minutes for slow Apache servers
 		},
 	}
 }
