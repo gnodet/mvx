@@ -189,13 +189,13 @@ func (r *RustTool) downloadAndInstall(url, destDir, version string, cfg config.T
 
 	// Configure robust download
 	config := DefaultDownloadConfig(url, tmpFile.Name())
-	config.ExpectedType = ""            // Accept any content type for rustup-init binary
-	config.MinSize = 5 * 1024 * 1024    // Minimum 5MB for rustup-init
-	config.MaxSize = 50 * 1024 * 1024   // Maximum 50MB for rustup-init
-	config.ValidateMagic = false        // rustup-init is a binary, not an archive
-	config.ToolName = "rust"            // For progress reporting
-	config.Version = version            // For checksum verification
-	config.Config = cfg                 // Tool configuration
+	config.ExpectedType = ""          // Accept any content type for rustup-init binary
+	config.MinSize = 5 * 1024 * 1024  // Minimum 5MB for rustup-init
+	config.MaxSize = 50 * 1024 * 1024 // Maximum 50MB for rustup-init
+	config.ValidateMagic = false      // rustup-init is a binary, not an archive
+	config.ToolName = "rust"          // For progress reporting
+	config.Version = version          // For checksum verification
+	config.Config = cfg               // Tool configuration
 	config.ChecksumRegistry = r.manager.GetChecksumRegistry()
 
 	// Perform robust download
