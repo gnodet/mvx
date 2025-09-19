@@ -12,58 +12,58 @@ func TestParseHybridArgs(t *testing.T) {
 	defer func() { os.Args = originalArgs }()
 
 	tests := []struct {
-		name           string
-		args           []string
-		expectedMaven  []string
+		name            string
+		args            []string
+		expectedMaven   []string
 		expectedVerbose bool
 		expectedQuiet   bool
 	}{
 		{
-			name:           "Maven flags only",
-			args:           []string{"mvx", "mvn", "-V"},
-			expectedMaven:  []string{"-V"},
+			name:            "Maven flags only",
+			args:            []string{"mvx", "mvn", "-V"},
+			expectedMaven:   []string{"-V"},
 			expectedVerbose: false,
 			expectedQuiet:   false,
 		},
 		{
-			name:           "mvx verbose + Maven flags",
-			args:           []string{"mvx", "--verbose", "mvn", "-V"},
-			expectedMaven:  []string{"-V"},
+			name:            "mvx verbose + Maven flags",
+			args:            []string{"mvx", "--verbose", "mvn", "-V"},
+			expectedMaven:   []string{"-V"},
 			expectedVerbose: true,
 			expectedQuiet:   false,
 		},
 		{
-			name:           "mvx quiet + Maven flags",
-			args:           []string{"mvx", "--quiet", "mvn", "-X", "clean"},
-			expectedMaven:  []string{"-X", "clean"},
+			name:            "mvx quiet + Maven flags",
+			args:            []string{"mvx", "--quiet", "mvn", "-X", "clean"},
+			expectedMaven:   []string{"-X", "clean"},
 			expectedVerbose: false,
 			expectedQuiet:   true,
 		},
 		{
-			name:           "mvx short flags + Maven flags",
-			args:           []string{"mvx", "-v", "mvn", "-Pprofile", "install"},
-			expectedMaven:  []string{"-Pprofile", "install"},
+			name:            "mvx short flags + Maven flags",
+			args:            []string{"mvx", "-v", "mvn", "-Pprofile", "install"},
+			expectedMaven:   []string{"-Pprofile", "install"},
 			expectedVerbose: true,
 			expectedQuiet:   false,
 		},
 		{
-			name:           "Complex Maven command",
-			args:           []string{"mvx", "mvn", "-X", "-Dmaven.test.skip=true", "clean", "install"},
-			expectedMaven:  []string{"-X", "-Dmaven.test.skip=true", "clean", "install"},
+			name:            "Complex Maven command",
+			args:            []string{"mvx", "mvn", "-X", "-Dmaven.test.skip=true", "clean", "install"},
+			expectedMaven:   []string{"-X", "-Dmaven.test.skip=true", "clean", "install"},
 			expectedVerbose: false,
 			expectedQuiet:   false,
 		},
 		{
-			name:           "Both mvx flags + complex Maven",
-			args:           []string{"mvx", "--verbose", "--quiet", "mvn", "-X", "-Pproduction", "package"},
-			expectedMaven:  []string{"-X", "-Pproduction", "package"},
+			name:            "Both mvx flags + complex Maven",
+			args:            []string{"mvx", "--verbose", "--quiet", "mvn", "-X", "-Pproduction", "package"},
+			expectedMaven:   []string{"-X", "-Pproduction", "package"},
 			expectedVerbose: true,
 			expectedQuiet:   true,
 		},
 		{
-			name:           "No Maven args",
-			args:           []string{"mvx", "mvn"},
-			expectedMaven:  []string{},
+			name:            "No Maven args",
+			args:            []string{"mvx", "mvn"},
+			expectedMaven:   []string{},
 			expectedVerbose: false,
 			expectedQuiet:   false,
 		},

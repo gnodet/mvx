@@ -35,8 +35,6 @@ Examples:
 			return err
 		}
 
-
-
 		// Handle backward compatibility: remove '--' separator if present and warn
 		if len(mavenArgs) > 0 && mavenArgs[0] == "--" {
 			printWarning("The '--' separator is no longer needed with 'mvx mvn'. You can remove it for cleaner syntax.")
