@@ -19,14 +19,14 @@ func TestRustTool_Name(t *testing.T) {
 
 func TestRustTool_GetDownloadURL(t *testing.T) {
 	tool := &RustTool{}
-	
+
 	url := tool.getDownloadURL()
-	
+
 	// Check that URL contains expected components
 	if !strings.Contains(url, "static.rust-lang.org") {
 		t.Errorf("Expected URL to contain 'static.rust-lang.org', got %s", url)
 	}
-	
+
 	if !strings.Contains(url, "rustup-init") {
 		t.Errorf("Expected URL to contain 'rustup-init', got %s", url)
 	}
@@ -85,7 +85,7 @@ func TestRustTool_IsInstalled(t *testing.T) {
 
 	// Create a mock installation structure
 	installDir := manager.GetToolVersionDir("rust", "1.84.0", "")
-	toolchainDir := filepath.Join(installDir, "toolchains", "stable-x86_64-unknown-linux-gnu")
+	toolchainDir := filepath.Join(installDir, "rustup", "toolchains", "1.84.0-x86_64-unknown-linux-gnu")
 	binDir := filepath.Join(toolchainDir, "bin")
 	if err := os.MkdirAll(binDir, 0755); err != nil {
 		t.Fatalf("Failed to create mock installation: %v", err)
@@ -129,7 +129,7 @@ func TestRustTool_GetPath(t *testing.T) {
 
 	// Create a mock installation structure
 	installDir := manager.GetToolVersionDir("rust", "1.84.0", "")
-	toolchainDir := filepath.Join(installDir, "toolchains", "stable-x86_64-unknown-linux-gnu")
+	toolchainDir := filepath.Join(installDir, "rustup", "toolchains", "1.84.0-x86_64-unknown-linux-gnu")
 	if err := os.MkdirAll(toolchainDir, 0755); err != nil {
 		t.Fatalf("Failed to create mock installation: %v", err)
 	}
@@ -163,7 +163,7 @@ func TestRustTool_GetBinPath(t *testing.T) {
 
 	// Create a mock installation structure
 	installDir := manager.GetToolVersionDir("rust", "1.84.0", "")
-	toolchainDir := filepath.Join(installDir, "toolchains", "stable-x86_64-unknown-linux-gnu")
+	toolchainDir := filepath.Join(installDir, "rustup", "toolchains", "1.84.0-x86_64-unknown-linux-gnu")
 	binDir := filepath.Join(toolchainDir, "bin")
 	if err := os.MkdirAll(binDir, 0755); err != nil {
 		t.Fatalf("Failed to create mock installation: %v", err)

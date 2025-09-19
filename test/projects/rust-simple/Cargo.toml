@@ -1,0 +1,14 @@
+[package]
+name = "rust-simple"
+version = "0.1.0"
+edition = "2021"
+authors = ["mvx-test <test@example.com>"]
+description = "A simple Rust project for testing mvx Rust/Cargo integration"
+license = "MIT"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[dev-dependencies]
+# No additional dev dependencies needed for basic testing

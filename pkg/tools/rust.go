@@ -69,19 +69,20 @@ func (r *RustTool) IsInstalled(version string, cfg config.ToolConfig) bool {
 // GetPath returns the installation path for the specified version
 func (r *RustTool) GetPath(version string, cfg config.ToolConfig) (string, error) {
 	installDir := r.manager.GetToolVersionDir("rust", version, "")
-	
+
 	// Rust toolchain is installed in a specific structure
-	// ~/.mvx/tools/rust/{version}/toolchains/stable-{arch}/
-	toolchainDir := filepath.Join(installDir, "toolchains")
-	
+	// ~/.mvx/tools/rust/{version}/rustup/toolchains/{version}-{arch}/
+	toolchainDir := filepath.Join(installDir, "rustup", "toolchains")
+
 	// Find the toolchain directory
 	entries, err := os.ReadDir(toolchainDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to read toolchain directory: %w", err)
 	}
 
+	// Look for the version-specific toolchain directory
 	for _, entry := range entries {
-		if entry.IsDir() && strings.Contains(entry.Name(), "stable") {
+		if entry.IsDir() && strings.HasPrefix(entry.Name(), version) {
 			return filepath.Join(toolchainDir, entry.Name()), nil
 		}
 	}
@@ -141,7 +142,7 @@ func (r *RustTool) ListVersions() ([]string, error) {
 // getDownloadURL returns the download URL for rustup-init
 func (r *RustTool) getDownloadURL() string {
 	var arch, ext string
-	
+
 	switch runtime.GOOS {
 	case "linux":
 		switch runtime.GOARCH {
@@ -188,9 +189,10 @@ func (r *RustTool) downloadAndInstall(url, destDir, version string, cfg config.T
 
 	// Configure robust download
 	config := DefaultDownloadConfig(url, tmpFile.Name())
-	config.ExpectedType = "application" // Accept various application types
+	config.ExpectedType = ""            // Accept any content type for rustup-init binary
 	config.MinSize = 5 * 1024 * 1024    // Minimum 5MB for rustup-init
 	config.MaxSize = 50 * 1024 * 1024   // Maximum 50MB for rustup-init
+	config.ValidateMagic = false        // rustup-init is a binary, not an archive
 	config.ToolName = "rust"            // For progress reporting
 	config.Version = version            // For checksum verification
 	config.Config = cfg                 // Tool configuration
@@ -219,7 +221,7 @@ func (r *RustTool) downloadAndInstall(url, destDir, version string, cfg config.T
 
 	// Install Rust using rustup-init
 	fmt.Printf("  🦀 Installing Rust toolchain %s...\n", version)
-	
+
 	args := []string{
 		"--default-toolchain", version,
 		"--profile", "default",
@@ -230,7 +232,7 @@ func (r *RustTool) downloadAndInstall(url, destDir, version string, cfg config.T
 	cmd := exec.Command(tmpFile.Name(), args...)
 	cmd.Env = env
 	cmd.Dir = destDir
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("rustup installation failed: %w\nOutput: %s", err, output)
