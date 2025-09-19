@@ -413,6 +413,74 @@ mvx automatically detects the configuration format:
 - Simplified CI/CD setup
 - Better collaboration with consistent tooling
 
+## 🚀 CI/CD Integration
+
+mvx is designed to work seamlessly in CI/CD environments. For faster builds and better reliability, you can configure mvx to use pre-installed tools instead of downloading them.
+
+### Using System Tools in CI
+
+When running in CI environments like GitHub Actions, the runners often have tools like Java and Maven pre-installed. You can configure mvx to use system tools instead of downloading them:
+
+```bash
+# Use system Java
+export MVX_USE_SYSTEM_JAVA=true
+
+# Use system Maven
+export MVX_USE_SYSTEM_MAVEN=true
+
+# Use system Node.js (when implemented)
+export MVX_USE_SYSTEM_NODE=true
+
+./mvx setup
+./mvx build
+```
+
+**Supported Tools:**
+- ✅ **Java**: Uses `JAVA_HOME` environment variable
+- ✅ **Maven**: Uses `MAVEN_HOME`, `M2_HOME`, or finds `mvn` in PATH
+- 🚧 **Node.js**: Coming soon
+- 🚧 **Go**: Coming soon
+
+**Benefits:**
+- ⚡ **Faster builds**: No time spent downloading tools
+- 🛡️ **More reliable**: Avoids network/download issues
+- 💾 **Better resource usage**: Uses existing installations
+- 🎯 **Selective control**: Enable/disable per tool independently
+
+**Example GitHub Actions workflow:**
+
+```yaml
+name: Build
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Maven
+        uses: actions/setup-maven@v4
+        with:
+          maven-version: '3.9.6'
+
+      - name: Build with mvx
+        env:
+          MVX_USE_SYSTEM_JAVA: true
+          MVX_USE_SYSTEM_MAVEN: true
+        run: |
+          ./mvx setup
+          ./mvx build
+```
+
+This approach works with any CI system that provides Java pre-installed or allows you to install it separately.
+
 ## 💡 Example Configuration
 
 mvx supports both **JSON5** and **YAML** configuration formats, inspired by [Maven Mason](https://github.com/maveniverse/mason).

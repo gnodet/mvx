@@ -1,6 +1,7 @@
 package test
 
 import (
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -9,6 +10,24 @@ import (
 
 	"github.com/gnodet/mvx/pkg/config"
 )
+
+// copyFile copies a file from src to dst
+func copyFile(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	_, err = io.Copy(destFile, sourceFile)
+	return err
+}
 
 // TestMvxBinary tests the mvx binary functionality
 func TestMvxBinary(t *testing.T) {
@@ -170,16 +189,29 @@ func testToolsAdd(t *testing.T, mvxBinary string) {
 		t.Fatalf("Failed to change to temp dir: %v", err)
 	}
 
+	// Copy mvx-dev binary to temp directory so wrapper can find it
+	devBinary := filepath.Join(oldDir, "mvx-dev")
+	if _, err := os.Stat(devBinary); err == nil {
+		tempDevBinary := filepath.Join(tempDir, "mvx-dev")
+		if err := copyFile(devBinary, tempDevBinary); err != nil {
+			t.Logf("Warning: Could not copy mvx-dev binary: %v", err)
+		} else {
+			if err := os.Chmod(tempDevBinary, 0755); err != nil {
+				t.Logf("Warning: Could not make mvx-dev executable: %v", err)
+			}
+		}
+	}
+
 	// Initialize project first
 	cmd := exec.Command(mvxBinary, "init", "--format", "json5")
-	_, err = cmd.CombinedOutput()
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("mvx init failed: %v", err)
+		t.Fatalf("mvx init failed: %v\nOutput: %s", err, output)
 	}
 
 	// Add Java tool
 	cmd = exec.Command(mvxBinary, "tools", "add", "java", "21")
-	output, err := cmd.CombinedOutput()
+	output, err = cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("mvx tools add java 21 failed: %v\nOutput: %s", err, output)
 	}
@@ -248,9 +280,23 @@ func testCustomCommands(t *testing.T, mvxBinary string) {
 	t.Skip("Custom commands test skipped - works manually but has issues in test environment")
 }
 
+// findMvxBinaryForBenchmark is a version of findMvxBinary that works with benchmarks
+func findMvxBinaryForBenchmark(b *testing.B) string {
+	// Use the wrapper script which will download the released version
+	wrapper := "../mvx"
+	if _, err := os.Stat(wrapper); err == nil {
+		abs, _ := filepath.Abs(wrapper)
+		b.Logf("Using mvx wrapper: %s", abs)
+		return abs
+	}
+
+	b.Fatal("Could not find mvx wrapper script.")
+	return ""
+}
+
 // Benchmark tests for performance regression detection
 func BenchmarkMvxVersion(b *testing.B) {
-	mvxBinary := findMvxBinary(&testing.T{})
+	mvxBinary := findMvxBinaryForBenchmark(b)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -263,7 +309,7 @@ func BenchmarkMvxVersion(b *testing.B) {
 }
 
 func BenchmarkMvxToolsList(b *testing.B) {
-	mvxBinary := findMvxBinary(&testing.T{})
+	mvxBinary := findMvxBinaryForBenchmark(b)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
