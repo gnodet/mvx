@@ -599,7 +599,108 @@ func (r *ToolRegistry) GetToolInfo(toolName string) (map[string]interface{}, err
 			"versions": versions,
 		}, nil
 
+	case "python":
+		versions, err := r.GetPythonVersions()
+		if err != nil {
+			return nil, err
+		}
+
+		return map[string]interface{}{
+			"name":     "Python Programming Language",
+			"versions": versions,
+		}, nil
+
 	default:
 		return nil, fmt.Errorf("unknown tool: %s", toolName)
 	}
+}
+
+// GetPythonVersions returns available Python versions
+func (r *ToolRegistry) GetPythonVersions() ([]string, error) {
+	// Try to fetch versions from Python releases API
+	versions, err := r.fetchPythonVersions()
+	if err != nil {
+		// Fallback to known versions if API is unavailable
+		return r.getFallbackPythonVersions(), nil
+	}
+	return version.SortVersions(versions), nil
+}
+
+// fetchPythonVersions fetches Python versions from GitHub releases API
+func (r *ToolRegistry) fetchPythonVersions() ([]string, error) {
+	resp, err := r.httpClient.Get("https://api.github.com/repos/python/cpython/tags?per_page=100")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var tags []struct {
+		Name string `json:"name"`
+	}
+
+	if err := json.Unmarshal(body, &tags); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	}
+
+	var versions []string
+	for _, tag := range tags {
+		// Python tags are in format "v3.11.0", "v3.10.8", etc.
+		if strings.HasPrefix(tag.Name, "v") && strings.Count(tag.Name, ".") >= 2 {
+			version := strings.TrimPrefix(tag.Name, "v")
+			// Only include stable releases (3.x.y format)
+			if strings.Count(version, ".") == 2 && !strings.Contains(version, "a") &&
+				!strings.Contains(version, "b") && !strings.Contains(version, "rc") {
+				versions = append(versions, version)
+			}
+		}
+	}
+
+	return versions, nil
+}
+
+// getFallbackPythonVersions returns a list of known Python versions as fallback
+func (r *ToolRegistry) getFallbackPythonVersions() []string {
+	return []string{
+		// Python 3.13
+		"3.13.0",
+		// Python 3.12
+		"3.12.7", "3.12.6", "3.12.5", "3.12.4", "3.12.3", "3.12.2", "3.12.1", "3.12.0",
+		// Python 3.11
+		"3.11.10", "3.11.9", "3.11.8", "3.11.7", "3.11.6", "3.11.5", "3.11.4", "3.11.3", "3.11.2", "3.11.1", "3.11.0",
+		// Python 3.10
+		"3.10.15", "3.10.14", "3.10.13", "3.10.12", "3.10.11", "3.10.10", "3.10.9", "3.10.8", "3.10.7", "3.10.6", "3.10.5", "3.10.4", "3.10.3", "3.10.2", "3.10.1", "3.10.0",
+		// Python 3.9
+		"3.9.20", "3.9.19", "3.9.18", "3.9.17", "3.9.16", "3.9.15", "3.9.14", "3.9.13", "3.9.12", "3.9.11", "3.9.10", "3.9.9", "3.9.8", "3.9.7", "3.9.6", "3.9.5", "3.9.4", "3.9.3", "3.9.2", "3.9.1", "3.9.0",
+		// Python 3.8
+		"3.8.20", "3.8.19", "3.8.18", "3.8.17", "3.8.16", "3.8.15", "3.8.14", "3.8.13", "3.8.12", "3.8.11", "3.8.10", "3.8.9", "3.8.8", "3.8.7", "3.8.6", "3.8.5", "3.8.4", "3.8.3", "3.8.2", "3.8.1", "3.8.0",
+	}
+}
+
+// ResolvePythonVersion resolves a Python version specification to a concrete version
+func (r *ToolRegistry) ResolvePythonVersion(versionSpec string) (string, error) {
+	availableVersions, err := r.GetPythonVersions()
+	if err != nil {
+		return "", err
+	}
+
+	spec, err := version.ParseSpec(versionSpec)
+	if err != nil {
+		return "", fmt.Errorf("invalid version specification %s: %w", versionSpec, err)
+	}
+
+	resolved, err := spec.Resolve(availableVersions)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve Python version %s: %w", versionSpec, err)
+	}
+
+	return resolved, nil
 }

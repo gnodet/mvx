@@ -76,6 +76,7 @@ func NewManager() (*Manager, error) {
 	manager.RegisterTool(&MvndTool{manager: manager})
 	manager.RegisterTool(&NodeTool{manager: manager})
 	manager.RegisterTool(&GoTool{manager: manager})
+	manager.RegisterTool(&PythonTool{manager: manager})
 
 	return manager, nil
 }
@@ -352,6 +353,71 @@ func (m *Manager) SetupEnvironment(cfg *config.Config) (map[string]string, error
 			env["MAVEN_HOME"] = toolPath
 		case "node":
 			env["NODE_HOME"] = toolPath
+		case "python":
+			env["PYTHON_HOME"] = toolPath
+		}
+	}
+
+	return env, nil
+}
+
+// SetupProjectEnvironment sets up project-specific environment for tools like Python
+func (m *Manager) SetupProjectEnvironment(cfg *config.Config, projectPath string) (map[string]string, error) {
+	env := make(map[string]string)
+
+	// Copy base environment
+	baseEnv, err := m.SetupEnvironment(cfg)
+	if err != nil {
+		return nil, err
+	}
+	for key, value := range baseEnv {
+		env[key] = value
+	}
+
+	// Handle Python project-specific environment
+	if pythonConfig, exists := cfg.Tools["python"]; exists {
+		tool, err := m.GetTool("python")
+		if err != nil {
+			return env, nil // Skip if Python tool not available
+		}
+
+		pythonTool, ok := tool.(*PythonTool)
+		if !ok {
+			return env, nil // Skip if not a Python tool
+		}
+
+		// Create project virtual environment if it doesn't exist
+		if err := pythonTool.CreateProjectVenv(pythonConfig.Version, pythonConfig, projectPath); err != nil {
+			return nil, fmt.Errorf("failed to create Python virtual environment: %w", err)
+		}
+
+		// Get project-specific Python environment
+		pythonEnv, err := pythonTool.GetProjectEnvironment(pythonConfig.Version, pythonConfig, projectPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get Python project environment: %w", err)
+		}
+
+		// Merge Python environment variables
+		for key, value := range pythonEnv {
+			env[key] = value
+		}
+
+		// Install requirements if specified
+		if requirementsFile, ok := pythonConfig.Options["requirements"]; ok {
+			if err := pythonTool.InstallProjectRequirements(pythonConfig.Version, pythonConfig, projectPath, requirementsFile); err != nil {
+				return nil, fmt.Errorf("failed to install Python requirements: %w", err)
+			}
+		} else {
+			// Try common requirements file names
+			for _, reqFile := range []string{"requirements.txt", "requirements.pip", "pyproject.toml"} {
+				if _, err := os.Stat(filepath.Join(projectPath, reqFile)); err == nil {
+					if err := pythonTool.InstallProjectRequirements(pythonConfig.Version, pythonConfig, projectPath, reqFile); err != nil {
+						// Don't fail if requirements installation fails, just warn
+						fmt.Printf("  ⚠️  Warning: failed to install requirements from %s: %v\n", reqFile, err)
+					}
+					break
+				}
+			}
 		}
 	}
 
@@ -375,6 +441,8 @@ func (m *Manager) resolveVersion(toolName string, toolConfig config.ToolConfig) 
 		return m.registry.ResolveNodeVersion(toolConfig.Version)
 	case "go":
 		return m.registry.ResolveGoVersion(toolConfig.Version)
+	case "python":
+		return m.registry.ResolvePythonVersion(toolConfig.Version)
 	default:
 		// For unknown tools, return version as-is
 		return toolConfig.Version, nil
