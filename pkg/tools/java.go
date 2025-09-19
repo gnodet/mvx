@@ -435,22 +435,46 @@ func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, rel
 
 // downloadAndExtract downloads and extracts a tar.gz file
 func (j *JavaTool) downloadAndExtract(url, destDir string) error {
-	// Download file with timeout
-	client := &http.Client{
-		Timeout: 300 * time.Second, // 5 minute timeout
-	}
-	resp, err := client.Get(url)
+	// Create temporary file for download
+	tmpFile, err := os.CreateTemp("", "java-*.tar.gz")
 	if err != nil {
-		return fmt.Errorf("failed to download: %w", err)
+		return fmt.Errorf("failed to create temporary file: %w", err)
 	}
-	defer resp.Body.Close()
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("download failed with status: %s", resp.Status)
+	// Configure robust download
+	config := DefaultDownloadConfig(url, tmpFile.Name())
+	config.ExpectedType = "application" // Accept various application types
+	config.MinSize = 50 * 1024 * 1024   // Minimum 50MB for Java distributions
+	config.MaxSize = 500 * 1024 * 1024  // Maximum 500MB for Java distributions
+	config.ToolName = "java"            // For progress reporting
+
+	// Perform robust download
+	result, err := RobustDownload(config)
+	if err != nil {
+		return fmt.Errorf("Java download failed: %s", DiagnoseDownloadError(url, err))
 	}
+
+	fmt.Printf("  📦 Downloaded %d bytes from %s\n", result.Size, result.FinalURL)
+
+	// Close temp file before extraction
+	tmpFile.Close()
+
+	// Extract the downloaded archive
+	return j.extractTarGz(tmpFile.Name(), destDir)
+}
+
+// extractTarGz extracts a tar.gz file from disk
+func (j *JavaTool) extractTarGz(archivePath, destDir string) error {
+	file, err := os.Open(archivePath)
+	if err != nil {
+		return fmt.Errorf("failed to open archive: %w", err)
+	}
+	defer file.Close()
 
 	// Create gzip reader
-	gzReader, err := gzip.NewReader(resp.Body)
+	gzReader, err := gzip.NewReader(file)
 	if err != nil {
 		return fmt.Errorf("failed to create gzip reader: %w", err)
 	}
