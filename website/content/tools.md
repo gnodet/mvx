@@ -35,6 +35,33 @@ mvx tools add go 1.23.1
 - ✅ **Preserves** existing configuration and formatting
 - ✅ **Adds comments** and proper JSON5 structure
 
+## Using System Tools
+
+For CI environments, corporate setups, or when you prefer to use existing tool installations, mvx supports using system-installed tools instead of downloading them. This is controlled via environment variables:
+
+```bash
+# Enable system tools individually
+export MVX_USE_SYSTEM_JAVA=true
+export MVX_USE_SYSTEM_MAVEN=true
+export MVX_USE_SYSTEM_NODE=true    # Coming soon
+export MVX_USE_SYSTEM_GO=true      # Coming soon
+
+./mvx setup
+```
+
+**Benefits:**
+- ⚡ **Faster builds**: No download time
+- 🛡️ **More reliable**: Avoids network issues
+- 💾 **Better resource usage**: Uses existing installations
+- 🎯 **Selective control**: Enable per tool independently
+- 🔒 **Security**: Use centrally managed, approved tool versions
+
+**How it works:**
+1. When `MVX_USE_SYSTEM_<TOOL>=true` is set, mvx first tries to use the system installation
+2. Validates that the system tool version matches your configuration
+3. If compatible, creates a symlink to integrate with mvx's tool management
+4. If incompatible or unavailable, falls back to downloading
+
 ## Supported Tools
 
 ## Java Ecosystem
@@ -53,6 +80,34 @@ Automatic installation of OpenJDK distributions.
     }
   }
 }
+```
+
+#### Using System Java
+
+For CI environments or when you prefer to use an existing Java installation, you can configure mvx to use the system Java instead of downloading:
+
+```bash
+export MVX_USE_SYSTEM_JAVA=true
+export JAVA_HOME=/path/to/your/java
+./mvx build
+```
+
+When `MVX_USE_SYSTEM_JAVA=true` is set:
+
+- ✅ **Uses existing Java**: mvx will use the Java installation from `JAVA_HOME`
+- ✅ **Version validation**: Ensures the system Java version matches the requested version
+- ✅ **Faster setup**: No time spent downloading Java in CI environments
+- ✅ **Fallback behavior**: If system Java is unavailable or incompatible, falls back to downloading
+
+**Requirements:**
+- `JAVA_HOME` environment variable must be set
+- System Java version must match the major version specified in your configuration
+- Java executable must be available at `$JAVA_HOME/bin/java`
+
+**Use Cases:**
+- **GitHub Actions**: Runners have Java pre-installed
+- **Corporate environments**: Java is centrally managed
+- **Offline environments**: Where downloading is restricted
 ```
 
 **Supported Versions**: 8, 11, 17, 21, 22, 23  
@@ -74,8 +129,34 @@ Apache Maven build automation tool.
 }
 ```
 
-**Supported Versions**: 3.6.x, 3.8.x, 3.9.x  
+**Supported Versions**: 3.6.x, 3.8.x, 3.9.x
 **Platforms**: All (Java-based)
+
+#### Using System Maven
+
+For CI environments or when you prefer to use an existing Maven installation:
+
+```bash
+export MVX_USE_SYSTEM_MAVEN=true
+./mvx build
+```
+
+When `MVX_USE_SYSTEM_MAVEN=true` is set:
+
+- ✅ **Uses existing Maven**: mvx will use Maven from `MAVEN_HOME`, `M2_HOME`, or PATH
+- ✅ **Version validation**: Ensures the system Maven version matches the requested version
+- ✅ **Faster setup**: No time spent downloading Maven in CI environments
+- ✅ **Fallback behavior**: If system Maven is unavailable or incompatible, falls back to downloading
+
+**Detection Order:**
+1. `MAVEN_HOME` environment variable
+2. `M2_HOME` environment variable (fallback)
+3. `mvn` command in PATH
+
+**Requirements:**
+- Maven must be accessible via one of the detection methods above
+- System Maven version must match the version specified in your configuration
+- Maven executable must be functional (`mvn --version` works)
 
 ### Maven Daemon
 
