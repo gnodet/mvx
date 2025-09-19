@@ -23,9 +23,37 @@ Imagine cloning any project and running:
 ./mvx build    # Builds the project with the right environment
 ./mvx test     # Runs tests with proper configuration
 ./mvx demo     # Launches project-specific demos or examples
+
+# Or use tools directly with natural syntax
+./mvx mvn -V clean install    # Maven with version flag
+./mvx --verbose mvn -X test   # mvx verbose + Maven debug
 ```
 
 No more "works on my machine" - every developer gets the exact same environment.
+
+## 🔧 Maven Integration
+
+mvx provides seamless Maven integration with transparent argument passing:
+
+```bash
+# All Maven flags work naturally - no special syntax needed
+./mvx mvn -V                    # Show Maven version
+./mvx mvn -X clean install      # Debug mode with clean install
+./mvx mvn -Pproduction package  # Activate profile and package
+
+# Combine mvx global flags with Maven flags
+./mvx --verbose mvn -V          # mvx verbose output + Maven version
+./mvx --quiet mvn test          # mvx quiet mode + Maven test
+
+# Backward compatibility maintained
+./mvx mvn -- -V                 # Still works (with helpful migration warning)
+```
+
+**Key Benefits:**
+- **🎯 Natural syntax**: Use Maven flags exactly as you would with `mvn`
+- **🔄 Transparent wrapper**: mvx acts like `mvnw` but with enhanced tool management
+- **⚡ No learning curve**: Existing Maven knowledge applies directly
+- **🛡️ Backward compatible**: Existing scripts continue to work
 
 ## 📦 mvx Bootstrap
 

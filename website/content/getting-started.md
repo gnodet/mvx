@@ -105,6 +105,14 @@ Edit `.mvx/config.json5` to specify your project's requirements:
 ./mvx build
 ./mvx test
 
+# Use Maven directly with natural syntax
+./mvx mvn -V                    # Show Maven version
+./mvx mvn clean install         # Standard Maven build
+./mvx mvn -X test              # Debug mode testing
+
+# Combine mvx and Maven flags
+./mvx --verbose mvn -V          # mvx verbose + Maven version
+
 # Or use built-in commands
 ./mvx tools list
 ./mvx version
@@ -138,6 +146,23 @@ Edit `.mvx/config.json5` to specify your project's requirements:
     }
   }
 }
+```
+
+**Usage Examples:**
+```bash
+# Use custom commands
+./mvx build
+./mvx quick-build
+./mvx run
+
+# Or use Maven directly with natural syntax
+./mvx mvn -V                    # Show Maven version
+./mvx mvn clean install         # Standard build
+./mvx mvn -Pproduction package  # Production build with profile
+./mvx mvn spring-boot:run       # Run Spring Boot app
+
+# Combine mvx and Maven flags for debugging
+./mvx --verbose mvn -X test     # mvx verbose + Maven debug mode
 ```
 
 ### Secure Production Project

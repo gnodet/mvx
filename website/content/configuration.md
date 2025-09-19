@@ -120,6 +120,92 @@ Enable checksum verification for enhanced security:
 }
 ```
 
+## Maven Integration
+
+mvx provides enhanced Maven wrapper functionality with transparent argument passing:
+
+### Direct Maven Usage
+
+You can use Maven directly through mvx without defining custom commands:
+
+```bash
+# All Maven commands work naturally
+./mvx mvn clean install
+./mvx mvn -V                    # Show version
+./mvx mvn -X test              # Debug mode
+./mvx mvn -Pproduction package # Profile activation
+
+# Combine mvx global flags with Maven flags
+./mvx --verbose mvn -V          # mvx verbose + Maven version
+./mvx --quiet mvn test          # mvx quiet mode + Maven test
+```
+
+### Maven Configuration Options
+
+```json5
+{
+  tools: {
+    maven: {
+      version: "3.9.6",                    // Maven version
+      settings: "custom-settings.xml",     // Custom settings file (optional)
+      checksum: {                          // Security verification (optional)
+        required: true                     // Fail on checksum errors
+      }
+    }
+  }
+}
+```
+
+### Maven vs Custom Commands
+
+You can use both approaches in the same project:
+
+```json5
+{
+  tools: {
+    maven: { version: "3.9.6" },
+    java: { version: "21" }
+  },
+  commands: {
+    // Custom commands for common workflows
+    build: {
+      description: "Standard build",
+      script: "mvn clean install"
+    },
+    "quick-build": {
+      description: "Build without tests",
+      script: "mvn clean install -DskipTests"
+    }
+  }
+}
+```
+
+**Usage:**
+```bash
+# Use custom commands for common workflows
+./mvx build
+./mvx quick-build
+
+# Use Maven directly for ad-hoc commands
+./mvx mvn dependency:tree
+./mvx mvn versions:display-updates
+./mvx mvn -Pintegration-tests verify
+```
+
+### Backward Compatibility
+
+Scripts using the `--` separator continue to work:
+
+```bash
+# Old syntax (still works with migration warnings)
+./mvx mvn -- -V
+./mvx mvn -- clean install
+
+# New syntax (recommended)
+./mvx mvn -V
+./mvx mvn clean install
+```
+
 ## Commands Section
 
 Define custom commands that become available as `./mvx <command>`:
