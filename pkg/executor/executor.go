@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/gnodet/mvx/pkg/config"
+	"github.com/gnodet/mvx/pkg/shell"
 	"github.com/gnodet/mvx/pkg/tools"
 )
 
@@ -48,8 +49,14 @@ func (e *Executor) ExecuteCommand(commandName string, args []string) error {
 		workDir = filepath.Join(e.projectRoot, cmdConfig.WorkingDir)
 	}
 
-	// Process script (handle multiline scripts)
-	script := e.processScript(cmdConfig.Script, args)
+	// Process script and resolve interpreter (handle platform-specific scripts)
+	script, interpreter, err := config.ResolvePlatformScriptWithInterpreter(cmdConfig.Script, cmdConfig.Interpreter)
+	if err != nil {
+		return fmt.Errorf("failed to resolve script: %w", err)
+	}
+
+	// Process script arguments
+	processedScript := e.processScriptString(script, args)
 
 	// Execute command
 	fmt.Printf("🔨 Running command: %s\n", commandName)
@@ -57,7 +64,7 @@ func (e *Executor) ExecuteCommand(commandName string, args []string) error {
 		fmt.Printf("   %s\n", cmdConfig.Description)
 	}
 
-	return e.executeScript(script, workDir, env)
+	return e.executeScriptWithInterpreter(processedScript, workDir, env, interpreter)
 }
 
 // ExecuteBuiltinCommand executes a built-in command with optional hooks and overrides
@@ -103,20 +110,28 @@ func (e *Executor) executeWithHooks(commandName string, args []string, builtinFu
 	}
 
 	// Execute pre-hook
-	if cmdConfig.Pre != "" {
+	if config.HasValidScript(cmdConfig.Pre) {
 		fmt.Printf("   ⚡ Running pre-hook...\n")
-		preScript := e.processScript(cmdConfig.Pre, args)
-		if err := e.executeScript(preScript, workDir, env); err != nil {
+		preScript, preInterpreter, err := config.ResolvePlatformScriptWithInterpreter(cmdConfig.Pre, cmdConfig.Interpreter)
+		if err != nil {
+			return fmt.Errorf("pre-hook script resolution failed: %w", err)
+		}
+		processedPreScript := e.processScriptString(preScript, args)
+		if err := e.executeScriptWithInterpreter(processedPreScript, workDir, env, preInterpreter); err != nil {
 			return fmt.Errorf("pre-hook failed: %w", err)
 		}
 	}
 
 	// Execute built-in command or custom script
-	if cmdConfig.Script != "" {
+	if config.HasValidScript(cmdConfig.Script) {
 		// Custom script instead of built-in
 		fmt.Printf("   🔧 Running custom script...\n")
-		script := e.processScript(cmdConfig.Script, args)
-		if err := e.executeScript(script, workDir, env); err != nil {
+		script, scriptInterpreter, err := config.ResolvePlatformScriptWithInterpreter(cmdConfig.Script, cmdConfig.Interpreter)
+		if err != nil {
+			return fmt.Errorf("custom script resolution failed: %w", err)
+		}
+		processedScript := e.processScriptString(script, args)
+		if err := e.executeScriptWithInterpreter(processedScript, workDir, env, scriptInterpreter); err != nil {
 			return fmt.Errorf("custom script failed: %w", err)
 		}
 	} else {
@@ -128,10 +143,14 @@ func (e *Executor) executeWithHooks(commandName string, args []string, builtinFu
 	}
 
 	// Execute post-hook
-	if cmdConfig.Post != "" {
+	if config.HasValidScript(cmdConfig.Post) {
 		fmt.Printf("   ⚡ Running post-hook...\n")
-		postScript := e.processScript(cmdConfig.Post, args)
-		if err := e.executeScript(postScript, workDir, env); err != nil {
+		postScript, postInterpreter, err := config.ResolvePlatformScriptWithInterpreter(cmdConfig.Post, cmdConfig.Interpreter)
+		if err != nil {
+			return fmt.Errorf("post-hook script resolution failed: %w", err)
+		}
+		processedPostScript := e.processScriptString(postScript, args)
+		if err := e.executeScriptWithInterpreter(processedPostScript, workDir, env, postInterpreter); err != nil {
 			return fmt.Errorf("post-hook failed: %w", err)
 		}
 	}
@@ -228,8 +247,19 @@ func (e *Executor) setupEnvironment(cmdConfig config.CommandConfig) ([]string, e
 	return env, nil
 }
 
-// processScript processes the script string, handling multiline scripts and arguments
-func (e *Executor) processScript(script string, args []string) string {
+// processScript processes the script, handling platform-specific scripts and arguments
+func (e *Executor) processScript(script interface{}, args []string) (string, error) {
+	// Resolve platform-specific script
+	resolvedScript, err := config.ResolvePlatformScript(script)
+	if err != nil {
+		return "", err
+	}
+
+	return e.processScriptString(resolvedScript, args), nil
+}
+
+// processScriptString processes a script string with arguments
+func (e *Executor) processScriptString(script string, args []string) string {
 	// If there are arguments, append them to the script
 	if len(args) > 0 {
 		// Join arguments with spaces and append to script
@@ -241,7 +271,29 @@ func (e *Executor) processScript(script string, args []string) string {
 }
 
 // executeScript executes a script in the specified working directory with environment
+// This method is kept for backward compatibility
 func (e *Executor) executeScript(script, workDir string, env []string) error {
+	return e.executeScriptWithInterpreter(script, workDir, env, "")
+}
+
+// executeScriptWithInterpreter executes a script using the specified interpreter
+func (e *Executor) executeScriptWithInterpreter(script, workDir string, env []string, interpreter string) error {
+	// Default to native interpreter if not specified
+	if interpreter == "" || interpreter == "native" {
+		return e.executeNativeScript(script, workDir, env)
+	}
+
+	// Use mvx-shell interpreter
+	if interpreter == "mvx-shell" {
+		mvxShell := shell.NewMVXShell(workDir, env)
+		return mvxShell.Execute(script)
+	}
+
+	return fmt.Errorf("unknown interpreter: %s", interpreter)
+}
+
+// executeNativeScript executes a script using the native system shell
+func (e *Executor) executeNativeScript(script, workDir string, env []string) error {
 	// Determine shell
 	shell := "/bin/bash"
 	shellArgs := []string{"-c"}
