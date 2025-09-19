@@ -203,40 +203,36 @@ Set environment variables for commands:
 
 ## Command Hooks
 
-Run commands before or after built-in mvx commands:
+Add pre and post hooks to built-in mvx commands by defining them within the command configuration:
 
 ```json5
 {
-  hooks: {
-    "pre-setup": {
-      description: "Prepare environment before setup",
-      script: "echo 'Preparing environment...'"
-    },
-    "post-setup": {
-      description: "Verify installation after setup",
-      script: [
+  commands: {
+    // Add hooks to built-in 'setup' command
+    setup: {
+      description: "Setup with custom hooks",
+      pre: "echo 'Preparing environment...'",
+      post: [
         "echo 'Verifying tools...'",
         "./mvx tools verify java",
         "./mvx tools verify maven"
       ]
     },
-    "pre-build": {
-      description: "Pre-build checks",
-      script: "echo 'Running pre-build checks...'"
-    },
-    "post-build": {
-      description: "Post-build actions",
-      script: "echo 'Build completed successfully!'"
+
+    // Add hooks to built-in 'build' command
+    build: {
+      description: "Build with pre-checks",
+      pre: "echo 'Running pre-build checks...'",
+      post: "echo 'Build completed successfully!'"
     }
   }
 }
 ```
 
-Available hook points:
-- `pre-setup` / `post-setup`
-- `pre-build` / `post-build` (for custom build commands)
-- `pre-test` / `post-test` (for custom test commands)
-- `pre-clean` / `post-clean`
+Hook properties:
+- `pre` - Script to run before the built-in command
+- `post` - Script to run after the built-in command
+- Both support single strings or arrays of commands
 
 ## Command Overrides
 
