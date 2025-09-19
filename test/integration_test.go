@@ -405,29 +405,43 @@ func buildCurrentVersionForBenchmark(b *testing.B) bool {
 }
 
 func testGradleIntegration(t *testing.T, mvxBinary string) {
-	// Create temporary directory for the test project
+	// Get the current working directory to find the test project
+	currentDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current directory: %v", err)
+	}
+
+	// Copy the test project to a temporary directory
 	tempDir := t.TempDir()
+
+	// The test is running from the test directory, so we need to go up one level
+	projectRoot := filepath.Dir(currentDir)
+	testProjectDir := filepath.Join(projectRoot, "test", "projects", "gradle-java-simple")
+
+	// Verify test project exists
+	if _, err := os.Stat(testProjectDir); os.IsNotExist(err) {
+		t.Fatalf("Test project not found at %s", testProjectDir)
+	}
+
+	// Copy test project to temp directory
+	err = copyDir(testProjectDir, tempDir)
+	if err != nil {
+		t.Fatalf("Failed to copy test project: %v", err)
+	}
+
+	// Change to the test project directory
 	oldDir, _ := os.Getwd()
 	defer os.Chdir(oldDir)
 
-	err := os.Chdir(tempDir)
+	err = os.Chdir(tempDir)
 	if err != nil {
 		t.Fatalf("Failed to change to temp dir: %v", err)
 	}
 
-	// Create .mvx directory and properties file
-	err = os.MkdirAll(".mvx", 0755)
-	if err != nil {
-		t.Fatalf("Failed to create .mvx directory: %v", err)
-	}
+	t.Logf("Using Gradle test project in: %s", tempDir)
 
-	err = os.WriteFile(".mvx/mvx.properties", []byte("mvxVersion=0.3.0\n"), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create mvx.properties: %v", err)
-	}
-
-	// Initialize project
-	cmd := exec.Command(mvxBinary, "init", "--format", "json5")
+	// Initialize project (force overwrite if config exists)
+	cmd := exec.Command(mvxBinary, "init", "--format", "json5", "--force")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("mvx init failed: %v\nOutput: %s", err, output)
@@ -490,8 +504,7 @@ func testGradleIntegration(t *testing.T, mvxBinary string) {
 		t.Errorf("Expected gradle version 8.5, got %s", gradleConfig.Version)
 	}
 
-	// Create a simple Gradle project
-	createGradleProject(t, tempDir)
+	// Test project is already copied and ready to use
 
 	// Test mvx setup (installs tools)
 	t.Run("GradleSetup", func(t *testing.T) {
@@ -548,6 +561,10 @@ func testGradleIntegration(t *testing.T, mvxBinary string) {
 			Description: "List Gradle tasks",
 			Script:      "gradle tasks --all",
 		}
+		cfg.Commands["gradle-test"] = config.CommandConfig{
+			Description: "Run Gradle tests",
+			Script:      "gradle test",
+		}
 
 		// Write updated config
 		updatedConfig, err := config.FormatAsJSON5(&cfg)
@@ -576,6 +593,41 @@ func testGradleIntegration(t *testing.T, mvxBinary string) {
 		// Check that build directory was created
 		if _, err := os.Stat("build"); os.IsNotExist(err) {
 			t.Error("Expected build directory to be created by Gradle")
+		}
+
+		// Check that classes were compiled
+		if _, err := os.Stat("build/classes/java/main/com/example/App.class"); os.IsNotExist(err) {
+			t.Error("Expected App.class to be compiled")
+		}
+
+		// Check that tests were compiled
+		if _, err := os.Stat("build/classes/java/test/com/example/AppTest.class"); os.IsNotExist(err) {
+			t.Error("Expected AppTest.class to be compiled")
+		}
+	})
+
+	// Test running Gradle tests
+	t.Run("GradleTest", func(t *testing.T) {
+		cmd := exec.Command(mvxBinary, "gradle-test")
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("mvx gradle-test failed: %v\nOutput: %s", err, output)
+		}
+
+		outputStr := string(output)
+		// Should show successful test execution
+		if !strings.Contains(outputStr, "BUILD SUCCESSFUL") {
+			t.Errorf("Expected successful Gradle test run, got: %s", outputStr)
+		}
+
+		// Should show test results - our test project has 6 tests
+		if !strings.Contains(outputStr, "6 tests completed") && !strings.Contains(outputStr, "tests") {
+			t.Logf("Test output (may vary by Gradle version): %s", outputStr)
+		}
+
+		// Check that test reports were generated
+		if _, err := os.Stat("build/reports/tests/test"); os.IsNotExist(err) {
+			t.Error("Expected test reports to be generated")
 		}
 	})
 
@@ -635,100 +687,28 @@ func testGradleIntegration(t *testing.T, mvxBinary string) {
 	})
 }
 
-// createGradleProject creates a simple Gradle project for testing
-func createGradleProject(t *testing.T, projectDir string) {
-	// Create build.gradle file
-	buildGradle := `plugins {
-    id 'java'
-    id 'application'
+// copyDir recursively copies a directory from src to dst
+func copyDir(src, dst string) error {
+	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Calculate the destination path
+		relPath, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		dstPath := filepath.Join(dst, relPath)
+
+		if info.IsDir() {
+			// Create directory
+			return os.MkdirAll(dstPath, info.Mode())
+		} else {
+			// Copy file
+			return copyFile(path, dstPath)
+		}
+	})
 }
 
-group = 'com.example'
-version = '1.0.0'
 
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.2'
-}
-
-application {
-    mainClass = 'com.example.App'
-}
-
-tasks.named('test') {
-    useJUnitPlatform()
-}
-`
-
-	err := os.WriteFile("build.gradle", []byte(buildGradle), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create build.gradle: %v", err)
-	}
-
-	// Create gradle.properties
-	gradleProperties := `org.gradle.daemon=false
-org.gradle.parallel=false
-`
-	err = os.WriteFile("gradle.properties", []byte(gradleProperties), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create gradle.properties: %v", err)
-	}
-
-	// Create source directory structure
-	srcDir := "src/main/java/com/example"
-	err = os.MkdirAll(srcDir, 0755)
-	if err != nil {
-		t.Fatalf("Failed to create source directory: %v", err)
-	}
-
-	// Create a simple Java class
-	appJava := `package com.example;
-
-public class App {
-    public static void main(String[] args) {
-        System.out.println("Hello, Gradle!");
-    }
-
-    public String getGreeting() {
-        return "Hello, Gradle!";
-    }
-}
-`
-
-	err = os.WriteFile(filepath.Join(srcDir, "App.java"), []byte(appJava), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create App.java: %v", err)
-	}
-
-	// Create test directory structure
-	testDir := "src/test/java/com/example"
-	err = os.MkdirAll(testDir, 0755)
-	if err != nil {
-		t.Fatalf("Failed to create test directory: %v", err)
-	}
-
-	// Create a simple test
-	appTest := `package com.example;
-
-import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
-
-public class AppTest {
-    @Test
-    public void testGetGreeting() {
-        App app = new App();
-        assertEquals("Hello, Gradle!", app.getGreeting());
-    }
-}
-`
-
-	err = os.WriteFile(filepath.Join(testDir, "AppTest.java"), []byte(appTest), 0644)
-	if err != nil {
-		t.Fatalf("Failed to create AppTest.java: %v", err)
-	}
-
-	t.Logf("Created Gradle project in %s", projectDir)
-}

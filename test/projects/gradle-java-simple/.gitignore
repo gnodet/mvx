@@ -1,0 +1,15 @@
+# Gradle build artifacts
+build/
+.gradle/
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# mvx files (created during testing)
+.mvx/
