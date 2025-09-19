@@ -539,10 +539,10 @@ Use external checksum sources:
 
 mvx automatically fetches checksums from official sources:
 
-- **Maven**: `https://archive.apache.org/dist/maven/maven-{version}/binaries/{filename}.sha512`
-- **Maven Daemon**: `https://archive.apache.org/dist/maven/mvnd/{version}/{filename}.sha512`
-- **Java**: Adoptium API at `https://api.adoptium.net/v3/assets/latest/{version}/hotspot`
-- **Node.js**: `https://nodejs.org/dist/v{version}/SHASUMS256.txt`
+- **Maven**: `https://archive.apache.org/dist/maven/maven-\{version}/binaries/\{filename}.sha512`
+- **Maven Daemon**: `https://archive.apache.org/dist/maven/mvnd/\{version}/\{filename}.sha512`
+- **Java**: Adoptium API at `https://api.adoptium.net/v3/assets/latest/\{version}/hotspot`
+- **Node.js**: `https://nodejs.org/dist/v\{version}/SHASUMS256.txt`
 - **Go**: Planned integration with Go's checksum database
 
 #### Security Best Practices
