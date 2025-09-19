@@ -52,6 +52,15 @@ layout: index
    </div>
 
    <div class="feature-card">
+       <div class="feature-icon">🔄</div>
+       <h3 class="feature-title">Enhanced Maven Wrapper</h3>
+       <p class="feature-description">
+           Drop-in replacement for <strong>Maven Wrapper (mvnw)</strong> with enhanced capabilities.
+           Natural Maven syntax, automatic Java setup, and transparent argument passing.
+       </p>
+   </div>
+
+   <div class="feature-card">
        <div class="feature-icon">⚡</div>
        <h3 class="feature-title">Simple Configuration</h3>
        <p class="feature-description">
@@ -94,7 +103,11 @@ layout: index
             <div class="quick-start-step">
                 <div class="step-number">4</div>
                 <h3>Build</h3>
-                <pre><code class="language-bash">./mvx setup && ./mvx build</code></pre>
+                <pre><code class="language-bash"># Setup tools and build
+./mvx setup && ./mvx build
+
+# Or use Maven directly
+./mvx mvn -V clean install</code></pre>
             </div>
         </div>
     </div>
