@@ -746,15 +746,15 @@ func (r *ToolRegistry) fetchGradleVersionsFromAPI() ([]string, error) {
 	}
 
 	var releases []struct {
-		Version    string `json:"version"`
-		Current    bool   `json:"current"`
-		Snapshot   bool   `json:"snapshot"`
-		Nightly    bool   `json:"nightly"`
-		ReleaseNightly bool `json:"releaseNightly"`
-		ActiveRc   bool   `json:"activeRc"`
-		RcFor      string `json:"rcFor"`
-		Milestone  bool   `json:"milestone"`
-		Broken     bool   `json:"broken"`
+		Version        string `json:"version"`
+		Current        bool   `json:"current"`
+		Snapshot       bool   `json:"snapshot"`
+		Nightly        bool   `json:"nightly"`
+		ReleaseNightly bool   `json:"releaseNightly"`
+		ActiveRc       bool   `json:"activeRc"`
+		RcFor          string `json:"rcFor"`
+		Milestone      bool   `json:"milestone"`
+		Broken         bool   `json:"broken"`
 	}
 
 	if err := json.Unmarshal(body, &releases); err != nil {

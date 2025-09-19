@@ -17,7 +17,7 @@ func TestGradleTool_Name(t *testing.T) {
 
 func TestGradleTool_GetDownloadURL(t *testing.T) {
 	tool := &GradleTool{}
-	
+
 	tests := []struct {
 		version     string
 		expectedURL string
@@ -30,7 +30,7 @@ func TestGradleTool_GetDownloadURL(t *testing.T) {
 	for _, test := range tests {
 		url := tool.getDownloadURL(test.version)
 		if url != test.expectedURL {
-			t.Errorf("For version %s, expected URL %s, got %s", 
+			t.Errorf("For version %s, expected URL %s, got %s",
 				test.version, test.expectedURL, url)
 		}
 	}

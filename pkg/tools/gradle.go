@@ -43,7 +43,7 @@ func (g *GradleTool) Install(version string, cfg config.ToolConfig) error {
 // IsInstalled checks if the specified version is installed
 func (g *GradleTool) IsInstalled(version string, cfg config.ToolConfig) bool {
 	installDir := g.manager.GetToolVersionDir("gradle", version, "")
-	
+
 	// Check if gradle executable exists in any subdirectory (Gradle archives have nested structure)
 	return g.findGradleExecutable(installDir) != ""
 }
@@ -51,7 +51,7 @@ func (g *GradleTool) IsInstalled(version string, cfg config.ToolConfig) bool {
 // GetPath returns the installation path for the specified version
 func (g *GradleTool) GetPath(version string, cfg config.ToolConfig) (string, error) {
 	installDir := g.manager.GetToolVersionDir("gradle", version, "")
-	
+
 	// Find the actual Gradle home directory (gradle-{version})
 	entries, err := os.ReadDir(installDir)
 	if err != nil {
@@ -156,15 +156,39 @@ func (g *GradleTool) findJavaHome() (string, error) {
 	}
 
 	// Try to find Java tool in manager
-	_, err := g.manager.GetTool("java")
+	javaTool, err := g.manager.GetTool("java")
 	if err != nil {
 		return "", fmt.Errorf("java tool not available: %w", err)
 	}
 
-	// This is a simplified approach - in a real implementation,
-	// we'd need to get the Java version from the current config
-	// For now, we'll return an error to indicate Java should be configured
-	return "", fmt.Errorf("JAVA_HOME not set and Java tool configuration not accessible")
+	// We need to find the Java configuration from the manager's current context
+	// For verification, we'll try to find any installed Java version
+	// This is a simplified approach - in practice, we'd get the version from the current config
+
+	// Try to find any Java installation in the tools directory
+	javaToolsDir := filepath.Join(g.manager.cacheDir, "tools", "java")
+	if _, err := os.Stat(javaToolsDir); os.IsNotExist(err) {
+		return "", fmt.Errorf("no Java installations found in %s", javaToolsDir)
+	}
+
+	// Look for any Java version directory
+	entries, err := os.ReadDir(javaToolsDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to read Java tools directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			// Try to get the path for this Java version
+			// We'll use a dummy config since we just need the path
+			dummyConfig := config.ToolConfig{Version: entry.Name()}
+			if javaPath, err := javaTool.GetPath(entry.Name(), dummyConfig); err == nil {
+				return javaPath, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("JAVA_HOME not set and no usable Java installation found")
 }
 
 // downloadAndExtract downloads and extracts Gradle
@@ -208,5 +232,3 @@ func (g *GradleTool) downloadAndExtract(url, destDir, version string, cfg config
 	fmt.Printf("  ✅ Gradle %s extracted successfully\n", version)
 	return nil
 }
-
-
