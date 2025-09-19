@@ -38,17 +38,7 @@ mvx uses a JSON5 configuration file (`.mvx/config.json5`) to define your project
     }
   },
   
-  // Command hooks (optional)
-  hooks: {
-    "pre-build": {
-      description: "Run before build",
-      script: "echo 'Starting build...'"
-    },
-    "post-build": {
-      description: "Run after build",
-      script: "echo 'Build completed!'"
-    }
-  }
+
 }
 ```
 
@@ -189,34 +179,38 @@ Define custom commands that become available as `./mvx <command>`:
 }
 ```
 
-## Hooks Section
+## Command Hooks
 
-Hooks allow you to run commands before or after built-in mvx commands:
+You can add pre and post hooks to built-in mvx commands by defining them within the command configuration:
 
 ```json5
 {
-  hooks: {
-    "pre-setup": {
-      description: "Prepare environment",
-      script: "echo 'Preparing environment...'"
+  commands: {
+    // Add hooks to the built-in 'build' command
+    build: {
+      description: "Build with custom hooks",
+      pre: "echo 'Starting build...'",
+      post: "echo 'Build completed!'"
     },
-    "post-setup": {
-      description: "Verify installation",
-      script: "echo 'Verifying tools...'"
-    },
-    "pre-build": {
-      description: "Pre-build checks",
-      script: "echo 'Running pre-build checks...'"
+
+    // Add hooks to the built-in 'test' command
+    test: {
+      description: "Test with verification",
+      pre: "echo 'Preparing test environment...'",
+      post: [
+        "echo 'Tests completed!'",
+        "echo 'Generating reports...'"
+      ]
     }
   }
 }
 ```
 
-Available hook points:
-- `pre-setup` / `post-setup`
-- `pre-build` / `post-build`
-- `pre-test` / `post-test`
-- `pre-clean` / `post-clean`
+Available hook points for built-in commands:
+- `build` - Build command hooks
+- `test` - Test command hooks
+- `setup` - Setup command hooks
+- `clean` - Clean command hooks
 
 ## Command Overrides
 
