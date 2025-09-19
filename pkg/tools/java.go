@@ -60,27 +60,23 @@ func (j *JavaTool) Install(version string, cfg config.ToolConfig) error {
 
 	// Check if we should use system Java instead of downloading
 	if useSystemJava() {
-		logVerbose("%s=true, attempting to use system Java", getSystemToolEnvVar("java"))
+		logVerbose("%s=true, forcing use of system Java", getSystemToolEnvVar("java"))
 
 		detector := getSystemJavaDetector()
 		systemJavaHome, err := detector.GetSystemHome()
 		if err != nil {
-			logVerbose("System Java not available: %v", err)
-			fmt.Printf("  ⚠️  System Java not available (%v), falling back to download\n", err)
-		} else {
-			systemVersion, err := detector.GetSystemVersion(systemJavaHome)
-			if err != nil {
-				logVerbose("Could not determine system Java version: %v", err)
-				fmt.Printf("  ⚠️  Could not determine system Java version (%v), falling back to download\n", err)
-			} else if !detector.IsVersionCompatible(systemVersion, version) {
-				logVerbose("System Java version %s does not match requested version %s", systemVersion, version)
-				fmt.Printf("  ⚠️  System Java version %s does not match requested version %s, falling back to download\n", systemVersion, version)
-			} else {
-				// Use system Java by creating a symlink
-				fmt.Printf("  🔗 Using system Java %s from JAVA_HOME: %s\n", systemVersion, systemJavaHome)
-				return detector.CreateSystemLink(systemJavaHome, installDir)
-			}
+			return fmt.Errorf("MVX_USE_SYSTEM_JAVA=true but system Java not available: %v", err)
 		}
+
+		systemVersion, err := detector.GetSystemVersion(systemJavaHome)
+		if err != nil {
+			logVerbose("Could not determine system Java version: %v", err)
+			fmt.Printf("  🔗 Using system Java from JAVA_HOME: %s (version detection failed)\n", systemJavaHome)
+		} else {
+			fmt.Printf("  🔗 Using system Java %s from JAVA_HOME: %s\n", systemVersion, systemJavaHome)
+		}
+
+		return detector.CreateSystemLink(systemJavaHome, installDir)
 	}
 
 	// Create installation directory
@@ -110,18 +106,16 @@ func (j *JavaTool) IsInstalled(version string, cfg config.ToolConfig) bool {
 		distribution = "temurin"
 	}
 
-	// If using system Java, check if system Java is available and compatible
+	// If using system Java, check if system Java is available (no version compatibility check)
 	if useSystemJava() {
 		detector := getSystemJavaDetector()
 		if systemJavaHome, err := detector.GetSystemHome(); err == nil {
-			if systemVersion, err := detector.GetSystemVersion(systemJavaHome); err == nil {
-				if detector.IsVersionCompatible(systemVersion, version) {
-					logVerbose("System Java %s is available and compatible with requested version %s", systemVersion, version)
-					return true
-				}
-			}
+			logVerbose("System Java is available at %s (MVX_USE_SYSTEM_JAVA=true)", systemJavaHome)
+			return true
+		} else {
+			logVerbose("System Java not available: %v", err)
+			return false
 		}
-		// If system Java is not available or compatible, fall through to check downloaded version
 	}
 
 	// Try to get the actual Java path (which handles nested directories)
@@ -142,18 +136,15 @@ func (j *JavaTool) GetPath(version string, cfg config.ToolConfig) (string, error
 		distribution = "temurin"
 	}
 
-	// If using system Java, return system JAVA_HOME if available and compatible
+	// If using system Java, return system JAVA_HOME if available (no version compatibility check)
 	if useSystemJava() {
 		detector := getSystemJavaDetector()
 		if systemJavaHome, err := detector.GetSystemHome(); err == nil {
-			if systemVersion, err := detector.GetSystemVersion(systemJavaHome); err == nil {
-				if detector.IsVersionCompatible(systemVersion, version) {
-					logVerbose("Using system Java %s from JAVA_HOME: %s", systemVersion, systemJavaHome)
-					return systemJavaHome, nil
-				}
-			}
+			logVerbose("Using system Java from JAVA_HOME: %s (MVX_USE_SYSTEM_JAVA=true)", systemJavaHome)
+			return systemJavaHome, nil
+		} else {
+			return "", fmt.Errorf("MVX_USE_SYSTEM_JAVA=true but system Java not available: %v", err)
 		}
-		// If system Java is not available or compatible, fall through to check downloaded version
 	}
 
 	installDir := j.manager.GetToolVersionDir("java", version, distribution)

@@ -97,10 +97,10 @@ export JAVA_HOME=/path/to/your/java
 
 When `MVX_USE_SYSTEM_JAVA=true` is set:
 
-- ✅ **Uses existing Java**: mvx will use the Java installation from `JAVA_HOME`
-- ✅ **Version validation**: Ensures the system Java version matches the requested version
+- ✅ **Always uses system Java**: mvx will use the Java installation from `JAVA_HOME`
+- ✅ **No version checking**: Uses system Java regardless of version differences
 - ✅ **Faster setup**: No time spent downloading Java in CI environments
-- ✅ **Fallback behavior**: If system Java is unavailable or incompatible, falls back to downloading
+- ✅ **Strict behavior**: Fails if system Java is unavailable (no fallback to download)
 
 **Requirements:**
 - `JAVA_HOME` environment variable must be set

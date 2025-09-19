@@ -312,7 +312,7 @@ export MVX_RETRY_DELAY="5s"
 #### Other System Variables
 
 ```bash
-# Use system-installed tools when available
+# Force use of system-installed tools (no version checking, no fallback)
 export MVX_USE_SYSTEM_JAVA=true
 export MVX_USE_SYSTEM_MAVEN=true
 export MVX_USE_SYSTEM_NODE=true
