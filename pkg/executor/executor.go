@@ -217,11 +217,18 @@ func (e *Executor) setupEnvironment(cmdConfig config.CommandConfig) ([]string, e
 		}
 
 		// Update PATH in environment
+		pathUpdated := false
 		for i, envVar := range env {
 			if strings.HasPrefix(envVar, "PATH=") {
 				env[i] = "PATH=" + newPath
+				pathUpdated = true
 				break
 			}
+		}
+
+		// If PATH wasn't found in environment, add it
+		if !pathUpdated {
+			env = append(env, "PATH="+newPath)
 		}
 	}
 
