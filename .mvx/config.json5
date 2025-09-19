@@ -20,6 +20,9 @@
     node: {
       version: "lts"
     },
+    python: {
+      version: "3.12"
+    },
     go: {
       version: "1.24.2"
     }
@@ -27,15 +30,57 @@
 
   // Custom commands
   commands: {
+    deps: {
+      description: "Download dependencies",
+      script: "go mod download && go mod tidy"
+    },
+
+    hello: {
+      description: "Say hello",
+      script: "echo Hello from mvx! && mvn -v"
+    },
+
+    benchmark: {
+      description: "Run benchmarks",
+      script: "cd test && go test -bench=. -benchtime=3s ./..."
+    },
+
     build: {
       description: "Build mvx binary with platform-optimized settings",
       script: "go build -o mvx-binary .",
       override: true
     },
 
+    fmt: {
+      description: "Format code",
+      script: "go fmt ./..."
+    },
+
+    lint: {
+      description: "Run linter",
+      script: "golangci-lint run"
+    },
+
     test: {
       description: "Run all tests",
       script: "go test -v ./...",
+      override: true
+    },
+
+    "test-integration": {
+      description: "Run integration tests",
+      script: "cd test && go test -v -timeout=5m ./..."
+    },
+
+    "website build": {
+      description: "Build the website using ROQ",
+      script: "cd website && QUARKUS_ROQ_GENERATOR_BATCH=true mvn clean package quarkus\\:run --no-transfer-progress",
+      override: true
+    },
+
+    "website serve": {
+      description: "Serve the website using ROQ dev mode",
+      script: "cd website && mvn quarkus\\:dev -Dquarkus.http.port=8081 --no-transfer-progress",
       override: true
     },
 
@@ -52,48 +97,6 @@
     clean: {
       description: "Clean build artifacts",
       script: "rm -f mvx-binary mvx-dev && rm -rf dist/ && rm -rf .mvx/local/ .mvx/tools/ .mvx/versions/",
-      override: true
-    },
-
-    fmt: {
-      description: "Format code",
-      script: "go fmt ./..."
-    },
-
-    lint: {
-      description: "Run linter",
-      script: "golangci-lint run"
-    },
-
-    deps: {
-      description: "Download dependencies",
-      script: "go mod download && go mod tidy"
-    },
-
-    "test-integration": {
-      description: "Run integration tests",
-      script: "cd test && go test -v -timeout=5m ./..."
-    },
-
-    benchmark: {
-      description: "Run benchmarks",
-      script: "cd test && go test -bench=. -benchtime=3s ./..."
-    },
-
-    hello: {
-      description: "Say hello",
-      script: "echo Hello from mvx! && mvn -v"
-    },
-
-    "website build": {
-      description: "Build the website using ROQ",
-      script: "cd website && QUARKUS_ROQ_GENERATOR_BATCH=true mvn clean package quarkus\\:run --no-transfer-progress",
-      override: true
-    },
-
-    "website serve": {
-      description: "Serve the website using ROQ dev mode",
-      script: "cd website && mvn quarkus\\:dev -Dquarkus.http.port=8081 --no-transfer-progress",
       override: true
     }
   }

@@ -169,6 +169,19 @@ func listTools() error {
 		}
 	}
 
+	// Python
+	printInfo("🐍 Python Programming Language")
+	if versions, err := registry.GetPythonVersions(); err == nil && len(versions) > 0 {
+		shown := versions
+		if len(versions) > 8 {
+			shown = versions[:8]
+		}
+		printInfo("  Versions: %s", strings.Join(shown, ", "))
+		if len(versions) > 8 {
+			printInfo("  ... and %d more", len(versions)-8)
+		}
+	}
+
 	printInfo("")
 
 	printInfo("Usage:")
@@ -177,6 +190,7 @@ func listTools() error {
 	printInfo("  mvx tools search mvnd        # Search Maven Daemon versions")
 	printInfo("  mvx tools search node        # Search Node.js versions")
 	printInfo("  mvx tools search go          # Search Go versions")
+	printInfo("  mvx tools search python      # Search Python versions")
 	printInfo("  mvx tools info java          # Show Java details")
 	printInfo("")
 	printInfo("Add tools to your project:")
@@ -184,6 +198,7 @@ func listTools() error {
 	printInfo("  mvx tools add java 17 zulu   # Add Java 17 (Azul Zulu)")
 	printInfo("  mvx tools add maven 4.0.0-rc-4  # Add Maven 4.0.0-rc-4")
 	printInfo("  mvx tools add node lts       # Add Node.js LTS")
+	printInfo("  mvx tools add python 3.12    # Add Python 3.12")
 	printInfo("  mvx tools add go 1.23.1      # Add Go 1.23.1")
 
 	return nil
@@ -209,6 +224,8 @@ func searchTool(toolName string, filters []string) error {
 		return searchNodeVersions(registry, filters)
 	case "go":
 		return searchGoVersions(registry, filters)
+	case "python":
+		return searchPythonVersions(registry, filters)
 	default:
 		return fmt.Errorf("unknown tool: %s", toolName)
 	}
@@ -497,6 +514,57 @@ func searchGoVersions(registry *tools.ToolRegistry, filters []string) error {
 	return nil
 }
 
+// searchPythonVersions searches for Python versions
+func searchPythonVersions(registry *tools.ToolRegistry, filters []string) error {
+	versions, err := registry.GetPythonVersions()
+	if err != nil {
+		return fmt.Errorf("failed to get Python versions: %w", err)
+	}
+
+	printInfo("🐍 Python Versions")
+	printInfo("")
+
+	// Group by major.minor version
+	majorVersions := make(map[string][]string)
+	for _, v := range versions {
+		parts := strings.Split(v, ".")
+		if len(parts) >= 2 {
+			major := parts[0] + "." + parts[1]
+			majorVersions[major] = append(majorVersions[major], v)
+		}
+	}
+
+	// Sort major versions
+	var majors []string
+	for major := range majorVersions {
+		majors = append(majors, major)
+	}
+	sort.Slice(majors, func(i, j int) bool { return majors[i] > majors[j] })
+
+	for _, major := range majors {
+		versions := majorVersions[major]
+		printInfo("Python %s.x:", major)
+		shown := versions
+		if len(versions) > 5 {
+			shown = versions[:5]
+		}
+		for _, v := range shown {
+			printInfo("  %s", v)
+		}
+		if len(versions) > 5 {
+			printInfo("  ... and %d more", len(versions)-5)
+		}
+		printInfo("")
+	}
+
+	printInfo("Usage examples:")
+	printInfo("  version: \"3.12\"         # Latest Python 3.12.x")
+	printInfo("  version: \"3.11\"         # Latest Python 3.11.x")
+	printInfo("  version: \"3.12.0\"       # Exact version")
+
+	return nil
+}
+
 // showToolInfo shows detailed information about a tool
 func showToolInfo(toolName string) error {
 	manager, err := tools.NewManager()
@@ -571,10 +639,10 @@ func addTool(toolName, version, distribution string) error {
 
 	// Validate that the tool exists
 	switch toolName {
-	case "java", "maven", "mvnd", "node", "go":
+	case "java", "maven", "mvnd", "node", "go", "python":
 		// Valid tools
 	default:
-		return fmt.Errorf("unknown tool: %s (supported: java, maven, mvnd, node, go)", toolName)
+		return fmt.Errorf("unknown tool: %s (supported: java, maven, mvnd, node, go, python)", toolName)
 	}
 
 	// Validate version exists for the tool
@@ -721,6 +789,22 @@ func validateToolVersion(registry *tools.ToolRegistry, toolName, version, distri
 		}
 
 		printInfo("🔍 Go %s - version will be resolved during installation", version)
+		return nil
+
+	case "python":
+		versions, err := registry.GetPythonVersions()
+		if err != nil {
+			return fmt.Errorf("failed to get Python versions: %w", err)
+		}
+
+		// Check if exact version exists
+		for _, v := range versions {
+			if v == version {
+				return nil
+			}
+		}
+
+		printInfo("🔍 Python %s - version will be resolved during installation", version)
 		return nil
 
 	default:

@@ -347,6 +347,9 @@ The bootstrap scripts (`mvx` and `mvx.cmd`) are **shell/batch scripts** (not bin
 - [x] **Java Development Kit** - Multiple distributions (Temurin, GraalVM, Oracle, Corretto, Liberica, Zulu, Microsoft)
 - [x] **Apache Maven** - All versions (3.x, 4.x including pre-releases)
 - [x] **Maven Daemon (mvnd)** - High-performance Maven alternative
+- [x] **Node.js** - All LTS and current versions with npm/yarn support
+- [x] **Go** - All stable versions from golang.org
+- [x] **Python** - All stable versions (3.8+) with pip support
 - [x] Tool installation and caching
 - [x] Environment setup and PATH management
 - [x] Version resolution (latest, major.minor, exact versions)
@@ -363,7 +366,7 @@ The bootstrap scripts (`mvx` and `mvx.cmd`) are **shell/batch scripts** (not bin
 #### Extended Tool Support
 
 - [x] **Node.js and npm/yarn support** ✅ **IMPLEMENTED**
-- [ ] Python and pip/poetry support
+- [x] **Python and pip/poetry support** ✅ **IMPLEMENTED**
 - [ ] Custom tool definitions and installers
 
 #### Enhanced Commands
@@ -516,6 +519,14 @@ mvx supports both **JSON5** and **YAML** configuration formats, inspired by [Mav
     mvnd: {
       version: "1.0.2",
     },
+
+    // Python for scripting and automation (with project isolation)
+    python: {
+      version: "3.12",
+      options: {
+        requirements: "requirements.txt", // Auto-install project dependencies
+      },
+    },
   },
 
   environment: {
@@ -572,6 +583,12 @@ tools:
   # Maven Daemon for faster builds
   mvnd:
     version: "1.0.2"
+
+  # Python for scripting and automation (with project isolation)
+  python:
+    version: "3.12"
+    options:
+      requirements: "requirements.txt"  # Auto-install project dependencies
 
 environment:
   # Increase memory for large builds
@@ -630,8 +647,8 @@ The bootstrap system is fully functional and provides:
 **Phase 2: Multi-Tool Support** ✅ **COMPLETED**
 
 - [x] Node.js and npm integration ✅ **IMPLEMENTED**
+- [x] Python and pip support ✅ **IMPLEMENTED**
 - [x] Security improvements (checksum verification) ✅ **IMPLEMENTED**
-- [ ] Python and pip support
 
 ## 🤝 Contributing
 

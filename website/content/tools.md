@@ -27,6 +27,9 @@ mvx tools add node lts
 
 # Add Go 1.23.1
 mvx tools add go 1.23.1
+
+# Add Python 3.12
+mvx tools add python 3.12
 ```
 
 **Benefits:**
@@ -229,8 +232,168 @@ Alternative package manager for Node.js.
 }
 ```
 
-**Supported Versions**: 1.22.x, 3.x, 4.x  
+**Supported Versions**: 1.22.x, 3.x, 4.x
 **Platforms**: All (Node.js-based)
+
+## Python Ecosystem
+
+### Python
+
+Python programming language interpreter with **automatic project isolation**.
+
+```json5
+{
+  tools: {
+    python: {
+      version: "3.12.0",                  // Python version
+      options: {
+        requirements: "requirements.txt", // Optional: auto-install requirements
+        venv: "true"                      // Optional: enable virtual environments (default: true)
+      }
+    }
+  }
+}
+```
+
+**Supported Versions**: 3.8.x, 3.9.x, 3.10.x, 3.11.x, 3.12.x, 3.13.x
+**Platforms**: Linux (x64, aarch64), macOS (x64, aarch64), Windows (x64)
+
+**🔒 Project Isolation Features**:
+- **Virtual Environments**: Each project gets its own isolated Python environment
+- **Package Isolation**: pip packages are installed per-project, not globally
+- **Path Management**: Project-specific PYTHONPATH and PATH configuration
+- **No Conflicts**: Projects don't interfere with each other or system Python
+- **Automatic Setup**: Virtual environments created automatically when needed
+
+### pip & Requirements
+
+Python package management with project isolation.
+
+```json5
+{
+  tools: {
+    python: {
+      version: "3.12.0",
+      options: {
+        requirements: "requirements.txt"  // Auto-install from requirements file
+      }
+    }
+  }
+}
+```
+
+**Automatic Requirements Installation**:
+- Detects `requirements.txt`, `requirements.pip`, or `pyproject.toml`
+- Installs packages in project-specific virtual environment
+- No global package pollution
+- Consistent dependencies across team members
+
+**Environment Variables Set**:
+- `VIRTUAL_ENV`: Path to project's virtual environment
+- `PYTHONPATH`: Project-specific Python path
+- `PYTHONNOUSERSITE`: Disables user site packages for isolation
+- `PATH`: Prioritizes virtual environment binaries
+
+## Python Environment Isolation
+
+mvx provides **complete project isolation** for Python, ensuring that:
+
+### 🔒 No Cross-Project Contamination
+
+Each project gets its own isolated environment:
+
+```bash
+# Project A uses Python 3.11 with Django
+cd /path/to/project-a
+./mvx setup  # Creates isolated environment for this project
+
+# Project B uses Python 3.12 with Flask
+cd /path/to/project-b
+./mvx setup  # Creates separate isolated environment
+```
+
+**Directory Structure**:
+```
+# Global Python installations (shared across projects)
+~/.mvx/tools/python/
+├── 3.11.0/                    # Python 3.11 installation
+│   ├── bin/python3
+│   └── lib/
+└── 3.12.0/                   # Python 3.12 installation
+    ├── bin/python3
+    └── lib/
+
+# Project-specific virtual environments (in each project)
+project-a/
+├── .mvx/
+│   ├── config.json5
+│   └── venv/                  # Project A's isolated virtual environment
+├── requirements.txt
+└── src/
+
+project-b/
+├── .mvx/
+│   ├── config.json5
+│   └── venv/                  # Project B's isolated virtual environment
+├── requirements.txt
+└── src/
+```
+
+### 🛡️ System Python Protection
+
+mvx **never modifies** your system Python:
+- No global package installations
+- No PATH modifications outside mvx
+- System Python remains untouched
+- No `sudo` required for package management
+
+### 📦 Automatic Dependency Management
+
+```json5
+{
+  tools: {
+    python: {
+      version: "3.12",
+      options: {
+        requirements: "requirements.txt"  // Auto-installed in project venv
+      }
+    }
+  }
+}
+```
+
+When you run `./mvx setup`:
+1. Downloads Python 3.12 to `~/.mvx/tools/python/3.12.0/`
+2. Creates project-specific virtual environment
+3. Installs requirements.txt packages in the virtual environment
+4. Sets up isolated environment variables
+
+### 🔄 Seamless Project Switching
+
+```bash
+# Work on Django project
+cd ~/projects/django-app
+./mvx setup         # Creates .mvx/venv/ with Django
+./mvx run server    # Uses Django in isolated environment
+
+# Switch to Flask project
+cd ~/projects/flask-api
+./mvx setup         # Creates .mvx/venv/ with Flask
+./mvx run server    # Uses Flask in different isolated environment
+```
+
+Each project maintains its own:
+- Python version (shared installation)
+- Package versions (in `.mvx/venv/`)
+- Environment variables
+- Virtual environment (in `.mvx/venv/`)
+
+**Benefits of project-local venvs:**
+- ✅ Automatic cleanup when project is deleted
+- ✅ Clear ownership and easy discovery
+- ✅ Project portability (can move/copy projects)
+- ✅ No orphaned virtual environments
+- ✅ Follows Python community conventions
 
 ## Tool Discovery
 
