@@ -10,6 +10,12 @@
 
   // Tool versions and configurations
   tools: {
+    go: {
+      version: "1.24.2"
+    },
+    gradle: {
+      version: "8.5"
+    },
     java: {
       version: "17",
       distribution: "zulu"
@@ -22,17 +28,14 @@
     },
     python: {
       version: "3.12"
-    },
-    go: {
-      version: "1.24.2"
     }
   },
 
   // Custom commands
   commands: {
-    deps: {
-      description: "Download dependencies",
-      script: "go mod download && go mod tidy"
+    fmt: {
+      description: "Format code",
+      script: "go fmt ./..."
     },
 
     hello: {
@@ -40,31 +43,9 @@
       script: "echo Hello from mvx! && mvn -v"
     },
 
-    benchmark: {
-      description: "Run benchmarks",
-      script: "cd test && go test -bench=. -benchtime=3s ./..."
-    },
-
-    build: {
-      description: "Build mvx binary with platform-optimized settings",
-      script: "go build -o mvx-binary .",
-      override: true
-    },
-
-    fmt: {
-      description: "Format code",
-      script: "go fmt ./..."
-    },
-
     lint: {
       description: "Run linter",
       script: "golangci-lint run"
-    },
-
-    test: {
-      description: "Run all tests",
-      script: "go test -v ./...",
-      override: true
     },
 
     "test-integration": {
@@ -78,15 +59,32 @@
       override: true
     },
 
-    "website serve": {
-      description: "Serve the website using ROQ dev mode",
-      script: "cd website && mvn quarkus\\:dev -Dquarkus.http.port=8081 --no-transfer-progress",
+    benchmark: {
+      description: "Run benchmarks",
+      script: "cd test && go test -bench=. -benchtime=3s ./..."
+    },
+
+    build: {
+      description: "Build mvx binary with platform-optimized settings",
+      script: "go build -o mvx-binary .",
       override: true
     },
 
     "build-all": {
       description: "Build for all platforms",
       script: "./scripts/build-all.sh"
+    },
+
+    test: {
+      description: "Run all tests",
+      script: "go test -v ./...",
+      override: true
+    },
+
+    "website serve": {
+      description: "Serve the website using ROQ dev mode",
+      script: "cd website && mvn quarkus\\:dev -Dquarkus.http.port=8081 --no-transfer-progress",
+      override: true
     },
 
     checksums: {
@@ -98,6 +96,11 @@
       description: "Clean build artifacts",
       script: "rm -f mvx-binary mvx-dev && rm -rf dist/ && rm -rf .mvx/local/ .mvx/tools/ .mvx/versions/",
       override: true
+    },
+
+    deps: {
+      description: "Download dependencies",
+      script: "go mod download && go mod tidy"
     }
   }
 }

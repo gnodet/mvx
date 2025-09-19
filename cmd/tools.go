@@ -142,6 +142,20 @@ func listTools() error {
 			printInfo("  ... and %d more", len(versions)-8)
 		}
 	}
+	printInfo("")
+
+	// Gradle
+	printInfo("🏗️  Gradle Build Tool")
+	if versions, err := registry.GetGradleVersions(); err == nil && len(versions) > 0 {
+		shown := versions
+		if len(versions) > 8 {
+			shown = versions[:8]
+		}
+		printInfo("  Versions: %s", strings.Join(shown, ", "))
+		if len(versions) > 8 {
+			printInfo("  ... and %d more", len(versions)-8)
+		}
+	}
 
 	// Node.js
 	printInfo("📦 Node.js")
@@ -188,6 +202,7 @@ func listTools() error {
 	printInfo("  mvx tools search java        # Search Java versions")
 	printInfo("  mvx tools search maven       # Search Maven versions")
 	printInfo("  mvx tools search mvnd        # Search Maven Daemon versions")
+	printInfo("  mvx tools search gradle      # Search Gradle versions")
 	printInfo("  mvx tools search node        # Search Node.js versions")
 	printInfo("  mvx tools search go          # Search Go versions")
 	printInfo("  mvx tools search python      # Search Python versions")
@@ -197,6 +212,7 @@ func listTools() error {
 	printInfo("  mvx tools add java 21        # Add Java 21 (Temurin)")
 	printInfo("  mvx tools add java 17 zulu   # Add Java 17 (Azul Zulu)")
 	printInfo("  mvx tools add maven 4.0.0-rc-4  # Add Maven 4.0.0-rc-4")
+	printInfo("  mvx tools add gradle 8.5     # Add Gradle 8.5")
 	printInfo("  mvx tools add node lts       # Add Node.js LTS")
 	printInfo("  mvx tools add python 3.12    # Add Python 3.12")
 	printInfo("  mvx tools add go 1.23.1      # Add Go 1.23.1")
@@ -220,6 +236,8 @@ func searchTool(toolName string, filters []string) error {
 		return searchMavenVersions(registry, filters)
 	case "mvnd":
 		return searchMvndVersions(registry, filters)
+	case "gradle":
+		return searchGradleVersions(registry, filters)
 	case "node":
 		return searchNodeVersions(registry, filters)
 	case "go":
@@ -415,6 +433,57 @@ func searchMvndVersions(registry *tools.ToolRegistry, filters []string) error {
 	return nil
 }
 
+// searchGradleVersions searches for Gradle versions
+func searchGradleVersions(registry *tools.ToolRegistry, filters []string) error {
+	versions, err := registry.GetGradleVersions()
+	if err != nil {
+		return fmt.Errorf("failed to get Gradle versions: %w", err)
+	}
+
+	printInfo("🏗️  Gradle Build Tool Versions")
+	printInfo("")
+
+	// Group by major version
+	majorVersions := make(map[string][]string)
+	for _, v := range versions {
+		major := strings.Split(v, ".")[0]
+		majorVersions[major] = append(majorVersions[major], v)
+	}
+
+	// Sort major versions
+	var majors []string
+	for major := range majorVersions {
+		majors = append(majors, major)
+	}
+	sort.Slice(majors, func(i, j int) bool {
+		return majors[i] > majors[j] // Newest first
+	})
+
+	// Display versions by major version
+	for _, major := range majors {
+		versions := majorVersions[major]
+		printInfo("📦 Gradle %s.x:", major)
+
+		// Show versions in rows of 6
+		for i := 0; i < len(versions); i += 6 {
+			end := i + 6
+			if end > len(versions) {
+				end = len(versions)
+			}
+			row := versions[i:end]
+			printInfo("  %s", strings.Join(row, ", "))
+		}
+		printInfo("")
+	}
+
+	printInfo("Usage examples:")
+	printInfo("  version: \"8\"             # Latest Gradle 8.x")
+	printInfo("  version: \"7.6\"           # Latest Gradle 7.6.x")
+	printInfo("  version: \"8.5\"           # Exact version")
+
+	return nil
+}
+
 // searchNodeVersions searches for Node.js versions
 func searchNodeVersions(registry *tools.ToolRegistry, filters []string) error {
 	versions, err := registry.GetNodeVersions()
@@ -604,6 +673,12 @@ func showToolInfo(toolName string) error {
 			printInfo("Available Versions: %d", len(versions))
 			printInfo("Latest: %s", versions[0])
 		}
+	case "gradle":
+		if versions, ok := info["versions"].([]string); ok {
+			printInfo("")
+			printInfo("Available Versions: %d", len(versions))
+			printInfo("Latest: %s", versions[0])
+		}
 	case "go":
 		if versions, ok := info["versions"].([]string); ok {
 			printInfo("")
@@ -639,10 +714,10 @@ func addTool(toolName, version, distribution string) error {
 
 	// Validate that the tool exists
 	switch toolName {
-	case "java", "maven", "mvnd", "node", "go", "python":
+	case "java", "maven", "mvnd", "gradle", "node", "go", "python":
 		// Valid tools
 	default:
-		return fmt.Errorf("unknown tool: %s (supported: java, maven, mvnd, node, go, python)", toolName)
+		return fmt.Errorf("unknown tool: %s (supported: java, maven, mvnd, gradle, node, go, python)", toolName)
 	}
 
 	// Validate version exists for the tool
@@ -752,6 +827,22 @@ func validateToolVersion(registry *tools.ToolRegistry, toolName, version, distri
 		}
 
 		printInfo("🔍 Maven Daemon %s - version will be resolved during installation", version)
+		return nil
+
+	case "gradle":
+		versions, err := registry.GetGradleVersions()
+		if err != nil {
+			return fmt.Errorf("failed to get Gradle versions: %w", err)
+		}
+
+		// Check if exact version exists
+		for _, v := range versions {
+			if v == version {
+				return nil
+			}
+		}
+
+		printInfo("🔍 Gradle %s - version will be resolved during installation", version)
 		return nil
 
 	case "node":
