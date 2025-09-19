@@ -610,6 +610,17 @@ func (r *ToolRegistry) GetToolInfo(toolName string) (map[string]interface{}, err
 			"versions": versions,
 		}, nil
 
+	case "gradle":
+		versions, err := r.GetGradleVersions()
+		if err != nil {
+			return nil, err
+		}
+
+		return map[string]interface{}{
+			"name":     "Gradle Build Tool",
+			"versions": versions,
+		}, nil
+
 	default:
 		return nil, fmt.Errorf("unknown tool: %s", toolName)
 	}
@@ -703,4 +714,73 @@ func (r *ToolRegistry) ResolvePythonVersion(versionSpec string) (string, error) 
 	}
 
 	return resolved, nil
+}
+
+// GetGradleVersions returns available Gradle versions
+func (r *ToolRegistry) GetGradleVersions() ([]string, error) {
+	// Try to fetch versions from Gradle releases API
+	versions, err := r.fetchGradleVersionsFromAPI()
+	if err != nil {
+		// Fallback to known versions if API is unavailable
+		return r.getFallbackGradleVersions(), nil
+	}
+	return version.SortVersions(versions), nil
+}
+
+// fetchGradleVersionsFromAPI fetches Gradle versions from the official API
+func (r *ToolRegistry) fetchGradleVersionsFromAPI() ([]string, error) {
+	url := "https://services.gradle.org/versions/all"
+	resp, err := r.httpClient.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch Gradle versions: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("gradle API returned status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var releases []struct {
+		Version    string `json:"version"`
+		Current    bool   `json:"current"`
+		Snapshot   bool   `json:"snapshot"`
+		Nightly    bool   `json:"nightly"`
+		ReleaseNightly bool `json:"releaseNightly"`
+		ActiveRc   bool   `json:"activeRc"`
+		RcFor      string `json:"rcFor"`
+		Milestone  bool   `json:"milestone"`
+		Broken     bool   `json:"broken"`
+	}
+
+	if err := json.Unmarshal(body, &releases); err != nil {
+		return nil, fmt.Errorf("failed to parse Gradle versions JSON: %w", err)
+	}
+
+	var versions []string
+	for _, release := range releases {
+		// Skip broken, snapshot, nightly, and milestone versions
+		if release.Broken || release.Snapshot || release.Nightly || release.Milestone {
+			continue
+		}
+		versions = append(versions, release.Version)
+	}
+
+	return versions, nil
+}
+
+// getFallbackGradleVersions returns known Gradle versions as fallback
+func (r *ToolRegistry) getFallbackGradleVersions() []string {
+	return []string{
+		"8.5", "8.4", "8.3", "8.2.1", "8.2", "8.1.1", "8.1", "8.0.2", "8.0.1", "8.0",
+		"7.6.4", "7.6.3", "7.6.2", "7.6.1", "7.6", "7.5.1", "7.5", "7.4.2", "7.4.1", "7.4",
+		"7.3.3", "7.3.2", "7.3.1", "7.3", "7.2", "7.1.1", "7.1", "7.0.2", "7.0.1", "7.0",
+		"6.9.4", "6.9.3", "6.9.2", "6.9.1", "6.9", "6.8.3", "6.8.2", "6.8.1", "6.8",
+		"6.7.1", "6.7", "6.6.1", "6.6", "6.5.1", "6.5", "6.4.1", "6.4", "6.3", "6.2.2",
+		"6.2.1", "6.2", "6.1.1", "6.1", "6.0.1", "6.0",
+	}
 }

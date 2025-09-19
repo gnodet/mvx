@@ -74,6 +74,7 @@ func NewManager() (*Manager, error) {
 	manager.RegisterTool(&JavaTool{manager: manager})
 	manager.RegisterTool(&MavenTool{manager: manager})
 	manager.RegisterTool(&MvndTool{manager: manager})
+	manager.RegisterTool(&GradleTool{manager: manager})
 	manager.RegisterTool(&NodeTool{manager: manager})
 	manager.RegisterTool(&GoTool{manager: manager})
 	manager.RegisterTool(&PythonTool{manager: manager})
@@ -351,6 +352,8 @@ func (m *Manager) SetupEnvironment(cfg *config.Config) (map[string]string, error
 			env["JAVA_HOME"] = toolPath
 		case "maven":
 			env["MAVEN_HOME"] = toolPath
+		case "gradle":
+			env["GRADLE_HOME"] = toolPath
 		case "node":
 			env["NODE_HOME"] = toolPath
 		case "python":

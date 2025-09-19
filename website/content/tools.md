@@ -22,6 +22,9 @@ mvx tools add java 17 zulu
 # Add Maven 4.0.0-rc-4
 mvx tools add maven 4.0.0-rc-4
 
+# Add Gradle 8.5
+mvx tools add gradle 8.5
+
 # Add Node.js LTS
 mvx tools add node lts
 
@@ -175,8 +178,51 @@ Faster Maven builds with persistent JVM.
 }
 ```
 
-**Supported Versions**: 0.9.x, 1.0.x  
+**Supported Versions**: 0.9.x, 1.0.x
 **Platforms**: Linux (x64, aarch64), macOS (x64, aarch64), Windows (x64)
+
+### Gradle
+
+Modern build automation tool for Java, Kotlin, Scala, and other JVM languages.
+
+```json5
+{
+  tools: {
+    gradle: {
+      version: "8.5"                   // Gradle version
+    }
+  }
+}
+```
+
+**Supported Versions**: 6.x, 7.x, 8.x
+**Platforms**: All (Java-based)
+**Requirements**: Java must be installed and configured
+
+#### Using System Gradle
+
+For CI environments or when you prefer to use an existing Gradle installation:
+
+```bash
+export MVX_USE_SYSTEM_GRADLE=true
+./mvx build
+```
+
+When `MVX_USE_SYSTEM_GRADLE=true` is set:
+
+- ✅ **Always uses system Gradle**: mvx will use Gradle from `GRADLE_HOME` or PATH
+- ✅ **No version checking**: Uses system Gradle regardless of version differences
+- ✅ **Faster setup**: No time spent downloading Gradle in CI environments
+- ✅ **Strict behavior**: Fails if system Gradle is unavailable (no fallback to download)
+
+**Detection Order:**
+1. `GRADLE_HOME` environment variable
+2. `gradle` command in PATH
+
+**Requirements:**
+- Gradle must be accessible via one of the detection methods above
+- Java must be available (Gradle requires Java to run)
+- Gradle executable must be functional (`gradle --version` works)
 
 ## Go Ecosystem
 
