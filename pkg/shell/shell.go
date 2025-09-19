@@ -51,25 +51,25 @@ func parseCommands(script string) ([]Command, error) {
 	// TODO: Add proper parsing for ||, ;, quotes, etc.
 	parts := strings.Split(script, "&&")
 	var commands []Command
-	
+
 	for _, part := range parts {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			continue
 		}
-		
+
 		// Split command and arguments
 		fields := strings.Fields(part)
 		if len(fields) == 0 {
 			continue
 		}
-		
+
 		commands = append(commands, Command{
 			Name: fields[0],
 			Args: fields[1:],
 		})
 	}
-	
+
 	return commands, nil
 }
 
@@ -99,17 +99,17 @@ func (s *MVXShell) changeDirectory(args []string) error {
 	if len(args) != 1 {
 		return fmt.Errorf("cd: expected 1 argument, got %d", len(args))
 	}
-	
+
 	newDir := args[0]
 	if !filepath.IsAbs(newDir) {
 		newDir = filepath.Join(s.workDir, newDir)
 	}
-	
+
 	// Check if directory exists
 	if _, err := os.Stat(newDir); os.IsNotExist(err) {
 		return fmt.Errorf("cd: directory does not exist: %s", newDir)
 	}
-	
+
 	s.workDir = newDir
 	return nil
 }
@@ -155,7 +155,7 @@ func (s *MVXShell) remove(args []string) error {
 	if len(args) == 0 {
 		return fmt.Errorf("rm: missing file argument")
 	}
-	
+
 	for _, path := range args {
 		if !filepath.IsAbs(path) {
 			path = filepath.Join(s.workDir, path)
@@ -172,17 +172,17 @@ func (s *MVXShell) copy(args []string) error {
 	if len(args) != 2 {
 		return fmt.Errorf("copy: expected 2 arguments (source, destination), got %d", len(args))
 	}
-	
+
 	src := args[0]
 	dst := args[1]
-	
+
 	if !filepath.IsAbs(src) {
 		src = filepath.Join(s.workDir, src)
 	}
 	if !filepath.IsAbs(dst) {
 		dst = filepath.Join(s.workDir, dst)
 	}
-	
+
 	return copyFile(src, dst)
 }
 
@@ -191,12 +191,12 @@ func (s *MVXShell) open(args []string) error {
 	if len(args) != 1 {
 		return fmt.Errorf("open: expected 1 argument, got %d", len(args))
 	}
-	
+
 	path := args[0]
 	if !filepath.IsAbs(path) {
 		path = filepath.Join(s.workDir, path)
 	}
-	
+
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "windows":
@@ -206,7 +206,7 @@ func (s *MVXShell) open(args []string) error {
 	default:
 		cmd = exec.Command("xdg-open", path)
 	}
-	
+
 	cmd.Dir = s.workDir
 	cmd.Env = s.env
 	return cmd.Run()
@@ -220,7 +220,7 @@ func (s *MVXShell) executeExternal(cmd Command) error {
 	execCmd.Stdout = os.Stdout
 	execCmd.Stderr = os.Stderr
 	execCmd.Stdin = os.Stdin
-	
+
 	return execCmd.Run()
 }
 

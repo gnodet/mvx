@@ -150,19 +150,19 @@ func TestPlatformScriptResolution(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := config.ResolvePlatformScript(tt.script)
-			
+
 			if tt.shouldError {
 				if err == nil {
 					t.Errorf("Expected error but got none")
 				}
 				return
 			}
-			
+
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 				return
 			}
-			
+
 			if result != tt.expectedResult {
 				t.Errorf("Expected %q, got %q", tt.expectedResult, result)
 			}
@@ -244,7 +244,7 @@ func TestConfigValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.config.Validate()
-			
+
 			if tt.shouldError {
 				if err == nil {
 					t.Errorf("Expected error but got none")
@@ -255,7 +255,7 @@ func TestConfigValidation(t *testing.T) {
 				}
 				return
 			}
-			
+
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}

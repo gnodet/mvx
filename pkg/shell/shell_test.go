@@ -168,7 +168,7 @@ func TestMVXShell_Copy(t *testing.T) {
 	dstFile := "destination.txt"
 	srcPath := filepath.Join(tempDir, srcFile)
 	dstPath := filepath.Join(tempDir, dstFile)
-	
+
 	testContent := "test content"
 	err := os.WriteFile(srcPath, []byte(testContent), 0644)
 	if err != nil {
