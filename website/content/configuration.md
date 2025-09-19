@@ -163,22 +163,105 @@ Define custom commands that become available as `./mvx <command>`:
 }
 ```
 
-### Platform-Specific Commands
+### Cross-Platform Scripts
 
-> **Note**: Platform-specific script syntax is not yet implemented. See [issue #21](https://github.com/gnodet/mvx/issues/21) for planned cross-platform script support.
+mvx provides powerful cross-platform script support with two approaches:
 
-For now, use conditional logic within scripts:
+#### Platform-Specific Scripts
+
+Define different scripts for different operating systems:
 
 ```json5
 {
   commands: {
     "start-db": {
-      description: "Start database (cross-platform)",
-      script: "if [[ \"$OSTYPE\" == \"msys\" ]]; then ./start-db.bat; else ./start-db.sh; fi"
+      description: "Start database service",
+      script: {
+        windows: "net start postgresql",
+        linux: "sudo systemctl start postgresql",
+        darwin: "brew services start postgresql",
+        unix: "echo 'Please start PostgreSQL manually'",  // Fallback for Unix-like systems
+        default: "echo 'Platform not supported'"          // Final fallback
+      }
     }
   }
 }
 ```
+
+**Platform Resolution Order:**
+1. Exact platform match (`windows`, `linux`, `darwin`)
+2. Platform family (`unix` for Linux/macOS)
+3. `default` fallback
+4. Error if no match found
+
+#### Cross-Platform Interpreter (mvx-shell)
+
+Use the built-in `mvx-shell` interpreter for truly portable scripts:
+
+```json5
+{
+  commands: {
+    "build-all": {
+      description: "Build all modules",
+      script: "cd frontend && npm run build && cd ../backend && mvn clean install -DskipTests",
+      interpreter: "mvx-shell"  // Cross-platform interpreter
+    },
+
+    "open-results": {
+      description: "Open build results",
+      script: "open target/",     // Works on Windows, macOS, and Linux
+      interpreter: "mvx-shell"
+    },
+
+    "setup-dev": {
+      description: "Setup development environment",
+      script: "mkdir -p logs temp && copy .env.example .env",
+      interpreter: "mvx-shell"
+    }
+  }
+}
+```
+
+**mvx-shell Commands:**
+- `cd <dir>` - Change directory (cross-platform)
+- `mkdir <dir>` - Create directories (with `-p` behavior)
+- `copy <src> <dst>` - Copy files
+- `rm <path>` - Remove files/directories
+- `echo <text>` - Print text
+- `open <path>` - Open files/directories (platform-appropriate)
+- `<tool> <args>` - Execute any external command
+
+**Command Chaining:**
+- `&&` - Execute next command only if previous succeeded
+
+#### Mixed Approach
+
+Combine both approaches for maximum flexibility:
+
+```json5
+{
+  commands: {
+    "dev-setup": {
+      description: "Setup development environment",
+      script: {
+        windows: {
+          script: "mkdir logs && copy config\\dev.properties config\\app.properties",
+          interpreter: "mvx-shell"
+        },
+        unix: {
+          script: "mkdir -p logs && cp config/dev.properties config/app.properties",
+          interpreter: "native"  // Use system shell
+        }
+      }
+    }
+  }
+}
+```
+
+#### Interpreter Options
+
+- **`native`** (default): Use system shell (`/bin/bash` on Unix, `cmd` on Windows)
+- **`mvx-shell`**: Use built-in cross-platform interpreter
 
 ## Command Hooks
 
@@ -202,6 +285,28 @@ You can add pre and post hooks to built-in mvx commands by defining them within 
         "echo 'Tests completed!'",
         "echo 'Generating reports...'"
       ]
+    }
+  }
+}
+```
+
+### Cross-Platform Hooks
+
+Hooks also support cross-platform scripts and interpreters:
+
+```json5
+{
+  commands: {
+    "test": {
+      description: "Run tests with cross-platform setup and cleanup",
+      pre: {
+        script: "mkdir -p test-results && echo Preparing test environment",
+        interpreter: "mvx-shell"
+      },
+      post: {
+        script: "echo Tests completed && open test-results/",
+        interpreter: "mvx-shell"
+      }
     }
   }
 }

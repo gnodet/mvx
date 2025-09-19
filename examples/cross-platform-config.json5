@@ -1,0 +1,145 @@
+{
+  // Cross-platform script configuration example
+  project: {
+    name: "cross-platform-example",
+    description: "Example project demonstrating cross-platform script support"
+  },
+
+  // Tool configurations
+  tools: {
+    maven: {
+      version: "3.9.6"
+    },
+    java: {
+      version: "21"
+    },
+    node: {
+      version: "20.10.0"
+    }
+  },
+
+  // Environment variables
+  environment: {
+    NODE_ENV: "development",
+    MAVEN_OPTS: "-Xmx2g"
+  },
+
+  // Commands demonstrating cross-platform features
+  commands: {
+    // Example 1: Platform-specific scripts using native interpreters
+    "start-db": {
+      description: "Start database service",
+      script: {
+        windows: "net start postgresql",
+        linux: "sudo systemctl start postgresql",
+        darwin: "brew services start postgresql",
+        default: "echo 'Please start PostgreSQL manually'"
+      }
+    },
+
+    // Example 2: Cross-platform script using mvx-shell interpreter
+    "build-all": {
+      description: "Build all modules cross-platform",
+      script: "cd frontend && npm run build && cd ../backend && mvn clean install -DskipTests",
+      interpreter: "mvx-shell"
+    },
+
+    // Example 3: Open results directory using platform-appropriate command
+    "open-results": {
+      description: "Open build results directory",
+      script: "open target/",
+      interpreter: "mvx-shell"
+    },
+
+    // Example 4: Setup development environment
+    "dev-setup": {
+      description: "Setup development environment",
+      script: {
+        windows: {
+          script: "mkdir logs && mkdir temp && copy .env.example .env",
+          interpreter: "mvx-shell"
+        },
+        unix: {
+          script: "mkdir -p logs temp && cp .env.example .env",
+          interpreter: "mvx-shell"
+        }
+      }
+    },
+
+    // Example 5: Complex build pipeline with cross-platform commands
+    "ci-build": {
+      description: "CI build pipeline",
+      script: "mkdir -p target && echo Starting build && mvn clean compile && mvn test && mvn package && echo Build complete",
+      interpreter: "mvx-shell"
+    },
+
+    // Example 6: Platform-specific file operations
+    "clean-temp": {
+      description: "Clean temporary files",
+      script: {
+        windows: "rmdir /s /q temp 2>nul || echo No temp directory",
+        unix: "rm -rf temp || echo No temp directory"
+      }
+    },
+
+    // Example 7: Mixed approach - platform detection with mvx-shell
+    "install-deps": {
+      description: "Install dependencies",
+      script: {
+        windows: "npm install && mvn dependency:resolve",
+        unix: "npm install && mvn dependency:resolve"
+      },
+      interpreter: "mvx-shell"
+    },
+
+    // Example 8: Built-in command with cross-platform hooks
+    "test": {
+      description: "Run tests with setup and cleanup",
+      pre: {
+        script: "mkdir -p test-results && echo Preparing test environment",
+        interpreter: "mvx-shell"
+      },
+      post: {
+        script: "echo Tests completed && open test-results/",
+        interpreter: "mvx-shell"
+      },
+      override: false
+    },
+
+    // Example 9: Development server with platform-specific startup
+    "dev-server": {
+      description: "Start development server",
+      script: {
+        windows: "start \"Dev Server\" cmd /k \"npm run dev\"",
+        unix: "npm run dev &",
+        default: "npm run dev"
+      }
+    },
+
+    // Example 10: Cross-platform file copying and processing
+    "prepare-release": {
+      description: "Prepare release artifacts",
+      script: "mkdir -p dist && copy target/*.jar dist/ && copy README.md dist/ && echo Release prepared in dist/",
+      interpreter: "mvx-shell"
+    },
+
+    // Example 11: Environment-specific configuration
+    "config-env": {
+      description: "Configure environment",
+      script: {
+        windows: "copy config\\windows.properties config\\app.properties",
+        linux: "cp config/linux.properties config/app.properties",
+        darwin: "cp config/macos.properties config/app.properties",
+        default: "cp config/default.properties config/app.properties"
+      },
+      interpreter: "mvx-shell"
+    },
+
+    // Example 12: Cross-platform network operations
+    "health-check": {
+      description: "Check service health",
+      script: "echo Checking service health && curl -f http://localhost:8080/health || echo Service not responding",
+      interpreter: "mvx-shell"
+    }
+  }
+}
