@@ -22,6 +22,9 @@ mvx tools add java 17 zulu
 # Add Maven 4.0.0-rc-4
 mvx tools add maven 4.0.0-rc-4
 
+# Add Rust 1.84.0
+mvx tools add rust 1.84.0
+
 # Add Node.js LTS
 mvx tools add node lts
 
@@ -175,8 +178,52 @@ Faster Maven builds with persistent JVM.
 }
 ```
 
-**Supported Versions**: 0.9.x, 1.0.x  
+**Supported Versions**: 0.9.x, 1.0.x
 **Platforms**: Linux (x64, aarch64), macOS (x64, aarch64), Windows (x64)
+
+## Rust Ecosystem
+
+### Rust
+
+Rust programming language with Cargo package manager.
+
+```json5
+{
+  tools: {
+    rust: {
+      version: "1.84.0"                // Rust version
+    }
+  }
+}
+```
+
+**Supported Versions**: 1.50.0+
+**Platforms**: Linux (x64, aarch64), macOS (x64, aarch64), Windows (x64)
+**Includes**: rustc compiler, cargo package manager, rustup toolchain manager
+
+#### Using System Rust
+
+For CI environments or when you prefer to use an existing Rust installation:
+
+```bash
+export MVX_USE_SYSTEM_RUST=true
+./mvx build
+```
+
+When `MVX_USE_SYSTEM_RUST=true` is set:
+
+- ✅ **Always uses system Rust**: mvx will use Rust from `CARGO_HOME`, `RUSTUP_HOME`, or PATH
+- ✅ **No version checking**: Uses system Rust regardless of version differences
+- ✅ **Faster setup**: No time spent downloading Rust in CI environments
+- ✅ **Strict behavior**: Fails if system Rust is unavailable (no fallback to download)
+
+**Detection Order:**
+1. `CARGO_HOME` and `RUSTUP_HOME` environment variables
+2. `cargo` and `rustc` commands in PATH
+
+**Requirements:**
+- Rust must be accessible via one of the detection methods above
+- Both `cargo --version` and `rustc --version` must work
 
 ## Go Ecosystem
 

@@ -610,6 +610,17 @@ func (r *ToolRegistry) GetToolInfo(toolName string) (map[string]interface{}, err
 			"versions": versions,
 		}, nil
 
+	case "rust":
+		versions, err := r.GetRustVersions()
+		if err != nil {
+			return nil, err
+		}
+
+		return map[string]interface{}{
+			"name":     "Rust Programming Language",
+			"versions": versions,
+		}, nil
+
 	default:
 		return nil, fmt.Errorf("unknown tool: %s", toolName)
 	}
@@ -703,4 +714,37 @@ func (r *ToolRegistry) ResolvePythonVersion(versionSpec string) (string, error) 
 	}
 
 	return resolved, nil
+}
+
+// GetRustVersions returns available Rust versions
+func (r *ToolRegistry) GetRustVersions() ([]string, error) {
+	// Try to fetch versions from Rust releases API
+	versions, err := r.fetchRustVersionsFromAPI()
+	if err != nil {
+		// Fallback to known versions if API is unavailable
+		return r.getFallbackRustVersions(), nil
+	}
+	return version.SortVersions(versions), nil
+}
+
+// fetchRustVersionsFromAPI fetches Rust versions from the official API
+func (r *ToolRegistry) fetchRustVersionsFromAPI() ([]string, error) {
+	// For now, we'll use a simpler approach and return fallback versions
+	// In a full implementation, we'd parse the channel releases page
+	// or use a different API endpoint like GitHub releases
+	return nil, fmt.Errorf("API not implemented yet")
+}
+
+// getFallbackRustVersions returns known Rust versions as fallback
+func (r *ToolRegistry) getFallbackRustVersions() []string {
+	return []string{
+		"1.84.0", "1.83.0", "1.82.0", "1.81.0", "1.80.1", "1.80.0",
+		"1.79.0", "1.78.0", "1.77.2", "1.77.1", "1.77.0", "1.76.0",
+		"1.75.0", "1.74.1", "1.74.0", "1.73.0", "1.72.1", "1.72.0",
+		"1.71.1", "1.71.0", "1.70.0", "1.69.0", "1.68.2", "1.68.1", "1.68.0",
+		"1.67.1", "1.67.0", "1.66.1", "1.66.0", "1.65.0", "1.64.0",
+		"1.63.0", "1.62.1", "1.62.0", "1.61.0", "1.60.0", "1.59.0",
+		"1.58.1", "1.58.0", "1.57.0", "1.56.1", "1.56.0", "1.55.0",
+		"1.54.0", "1.53.0", "1.52.1", "1.52.0", "1.51.0", "1.50.0",
+	}
 }

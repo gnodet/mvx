@@ -74,6 +74,7 @@ func NewManager() (*Manager, error) {
 	manager.RegisterTool(&JavaTool{manager: manager})
 	manager.RegisterTool(&MavenTool{manager: manager})
 	manager.RegisterTool(&MvndTool{manager: manager})
+	manager.RegisterTool(&RustTool{manager: manager})
 	manager.RegisterTool(&NodeTool{manager: manager})
 	manager.RegisterTool(&GoTool{manager: manager})
 	manager.RegisterTool(&PythonTool{manager: manager})
@@ -351,6 +352,11 @@ func (m *Manager) SetupEnvironment(cfg *config.Config) (map[string]string, error
 			env["JAVA_HOME"] = toolPath
 		case "maven":
 			env["MAVEN_HOME"] = toolPath
+		case "rust":
+			// For Rust, we need to set both RUSTUP_HOME and CARGO_HOME
+			installDir := m.GetToolVersionDir(toolName, toolConfig.Version, "")
+			env["RUSTUP_HOME"] = filepath.Join(installDir, "rustup")
+			env["CARGO_HOME"] = filepath.Join(installDir, "cargo")
 		case "node":
 			env["NODE_HOME"] = toolPath
 		case "python":

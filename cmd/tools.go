@@ -142,6 +142,20 @@ func listTools() error {
 			printInfo("  ... and %d more", len(versions)-8)
 		}
 	}
+	printInfo("")
+
+	// Rust
+	printInfo("🦀 Rust Programming Language")
+	if versions, err := registry.GetRustVersions(); err == nil && len(versions) > 0 {
+		shown := versions
+		if len(versions) > 8 {
+			shown = versions[:8]
+		}
+		printInfo("  Versions: %s", strings.Join(shown, ", "))
+		if len(versions) > 8 {
+			printInfo("  ... and %d more", len(versions)-8)
+		}
+	}
 
 	// Node.js
 	printInfo("📦 Node.js")
@@ -188,6 +202,7 @@ func listTools() error {
 	printInfo("  mvx tools search java        # Search Java versions")
 	printInfo("  mvx tools search maven       # Search Maven versions")
 	printInfo("  mvx tools search mvnd        # Search Maven Daemon versions")
+	printInfo("  mvx tools search rust        # Search Rust versions")
 	printInfo("  mvx tools search node        # Search Node.js versions")
 	printInfo("  mvx tools search go          # Search Go versions")
 	printInfo("  mvx tools search python      # Search Python versions")
@@ -197,6 +212,7 @@ func listTools() error {
 	printInfo("  mvx tools add java 21        # Add Java 21 (Temurin)")
 	printInfo("  mvx tools add java 17 zulu   # Add Java 17 (Azul Zulu)")
 	printInfo("  mvx tools add maven 4.0.0-rc-4  # Add Maven 4.0.0-rc-4")
+	printInfo("  mvx tools add rust 1.84.0    # Add Rust 1.84.0")
 	printInfo("  mvx tools add node lts       # Add Node.js LTS")
 	printInfo("  mvx tools add python 3.12    # Add Python 3.12")
 	printInfo("  mvx tools add go 1.23.1      # Add Go 1.23.1")
@@ -220,6 +236,8 @@ func searchTool(toolName string, filters []string) error {
 		return searchMavenVersions(registry, filters)
 	case "mvnd":
 		return searchMvndVersions(registry, filters)
+	case "rust":
+		return searchRustVersions(registry, filters)
 	case "node":
 		return searchNodeVersions(registry, filters)
 	case "go":
@@ -415,6 +433,60 @@ func searchMvndVersions(registry *tools.ToolRegistry, filters []string) error {
 	return nil
 }
 
+// searchRustVersions searches for Rust versions
+func searchRustVersions(registry *tools.ToolRegistry, filters []string) error {
+	versions, err := registry.GetRustVersions()
+	if err != nil {
+		return fmt.Errorf("failed to get Rust versions: %w", err)
+	}
+
+	printInfo("🦀 Rust Programming Language Versions")
+	printInfo("")
+
+	// Group by major.minor version
+	majorVersions := make(map[string][]string)
+	for _, v := range versions {
+		parts := strings.Split(v, ".")
+		if len(parts) >= 2 {
+			major := parts[0] + "." + parts[1]
+			majorVersions[major] = append(majorVersions[major], v)
+		}
+	}
+
+	// Sort major versions
+	var majors []string
+	for major := range majorVersions {
+		majors = append(majors, major)
+	}
+	sort.Slice(majors, func(i, j int) bool {
+		return majors[i] > majors[j] // Newest first
+	})
+
+	// Display versions by major.minor version
+	for _, major := range majors {
+		versions := majorVersions[major]
+		printInfo("📦 Rust %s.x:", major)
+
+		// Show versions in rows of 6
+		for i := 0; i < len(versions); i += 6 {
+			end := i + 6
+			if end > len(versions) {
+				end = len(versions)
+			}
+			row := versions[i:end]
+			printInfo("  %s", strings.Join(row, ", "))
+		}
+		printInfo("")
+	}
+
+	printInfo("Usage examples:")
+	printInfo("  version: \"1.84\"          # Latest Rust 1.84.x")
+	printInfo("  version: \"1.83.0\"        # Exact version")
+	printInfo("  version: \"stable\"        # Latest stable release")
+
+	return nil
+}
+
 // searchNodeVersions searches for Node.js versions
 func searchNodeVersions(registry *tools.ToolRegistry, filters []string) error {
 	versions, err := registry.GetNodeVersions()
@@ -604,6 +676,12 @@ func showToolInfo(toolName string) error {
 			printInfo("Available Versions: %d", len(versions))
 			printInfo("Latest: %s", versions[0])
 		}
+	case "rust":
+		if versions, ok := info["versions"].([]string); ok {
+			printInfo("")
+			printInfo("Available Versions: %d", len(versions))
+			printInfo("Latest: %s", versions[0])
+		}
 	case "go":
 		if versions, ok := info["versions"].([]string); ok {
 			printInfo("")
@@ -639,10 +717,10 @@ func addTool(toolName, version, distribution string) error {
 
 	// Validate that the tool exists
 	switch toolName {
-	case "java", "maven", "mvnd", "node", "go", "python":
+	case "java", "maven", "mvnd", "rust", "node", "go", "python":
 		// Valid tools
 	default:
-		return fmt.Errorf("unknown tool: %s (supported: java, maven, mvnd, node, go, python)", toolName)
+		return fmt.Errorf("unknown tool: %s (supported: java, maven, mvnd, rust, node, go, python)", toolName)
 	}
 
 	// Validate version exists for the tool
@@ -752,6 +830,27 @@ func validateToolVersion(registry *tools.ToolRegistry, toolName, version, distri
 		}
 
 		printInfo("🔍 Maven Daemon %s - version will be resolved during installation", version)
+		return nil
+
+	case "rust":
+		versions, err := registry.GetRustVersions()
+		if err != nil {
+			return fmt.Errorf("failed to get Rust versions: %w", err)
+		}
+
+		// Check for special versions
+		if version == "stable" || version == "latest" {
+			return nil
+		}
+
+		// Check if exact version exists
+		for _, v := range versions {
+			if v == version {
+				return nil
+			}
+		}
+
+		printInfo("🔍 Rust %s - version will be resolved during installation", version)
 		return nil
 
 	case "node":
