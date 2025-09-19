@@ -43,9 +43,14 @@ Examples:
 			return fmt.Errorf("no Maven tool configured. Add tools.maven to .mvx/config and run 'mvx setup'")
 		}
 
-		// Ensure tools installed and get environment
-		if err := mgr.InstallTools(cfg); err != nil {
-			return fmt.Errorf("failed to install tools: %w", err)
+		// Only ensure Maven and Java are installed (Maven needs Java)
+		requiredTools := []string{"maven"}
+		if _, hasJava := cfg.Tools["java"]; hasJava {
+			requiredTools = append(requiredTools, "java")
+		}
+
+		if err := mgr.InstallSpecificTools(cfg, requiredTools); err != nil {
+			return fmt.Errorf("failed to install required tools: %w", err)
 		}
 		envMap, err := mgr.SetupEnvironment(cfg)
 		if err != nil {
