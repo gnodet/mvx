@@ -167,8 +167,22 @@ func (m *MavenTool) Verify(version string, cfg config.ToolConfig) error {
 		mvnExe += ".cmd"
 	}
 
+	// Set up environment with JAVA_HOME if Java is available
+	env := os.Environ()
+	if _, err := m.manager.GetTool("java"); err == nil {
+		// Find Java configuration from the manager's config
+		// For now, we'll try to detect if Java is installed and use it
+		if javaPath, err := m.findJavaHome(); err == nil {
+			env = append(env, fmt.Sprintf("JAVA_HOME=%s", javaPath))
+			logVerbose("Setting JAVA_HOME=%s for Maven verification", javaPath)
+		} else {
+			logVerbose("Could not find Java for Maven verification: %v", err)
+		}
+	}
+
 	// Run mvn --version to verify installation
 	cmd := exec.Command(mvnExe, "--version")
+	cmd.Env = env
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("maven verification failed: %w\nOutput: %s", err, output)
@@ -181,6 +195,62 @@ func (m *MavenTool) Verify(version string, cfg config.ToolConfig) error {
 	}
 
 	return nil
+}
+
+// findJavaHome attempts to find an installed Java home directory
+func (m *MavenTool) findJavaHome() (string, error) {
+	// Check if JAVA_HOME is already set
+	if javaHome := os.Getenv("JAVA_HOME"); javaHome != "" {
+		return javaHome, nil
+	}
+
+	// Try to find Java installations in the tools directory
+	javaToolsDir := filepath.Join(m.manager.GetToolsDir(), "java")
+	if entries, err := os.ReadDir(javaToolsDir); err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() {
+				javaVersionDir := filepath.Join(javaToolsDir, entry.Name())
+
+				// Try to find Java executable in this version directory
+				if javaPath, err := m.findJavaInDirectory(javaVersionDir); err == nil {
+					logVerbose("Found Java installation at: %s", javaPath)
+					return javaPath, nil
+				}
+			}
+		}
+	}
+
+	return "", fmt.Errorf("no Java installation found")
+}
+
+// findJavaInDirectory searches for Java executable in a directory and returns JAVA_HOME
+func (m *MavenTool) findJavaInDirectory(dir string) (string, error) {
+	// Check if there are subdirectories (common with JDK archives)
+	if entries, err := os.ReadDir(dir); err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() {
+				subPath := filepath.Join(dir, entry.Name())
+				javaExe := filepath.Join(subPath, "bin", "java")
+				if runtime.GOOS == "windows" {
+					javaExe += ".exe"
+				}
+				if _, err := os.Stat(javaExe); err == nil {
+					return subPath, nil
+				}
+			}
+		}
+	}
+
+	// Also check if java is directly in the directory
+	javaExe := filepath.Join(dir, "bin", "java")
+	if runtime.GOOS == "windows" {
+		javaExe += ".exe"
+	}
+	if _, err := os.Stat(javaExe); err == nil {
+		return dir, nil
+	}
+
+	return "", fmt.Errorf("java executable not found in %s", dir)
 }
 
 // ListVersions returns available versions for installation

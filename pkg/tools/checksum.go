@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -121,7 +122,14 @@ func (cv *ChecksumVerifier) fetchChecksumFromURL(url, filename string) (string, 
 
 	// If filename is specified, parse the checksum file format
 	if filename != "" {
-		return cv.parseChecksumFile(content, filename)
+		checksum, err := cv.parseChecksumFile(content, filename)
+		if err != nil {
+			// Add debug information for checksum parsing failures
+			fmt.Printf("⚠️  Debug: Failed to parse checksum for file '%s' from URL '%s'\n", filename, url)
+			fmt.Printf("   Content preview (first 200 chars): %s\n", truncateString(content, 200))
+			return "", fmt.Errorf("failed to parse checksum file: %w", err)
+		}
+		return checksum, nil
 	}
 
 	// Otherwise, assume the entire content is the checksum
@@ -132,10 +140,11 @@ func (cv *ChecksumVerifier) fetchChecksumFromURL(url, filename string) (string, 
 // Supports formats like: "checksum  filename" or "checksum *filename"
 func (cv *ChecksumVerifier) parseChecksumFile(content, filename string) (string, error) {
 	lines := strings.Split(content, "\n")
+	var candidateFiles []string
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if line == "" {
+		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
 
@@ -153,13 +162,37 @@ func (cv *ChecksumVerifier) parseChecksumFile(content, filename string) (string,
 			fileInLine = fileInLine[1:]
 		}
 
-		// Check if this line matches our filename
+		// Store candidate files for debugging
+		candidateFiles = append(candidateFiles, fileInLine)
+
+		// Check if this line matches our filename (exact match)
 		if fileInLine == filename {
+			return checksum, nil
+		}
+
+		// Also try matching just the basename
+		if filepath.Base(fileInLine) == filename {
+			return checksum, nil
+		}
+
+		// Try matching without path separators
+		if strings.Contains(fileInLine, filename) {
 			return checksum, nil
 		}
 	}
 
+	// If we get here, no match was found - provide helpful debug info
+	fmt.Printf("⚠️  Debug: Available files in checksum file: %v\n", candidateFiles)
+	fmt.Printf("   Looking for: %s\n", filename)
 	return "", fmt.Errorf("checksum not found for file %s", filename)
+}
+
+// truncateString truncates a string to the specified length with ellipsis
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }
 
 // VerifyFileWithWarning verifies a file with checksum, but only warns if verification fails

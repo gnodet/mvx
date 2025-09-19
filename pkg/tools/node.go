@@ -140,8 +140,15 @@ func (n *NodeTool) getDownloadURL(version string) string {
 }
 
 func (n *NodeTool) downloadAndExtract(url, destDir, version string, cfg config.ToolConfig) error {
-	// Create temporary file for download
-	tmpFile, err := os.CreateTemp("", "node-*.pkg")
+	// Create temporary file for download with appropriate extension
+	var tmpFilePattern string
+	if runtime.GOOS == "windows" {
+		tmpFilePattern = "node-*.zip"
+	} else {
+		tmpFilePattern = "node-*.tar.xz"
+	}
+
+	tmpFile, err := os.CreateTemp("", tmpFilePattern)
 	if err != nil {
 		return fmt.Errorf("failed to create temporary file: %w", err)
 	}

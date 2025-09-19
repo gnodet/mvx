@@ -168,7 +168,9 @@ func attemptDownload(config *DownloadConfig) (*DownloadResult, error) {
 
 	// Verify checksum if checksum registry is available
 	if config.ChecksumRegistry != nil {
-		verifyChecksum(tempFile.Name(), config)
+		if err := verifyChecksum(tempFile.Name(), config); err != nil {
+			return nil, err
+		}
 	}
 
 	// Create destination directory
@@ -176,8 +178,8 @@ func attemptDownload(config *DownloadConfig) (*DownloadResult, error) {
 		return nil, fmt.Errorf("failed to create destination directory: %w", err)
 	}
 
-	// Move to final destination
-	if err := os.Rename(tempFile.Name(), config.DestPath); err != nil {
+	// Move to final destination with Windows-specific retry logic
+	if err := moveFileWithRetry(tempFile.Name(), config.DestPath); err != nil {
 		return nil, fmt.Errorf("failed to move file to destination: %w", err)
 	}
 
@@ -356,9 +358,9 @@ func DiagnoseDownloadError(url string, err error) string {
 }
 
 // verifyChecksum verifies the checksum of a downloaded file
-func verifyChecksum(filePath string, config *DownloadConfig) {
+func verifyChecksum(filePath string, config *DownloadConfig) error {
 	if config.ChecksumRegistry == nil {
-		return
+		return nil
 	}
 
 	// Get checksum information
@@ -367,21 +369,32 @@ func verifyChecksum(filePath string, config *DownloadConfig) {
 
 	if !hasChecksum {
 		// Try to get checksum from known patterns or APIs
-		filename := filepath.Base(filePath)
+		// Use the URL basename as the expected filename
+		filename := filepath.Base(config.URL)
+		fmt.Printf("  🔍 Attempting to find checksum for file: %s\n", filename)
 
 		// Special handling for Java (Adoptium API)
 		if config.ToolName == "java" {
+			fmt.Printf("  🔍 Fetching Java checksum from Adoptium API...\n")
 			if javaChecksum, err := config.ChecksumRegistry.GetJavaChecksumFromAPI(config.Version, "amd64", "linux"); err == nil {
 				checksumInfo = javaChecksum
 				hasChecksum = true
+				fmt.Printf("  ✅ Found Java checksum from Adoptium API\n")
+			} else {
+				fmt.Printf("  ⚠️  Failed to get Java checksum from Adoptium API: %v\n", err)
 			}
 		}
 
 		// Special handling for Node.js (SHASUMS256.txt)
 		if config.ToolName == "node" && !hasChecksum {
+			fmt.Printf("  🔍 Fetching Node.js checksum from SHASUMS256.txt...\n")
+			// The GetNodeChecksumFromSHASUMS method already handles platform detection
 			if nodeChecksum, err := config.ChecksumRegistry.GetNodeChecksumFromSHASUMS(config.Version, filename); err == nil {
 				checksumInfo = nodeChecksum
 				hasChecksum = true
+				fmt.Printf("  ✅ Found Node.js checksum from SHASUMS256.txt\n")
+			} else {
+				fmt.Printf("  ⚠️  Failed to get Node.js checksum from SHASUMS256.txt: %v\n", err)
 			}
 		}
 
@@ -389,6 +402,7 @@ func verifyChecksum(filePath string, config *DownloadConfig) {
 		if !hasChecksum {
 			checksumURL := config.ChecksumRegistry.GetChecksumURL(config.ToolName, config.Version, filename)
 			if checksumURL != "" {
+				fmt.Printf("  🔍 Using checksum URL pattern: %s\n", checksumURL)
 				checksumInfo = ChecksumInfo{
 					Type:     SHA256,
 					URL:      checksumURL,
@@ -404,7 +418,7 @@ func verifyChecksum(filePath string, config *DownloadConfig) {
 			fmt.Printf("⚠️  No checksum available for %s %s\n", config.ToolName, config.Version)
 			fmt.Printf("   Consider adding checksum verification to your configuration for enhanced security.\n")
 		}
-		return
+		return nil
 	}
 
 	// Check if checksum verification is required
@@ -418,11 +432,68 @@ func verifyChecksum(filePath string, config *DownloadConfig) {
 		if err := verifier.VerifyFile(filePath, checksumInfo); err != nil {
 			// Remove the downloaded file on checksum failure
 			os.Remove(filePath)
-			panic(fmt.Sprintf("Checksum verification failed (required): %v", err))
+			// Don't panic, return error instead for better error handling
+			return fmt.Errorf("checksum verification failed (required): %v", err)
 		}
 		fmt.Printf("✅ Checksum verified successfully (required)\n")
 	} else {
 		// Optional verification - warn on error
 		verifier.VerifyFileWithWarning(filePath, checksumInfo)
 	}
+
+	return nil
+}
+
+// moveFileWithRetry moves a file with retry logic for Windows compatibility
+func moveFileWithRetry(src, dst string) error {
+	// First, try a simple rename
+	if err := os.Rename(src, dst); err == nil {
+		return nil
+	}
+
+	// If rename fails, try copy + delete approach (more reliable on Windows)
+	return copyAndDelete(src, dst)
+}
+
+// copyAndDelete copies a file and then deletes the source
+func copyAndDelete(src, dst string) error {
+	// Open source file
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("failed to open source file: %w", err)
+	}
+	defer srcFile.Close()
+
+	// Create destination file
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		return fmt.Errorf("failed to create destination file: %w", err)
+	}
+	defer dstFile.Close()
+
+	// Copy content
+	_, err = io.Copy(dstFile, srcFile)
+	if err != nil {
+		// Clean up partial destination file
+		os.Remove(dst)
+		return fmt.Errorf("failed to copy file content: %w", err)
+	}
+
+	// Ensure data is written to disk
+	if err := dstFile.Sync(); err != nil {
+		os.Remove(dst)
+		return fmt.Errorf("failed to sync destination file: %w", err)
+	}
+
+	// Close destination file before removing source
+	dstFile.Close()
+
+	// Remove source file
+	if err := os.Remove(src); err != nil {
+		// Don't fail if we can't remove the source - the copy succeeded
+		// This is just cleanup
+		return nil
+	}
+
+	return nil
 }

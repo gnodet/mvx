@@ -235,11 +235,12 @@ func TestChecksumRegistry_GetNodeChecksumFromSHASUMS(t *testing.T) {
 	if checksum.Type != SHA256 {
 		t.Errorf("Expected SHA256 checksum type, got %s", checksum.Type)
 	}
-	if checksum.URL == "" {
-		t.Errorf("Expected non-empty checksum URL")
+	if checksum.Value == "" {
+		t.Errorf("Expected non-empty checksum value")
 	}
-	if checksum.Filename == "" {
-		t.Errorf("Expected non-empty filename")
+	// Verify the checksum looks like a valid SHA256 (64 hex characters)
+	if len(checksum.Value) != 64 {
+		t.Errorf("Expected 64-character SHA256 checksum, got %d characters: %s", len(checksum.Value), checksum.Value)
 	}
-	t.Logf("Node.js 22.14.0 checksum URL: %s", checksum.URL)
+	t.Logf("Node.js 22.14.0 checksum value: %s", checksum.Value)
 }
