@@ -10,6 +10,33 @@ mvx provides both built-in commands for tool management and the ability to defin
 
 ## Built-in Commands
 
+### Tool Wrapper Commands
+
+mvx provides transparent wrapper commands for managed tools, allowing you to use them with their native syntax:
+
+#### Maven Integration
+
+```bash
+# Use Maven with natural syntax - all flags work
+./mvx mvn -V                    # Show Maven version
+./mvx mvn -X clean install      # Debug mode with clean install
+./mvx mvn -Pproduction package  # Activate profile and package
+./mvx mvn help:effective-pom    # Any Maven goal or plugin
+
+# Combine mvx global flags with Maven flags
+./mvx --verbose mvn -V          # mvx verbose output + Maven version
+./mvx --quiet mvn test          # mvx quiet mode + Maven test
+
+# Backward compatibility (with migration warnings)
+./mvx mvn -- -V                 # Still works, shows helpful migration tip
+```
+
+**Key Features:**
+- **🎯 Transparent wrapper**: Acts like `mvnw` but with enhanced tool management
+- **🔄 Natural syntax**: Use Maven flags exactly as you would with `mvn`
+- **⚡ No learning curve**: Existing Maven knowledge applies directly
+- **🛡️ Backward compatible**: Scripts using `--` separator continue to work
+
 ### Project Management
 
 ```bash
@@ -256,6 +283,72 @@ Override built-in mvx commands with custom implementations:
     }
   }
 }
+```
+
+## Maven Wrapper Integration
+
+mvx provides enhanced Maven wrapper functionality that goes beyond traditional `mvnw`:
+
+### Direct Maven Usage
+
+```bash
+# All Maven commands work naturally
+./mvx mvn clean install
+./mvx mvn -V                    # Show version
+./mvx mvn -X test              # Debug mode
+./mvx mvn -Pproduction package # Profile activation
+./mvx mvn help:effective-pom   # Plugin goals
+./mvx mvn dependency:tree      # Dependency analysis
+
+# Complex Maven commands work seamlessly
+./mvx mvn org.springframework.boot:spring-boot-maven-plugin:run
+./mvx mvn versions:set -DnewVersion=2.0.0
+```
+
+### Enhanced Features vs Traditional mvnw
+
+| Feature | Traditional `mvnw` | mvx Maven Integration |
+|---------|-------------------|----------------------|
+| Maven version management | ✅ Fixed version | ✅ Configurable version |
+| Java version management | ❌ System Java only | ✅ Automatic Java setup |
+| Tool isolation | ❌ Global tools | ✅ Project-specific tools |
+| Environment setup | ❌ Manual | ✅ Automatic |
+| Cross-platform | ✅ Yes | ✅ Enhanced |
+| Argument passing | ✅ Basic | ✅ Hybrid parsing |
+| Global flags | ❌ No | ✅ `--verbose`, `--quiet` |
+
+### Migration from mvnw
+
+Replace your existing Maven Wrapper with mvx:
+
+```bash
+# Before (traditional mvnw)
+./mvnw clean install
+./mvnw -V
+./mvnw spring-boot:run
+
+# After (mvx - same commands work)
+./mvx mvn clean install
+./mvx mvn -V
+./mvx mvn spring-boot:run
+
+# Plus enhanced capabilities
+./mvx --verbose mvn -X test     # mvx verbose + Maven debug
+./mvx setup                     # Auto-install Java + Maven
+```
+
+### Backward Compatibility
+
+Existing scripts using the `--` separator continue to work:
+
+```bash
+# Old syntax (still works with helpful warnings)
+./mvx mvn -- -V
+./mvx mvn -- clean install
+
+# New syntax (recommended)
+./mvx mvn -V
+./mvx mvn clean install
 ```
 
 ## Command Examples
