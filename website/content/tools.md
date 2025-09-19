@@ -299,10 +299,119 @@ Override tool paths if needed:
 
 mvx automatically verifies tool installations:
 
-- **Checksum verification**: Downloaded binaries are verified
+- **Checksum verification**: Downloaded binaries are verified against SHA256/SHA512 checksums
+  - ✅ Maven: Uses Apache's official SHA512 checksums
+  - ✅ Maven Daemon: Uses Apache's official SHA512 checksums
+  - ✅ Java: Uses Adoptium API SHA256 checksums
+  - ✅ Node.js: Uses official SHASUMS256.txt files
+  - ✅ Go: Framework ready for Go's checksum database
 - **Version validation**: Ensures correct version is installed
 - **Path resolution**: Verifies tools are accessible
 - **Health checks**: Basic functionality tests
+
+### Checksum Configuration
+
+#### Verification Modes
+
+**Optional Verification** (default): Warns on checksum failures but continues installation
+```
+⚠️  Checksum verification failed: checksum mismatch
+   This could indicate a corrupted download or security issue.
+```
+
+**Required Verification**: Fails installation on checksum errors
+```json5
+{
+  tools: {
+    maven: {
+      version: "3.9.6",
+      checksum: {
+        required: true  // Fail installation if checksum verification fails
+      }
+    }
+  }
+}
+```
+
+#### Custom Checksums
+
+Provide your own checksums for enhanced security:
+
+```json5
+{
+  tools: {
+    maven: {
+      version: "3.9.6",
+      checksum: {
+        type: "sha512",  // sha256 or sha512
+        value: "abc123def456...",
+        required: true
+      }
+    }
+  }
+}
+```
+
+#### Checksum URLs
+
+Use external checksum sources:
+
+```json5
+{
+  tools: {
+    maven: {
+      version: "3.9.6",
+      checksum: {
+        type: "sha512",
+        url: "https://archive.apache.org/dist/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.zip.sha512",
+        filename: "apache-maven-3.9.6-bin.zip",
+        required: true
+      }
+    }
+  }
+}
+```
+
+#### Automatic Checksum Sources
+
+mvx automatically fetches checksums from official sources:
+
+- **Maven**: `https://archive.apache.org/dist/maven/maven-{version}/binaries/{filename}.sha512`
+- **Maven Daemon**: `https://archive.apache.org/dist/maven/mvnd/{version}/{filename}.sha512`
+- **Java**: Adoptium API at `https://api.adoptium.net/v3/assets/latest/{version}/hotspot`
+- **Node.js**: `https://nodejs.org/dist/v{version}/SHASUMS256.txt`
+- **Go**: Planned integration with Go's checksum database
+
+#### Security Best Practices
+
+1. **Enable required verification** for production:
+   ```json5
+   {
+     tools: {
+       maven: { version: "3.9.6", checksum: { required: true } },
+       java: { version: "21", checksum: { required: true } },
+       node: { version: "22.14.0", checksum: { required: true } }
+     }
+   }
+   ```
+
+2. **Pin specific checksums** for critical tools:
+   ```json5
+   {
+     tools: {
+       maven: {
+         version: "3.9.6",
+         checksum: {
+           type: "sha512",
+           value: "specific-checksum-here",
+           required: true
+         }
+       }
+     }
+   }
+   ```
+
+3. **Verify checksums manually** for sensitive environments by downloading from official sources
 
 ## Adding New Tools
 

@@ -29,7 +29,7 @@ func (n *NodeTool) Install(version string, cfg config.ToolConfig) error {
 
 	url := n.getDownloadURL(version)
 	fmt.Printf("  ⏳ Downloading Node.js %s...\n", version)
-	if err := n.downloadAndExtract(url, installDir); err != nil {
+	if err := n.downloadAndExtract(url, installDir, version, cfg); err != nil {
 		return fmt.Errorf("failed to download and extract: %w", err)
 	}
 	return nil
@@ -139,22 +139,26 @@ func (n *NodeTool) getDownloadURL(version string) string {
 	return fmt.Sprintf("https://nodejs.org/dist/v%[1]s/node-v%[1]s-%[2]s.tar.xz", version, platform)
 }
 
-func (n *NodeTool) downloadAndExtract(url, destDir string) error {
-	tmp, err := os.CreateTemp("", "node-*.pkg")
+func (n *NodeTool) downloadAndExtract(url, destDir, version string, cfg config.ToolConfig) error {
+	// Create temporary file for download
+	tmpFile, err := os.CreateTemp("", "node-*.pkg")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create temporary file: %w", err)
 	}
-	defer os.Remove(tmp.Name())
-	defer tmp.Close()
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
 
-	// Configure robust download
-	config := DefaultDownloadConfig(url, tmp.Name())
+	// Configure robust download with checksum verification
+	config := DefaultDownloadConfig(url, tmpFile.Name())
 	config.ExpectedType = "application" // Accept various application types
 	config.MinSize = 10 * 1024 * 1024   // Minimum 10MB for Node.js distributions
 	config.MaxSize = 100 * 1024 * 1024  // Maximum 100MB for Node.js distributions
 	config.ToolName = "node"            // For progress reporting
+	config.Version = version            // For checksum verification
+	config.Config = cfg                 // Tool configuration
+	config.ChecksumRegistry = n.manager.GetChecksumRegistry()
 
-	// Perform robust download
+	// Perform robust download with checksum verification
 	result, err := RobustDownload(config)
 	if err != nil {
 		return fmt.Errorf("Node.js download failed: %s", DiagnoseDownloadError(url, err))
@@ -163,16 +167,16 @@ func (n *NodeTool) downloadAndExtract(url, destDir string) error {
 	fmt.Printf("  📦 Downloaded %d bytes from %s\n", result.Size, result.FinalURL)
 
 	// Close temp file before extraction
-	tmp.Close()
+	tmpFile.Close()
 
 	if strings.HasSuffix(url, ".zip") {
-		return extractZipFile(tmp.Name(), destDir)
+		return extractZipFile(tmpFile.Name(), destDir)
 	}
 	// Use system tar to extract .tar.xz
 	if err := os.MkdirAll(destDir, 0755); err != nil {
 		return err
 	}
-	cmd := exec.Command("tar", "-xJf", tmp.Name(), "-C", destDir)
+	cmd := exec.Command("tar", "-xJf", tmpFile.Name(), "-C", destDir)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()

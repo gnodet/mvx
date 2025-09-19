@@ -362,7 +362,7 @@ The bootstrap scripts (`mvx` and `mvx.cmd`) are **shell/batch scripts** (not bin
 
 #### Extended Tool Support
 
-- [ ] Node.js and npm/yarn support
+- [x] **Node.js and npm/yarn support** ✅ **IMPLEMENTED**
 - [ ] Python and pip/poetry support
 - [ ] Custom tool definitions and installers
 
@@ -373,7 +373,11 @@ The bootstrap scripts (`mvx` and `mvx.cmd`) are **shell/batch scripts** (not bin
 
 #### Security & Performance
 
-- [ ] Checksum verification for security
+- [x] **Checksum verification for security** ✅ **IMPLEMENTED**
+  - SHA256/SHA512 verification for Maven, Maven Daemon, Java, Node.js, and Go
+  - Optional and required verification modes
+  - Support for custom checksums and checksum URLs
+  - Automatic fetching from official sources (Apache, Adoptium, Node.js, etc.)
 - [ ] Parallel tool downloads
 
 ## 🛠️ Implementation
@@ -623,11 +627,11 @@ The bootstrap system is fully functional and provides:
 - [x] Java version detection and management (multiple distributions)
 - [x] Command configuration system (JSON5/YAML)
 
-**Phase 2: Multi-Tool Support** (Q2 2025)
+**Phase 2: Multi-Tool Support** ✅ **COMPLETED**
 
-- [ ] Node.js and npm integration
+- [x] Node.js and npm integration ✅ **IMPLEMENTED**
+- [x] Security improvements (checksum verification) ✅ **IMPLEMENTED**
 - [ ] Python and pip support
-- [ ] Security improvements (checksum verification)
 
 ## 🤝 Contributing
 

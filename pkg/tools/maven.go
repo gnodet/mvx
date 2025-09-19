@@ -72,7 +72,7 @@ func (m *MavenTool) Install(version string, cfg config.ToolConfig) error {
 
 	// Download and extract
 	fmt.Printf("  ⏳ Downloading Maven %s...\n", version)
-	if err := m.downloadAndExtract(downloadURL, installDir); err != nil {
+	if err := m.downloadAndExtract(downloadURL, installDir, version, cfg); err != nil {
 		return fmt.Errorf("failed to download and extract: %w", err)
 	}
 
@@ -202,8 +202,8 @@ func (m *MavenTool) getDownloadURL(version string) string {
 	return fmt.Sprintf("https://archive.apache.org/dist/maven/maven-3/%s/binaries/apache-maven-%s-bin.zip", version, version)
 }
 
-// downloadAndExtract downloads and extracts a zip file
-func (m *MavenTool) downloadAndExtract(url, destDir string) error {
+// downloadAndExtract downloads and extracts a zip file with checksum verification
+func (m *MavenTool) downloadAndExtract(url, destDir, version string, cfg config.ToolConfig) error {
 	// Create temporary file for download
 	tmpFile, err := os.CreateTemp("", "maven-*.zip")
 	if err != nil {
@@ -212,14 +212,17 @@ func (m *MavenTool) downloadAndExtract(url, destDir string) error {
 	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
 
-	// Configure robust download
+	// Configure robust download with checksum verification
 	config := DefaultDownloadConfig(url, tmpFile.Name())
 	config.ExpectedType = "application" // Accept various application types
 	config.MinSize = 5 * 1024 * 1024    // Minimum 5MB for Maven distributions
 	config.MaxSize = 50 * 1024 * 1024   // Maximum 50MB for Maven distributions
 	config.ToolName = "maven"           // For progress reporting
+	config.Version = version            // For checksum verification
+	config.Config = cfg                 // Tool configuration
+	config.ChecksumRegistry = m.manager.GetChecksumRegistry()
 
-	// Perform robust download
+	// Perform robust download with checksum verification
 	result, err := RobustDownload(config)
 	if err != nil {
 		return fmt.Errorf("Maven download failed: %s", DiagnoseDownloadError(url, err))

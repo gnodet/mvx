@@ -140,6 +140,39 @@ Edit `.mvx/config.json5` to specify your project's requirements:
 }
 ```
 
+### Secure Production Project
+
+For production environments, enable checksum verification:
+
+```json5
+{
+  project: {
+    name: "secure-production-app"
+  },
+  tools: {
+    maven: {
+      version: "3.9.6",
+      checksum: {
+        required: true  // Fail if checksum verification fails
+      }
+    },
+    java: { version: "21" },
+    mvnd: {
+      version: "1.0.2",
+      checksum: {
+        required: true  // Enhanced security for build tools
+      }
+    }
+  },
+  commands: {
+    "secure-build": {
+      description: "Build with security verification",
+      script: "mvn clean verify -Dsecurity.check=true"
+    }
+  }
+}
+```
+
 ### Go Project
 
 ```json5

@@ -64,7 +64,17 @@ func TestMvxBinary(t *testing.T) {
 }
 
 func findMvxBinary(t *testing.T) string {
-	// Use the wrapper script which will download the released version
+	// First try to build the current version
+	if buildCurrentVersion(t) {
+		binary := "../mvx-current"
+		if _, err := os.Stat(binary); err == nil {
+			abs, _ := filepath.Abs(binary)
+			t.Logf("Using built mvx binary: %s", abs)
+			return abs
+		}
+	}
+
+	// Fall back to the wrapper script which will download the released version
 	wrapper := "../mvx"
 	if _, err := os.Stat(wrapper); err == nil {
 		abs, _ := filepath.Abs(wrapper)
@@ -72,8 +82,21 @@ func findMvxBinary(t *testing.T) string {
 		return abs
 	}
 
-	t.Fatal("Could not find mvx wrapper script.")
+	t.Fatal("Could not find mvx binary or wrapper script.")
 	return ""
+}
+
+func buildCurrentVersion(t *testing.T) bool {
+	// Try to build the current version for testing
+	cmd := exec.Command("go", "build", "-o", "mvx-current", ".")
+	cmd.Dir = ".."
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Logf("Failed to build current version: %v\nOutput: %s", err, output)
+		return false
+	}
+	t.Logf("Successfully built current version")
+	return true
 }
 
 func testVersion(t *testing.T, mvxBinary string) {
@@ -302,23 +325,15 @@ func testCustomCommands(t *testing.T, mvxBinary string) {
 	t.Skip("Custom commands test skipped - works manually but has issues in test environment")
 }
 
-// findMvxBinaryForBench is a version of findMvxBinary for benchmarks
-func findMvxBinaryForBench(b *testing.B) string {
-	// Use the wrapper script which will download the released version
-	wrapper := "../mvx"
-	if _, err := os.Stat(wrapper); err == nil {
-		abs, _ := filepath.Abs(wrapper)
-		b.Logf("Using mvx wrapper: %s", abs)
-		return abs
-	}
-
-	b.Fatal("Could not find mvx wrapper script.")
-	return ""
-}
-
 // Benchmark tests for performance regression detection
 func BenchmarkMvxVersion(b *testing.B) {
-	mvxBinary := findMvxBinaryForBench(b)
+	// Convert *testing.B to *testing.T for findMvxBinary
+	t := &testing.T{}
+	mvxBinary := findMvxBinaryForBenchmark(b, t)
+	if mvxBinary == "" {
+		b.Skip("mvx binary not available for benchmarking")
+		return
+	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -331,7 +346,13 @@ func BenchmarkMvxVersion(b *testing.B) {
 }
 
 func BenchmarkMvxToolsList(b *testing.B) {
-	mvxBinary := findMvxBinaryForBench(b)
+	// Convert *testing.B to *testing.T for findMvxBinary
+	t := &testing.T{}
+	mvxBinary := findMvxBinaryForBenchmark(b, t)
+	if mvxBinary == "" {
+		b.Skip("mvx binary not available for benchmarking")
+		return
+	}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -341,4 +362,40 @@ func BenchmarkMvxToolsList(b *testing.B) {
 			b.Fatalf("mvx tools list failed: %v\nOutput: %s", err, output)
 		}
 	}
+}
+
+func findMvxBinaryForBenchmark(b *testing.B, t *testing.T) string {
+	// First try to build the current version
+	if buildCurrentVersionForBenchmark(b) {
+		binary := "../mvx-current"
+		if _, err := os.Stat(binary); err == nil {
+			abs, _ := filepath.Abs(binary)
+			b.Logf("Using built mvx binary: %s", abs)
+			return abs
+		}
+	}
+
+	// Fall back to the wrapper script
+	wrapper := "../mvx"
+	if _, err := os.Stat(wrapper); err == nil {
+		abs, _ := filepath.Abs(wrapper)
+		b.Logf("Using mvx wrapper: %s", abs)
+		return abs
+	}
+
+	b.Logf("Could not find mvx binary or wrapper script")
+	return ""
+}
+
+func buildCurrentVersionForBenchmark(b *testing.B) bool {
+	// Try to build the current version for benchmarking
+	cmd := exec.Command("go", "build", "-o", "mvx-current", ".")
+	cmd.Dir = ".."
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		b.Logf("Failed to build current version: %v\nOutput: %s", err, output)
+		return false
+	}
+	b.Logf("Successfully built current version")
+	return true
 }
