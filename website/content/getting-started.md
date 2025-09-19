@@ -227,6 +227,44 @@ For production environments, enable checksum verification:
 }
 ```
 
+## Cross-Platform Scripts
+
+mvx provides powerful cross-platform script support, making your commands work seamlessly across Windows, Linux, and macOS:
+
+### Platform-Specific Scripts
+
+```json5
+{
+  commands: {
+    "start-db": {
+      description: "Start database service",
+      script: {
+        windows: "net start postgresql",
+        linux: "sudo systemctl start postgresql",
+        darwin: "brew services start postgresql",
+        default: "echo 'Please start PostgreSQL manually'"
+      }
+    }
+  }
+}
+```
+
+### Cross-Platform Interpreter
+
+```json5
+{
+  commands: {
+    "build-all": {
+      description: "Build all modules",
+      script: "cd frontend && npm run build && cd ../backend && mvn clean install",
+      interpreter: "mvx-shell"  // Works on all platforms
+    }
+  }
+}
+```
+
+**Learn more**: [Cross-Platform Scripts Guide](/cross-platform-scripts)
+
 ## Key Benefits
 
 - **🚀 Zero Dependencies**: No need to install tools on your system
@@ -238,6 +276,7 @@ For production environments, enable checksum verification:
 ## Next Steps
 
 - [Learn about configuration options](/configuration)
+- [Write cross-platform scripts](/cross-platform-scripts)
 - [Explore supported tools](/tools)
 - [Discover custom commands](/commands)
 - [Check out the GitHub repository](https://github.com/gnodet/mvx)
@@ -245,6 +284,7 @@ For production environments, enable checksum verification:
 ## Need Help?
 
 - 📖 [Configuration Guide](/configuration)
+- 🌍 [Cross-Platform Scripts](/cross-platform-scripts)
 - 🔧 [Supported Tools](/tools)
 - 💬 [GitHub Discussions](https://github.com/gnodet/mvx/discussions)
 - 🐛 [Report Issues](https://github.com/gnodet/mvx/issues)
