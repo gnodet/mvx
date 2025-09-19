@@ -172,6 +172,7 @@ func (j *JavaTool) GetPath(version string, cfg config.ToolConfig) (string, error
 	for _, entry := range entries {
 		if entry.IsDir() {
 			subPath := filepath.Join(installDir, entry.Name())
+			logVerbose("Examining subdirectory: %s", subPath)
 
 			// Check standard location first
 			javaExe := filepath.Join(subPath, "bin", "java")
@@ -192,6 +193,24 @@ func (j *JavaTool) GetPath(version string, cfg config.ToolConfig) (string, error
 					macOSJavaHome := filepath.Join(subPath, "Contents", "Home")
 					logVerbose("Found macOS Java executable, using JAVA_HOME: %s", macOSJavaHome)
 					return macOSJavaHome, nil
+				}
+			}
+
+			// For Alpine Linux and some other distributions, check nested subdirectories
+			if nestedEntries, err := os.ReadDir(subPath); err == nil {
+				for _, nestedEntry := range nestedEntries {
+					if nestedEntry.IsDir() {
+						nestedPath := filepath.Join(subPath, nestedEntry.Name())
+						nestedJavaExe := filepath.Join(nestedPath, "bin", "java")
+						if runtime.GOOS == "windows" {
+							nestedJavaExe += ".exe"
+						}
+						logVerbose("Checking for nested Java executable at: %s", nestedJavaExe)
+						if _, err := os.Stat(nestedJavaExe); err == nil {
+							logVerbose("Found Java executable in nested subdirectory: %s", nestedPath)
+							return nestedPath, nil
+						}
+					}
 				}
 			}
 		}
@@ -234,14 +253,38 @@ func (j *JavaTool) GetBinPath(version string, cfg config.ToolConfig) (string, er
 
 // Verify checks if the installation is working correctly
 func (j *JavaTool) Verify(version string, cfg config.ToolConfig) error {
+	distribution := cfg.Distribution
+	if distribution == "" {
+		distribution = "temurin"
+	}
+
 	binPath, err := j.GetBinPath(version, cfg)
 	if err != nil {
-		return err
+		// Provide detailed debugging information
+		installDir := j.manager.GetToolVersionDir("java", version, distribution)
+		fmt.Printf("  🔍 Debug: Java installation verification failed\n")
+		fmt.Printf("     Install directory: %s\n", installDir)
+		fmt.Printf("     Error getting bin path: %v\n", err)
+
+		// List contents of install directory for debugging
+		if entries, readErr := os.ReadDir(installDir); readErr == nil {
+			fmt.Printf("     Install directory contents:\n")
+			for _, entry := range entries {
+				fmt.Printf("       - %s (dir: %t)\n", entry.Name(), entry.IsDir())
+			}
+		}
+
+		return fmt.Errorf("installation verification failed for java %s: %w", version, err)
 	}
 
 	javaExe := filepath.Join(binPath, "java")
 	if runtime.GOOS == "windows" {
 		javaExe += ".exe"
+	}
+
+	// Check if java executable exists
+	if _, err := os.Stat(javaExe); err != nil {
+		return fmt.Errorf("java verification failed: java executable not found at %s: %w", javaExe, err)
 	}
 
 	// Run java -version to verify installation
@@ -363,6 +406,10 @@ func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, rel
 			DirectDownloadURI string `json:"direct_download_uri"`
 			Filename          string `json:"filename"`
 			VersionNumber     string `json:"version_number"`
+			LibCType          string `json:"lib_c_type"`
+			Architecture      string `json:"architecture"`
+			OperatingSystem   string `json:"operating_system"`
+			ArchiveType       string `json:"archive_type"`
 			Links             struct {
 				PkgDownloadRedirect string `json:"pkg_download_redirect"`
 			} `json:"links"`
@@ -396,27 +443,70 @@ func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, rel
 		return "", fmt.Errorf("no packages found for Java %s (%s)", version, distribution)
 	}
 
-	// Prefer tar.gz files over other formats (pkg, dmg, zip)
-	var selectedPkg *struct {
+	// Define the package type for consistency
+	type packageType struct {
 		DirectDownloadURI string `json:"direct_download_uri"`
 		Filename          string `json:"filename"`
 		VersionNumber     string `json:"version_number"`
+		LibCType          string `json:"lib_c_type"`
+		Architecture      string `json:"architecture"`
+		OperatingSystem   string `json:"operating_system"`
+		ArchiveType       string `json:"archive_type"`
 		Links             struct {
 			PkgDownloadRedirect string `json:"pkg_download_redirect"`
 		} `json:"links"`
 	}
 
-	// First, look for tar.gz files
+	var selectedPkg *packageType
+
+	// Smart selection: prefer glibc over musl on glibc systems, and tar.gz over other formats
+	var glibcPkg, muslPkg, otherPkg *packageType
+
 	for _, pkg := range packages.Result {
-		if strings.HasSuffix(pkg.Filename, ".tar.gz") {
-			selectedPkg = &pkg
-			break
+		pkgCopy := packageType{
+			DirectDownloadURI: pkg.DirectDownloadURI,
+			Filename:          pkg.Filename,
+			VersionNumber:     pkg.VersionNumber,
+			LibCType:          pkg.LibCType,
+			Architecture:      pkg.Architecture,
+			OperatingSystem:   pkg.OperatingSystem,
+			ArchiveType:       pkg.ArchiveType,
+			Links:             pkg.Links,
+		}
+
+		// Only consider tar.gz packages for Linux
+		if pkg.ArchiveType == "tar.gz" && pkg.OperatingSystem == "linux" && pkg.Architecture == "x64" {
+			if pkg.LibCType == "musl" {
+				if muslPkg == nil {
+					muslPkg = &pkgCopy
+					logVerbose("Found musl candidate: %s", pkg.Filename)
+				}
+			} else if pkg.LibCType == "glibc" {
+				if glibcPkg == nil {
+					glibcPkg = &pkgCopy
+					logVerbose("Found glibc candidate: %s", pkg.Filename)
+				}
+			}
+		}
+
+		// Keep track of any package as fallback
+		if otherPkg == nil {
+			otherPkg = &pkgCopy
 		}
 	}
 
-	// If no tar.gz found, use the first available package
-	if selectedPkg == nil {
-		selectedPkg = &packages.Result[0]
+	// Select the best package: prefer glibc, then musl, then any other
+	if glibcPkg != nil {
+		selectedPkg = glibcPkg
+		logVerbose("Selected glibc package: %s (lib_c_type: %s)", selectedPkg.Filename, selectedPkg.LibCType)
+	} else if muslPkg != nil {
+		selectedPkg = muslPkg
+		logVerbose("Selected musl package: %s (lib_c_type: %s)", selectedPkg.Filename, selectedPkg.LibCType)
+	} else if otherPkg != nil {
+		selectedPkg = otherPkg
+		logVerbose("Selected fallback package: %s", selectedPkg.Filename)
+	} else {
+		return "", fmt.Errorf("no suitable packages found for Java %s (%s)", version, distribution)
 	}
 
 	logVerbose("Selected package: %s", selectedPkg.Filename)

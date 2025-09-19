@@ -3,6 +3,7 @@ package tools
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"runtime"
 	"strings"
@@ -296,9 +297,96 @@ func (cr *ChecksumRegistry) GetNodeChecksumFromSHASUMS(version, filename string)
 		return ChecksumInfo{}, fmt.Errorf("Node.js checksums returned status %d", resp.StatusCode)
 	}
 
+	// Read and parse the checksum file content immediately
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return ChecksumInfo{}, fmt.Errorf("failed to read Node.js checksums: %w", err)
+	}
+
+	content := string(body)
+
+	// Parse the checksum file to find the checksum for our filename
+	// We need to determine the actual Node.js filename from the version and platform
+	nodeFilename := cr.getNodeFilename(version)
+
+	checksum, err := cr.parseNodeChecksumFile(content, nodeFilename)
+	if err != nil {
+		return ChecksumInfo{}, fmt.Errorf("failed to parse Node.js checksum: %w", err)
+	}
+
 	return ChecksumInfo{
-		Type:     SHA256,
-		URL:      url,
-		Filename: filename,
+		Type:  SHA256,
+		Value: checksum,
 	}, nil
+}
+
+// parseNodeChecksumFile parses Node.js SHASUMS256.txt content to find checksum for specific filename
+func (cr *ChecksumRegistry) parseNodeChecksumFile(content, filename string) (string, error) {
+	lines := strings.Split(content, "\n")
+	var candidateFiles []string
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		// Split on whitespace - Node.js format is: checksum  filename
+		parts := strings.Fields(line)
+		if len(parts) < 2 {
+			continue
+		}
+
+		checksum := parts[0]
+		fileInLine := parts[1]
+
+		// Store candidate files for debugging
+		candidateFiles = append(candidateFiles, fileInLine)
+
+		// Check if this line matches our filename (exact match)
+		if fileInLine == filename {
+			return checksum, nil
+		}
+
+		// Also try matching just the basename
+		if strings.Contains(fileInLine, "/") {
+			parts := strings.Split(fileInLine, "/")
+			basename := parts[len(parts)-1]
+			if basename == filename {
+				return checksum, nil
+			}
+		}
+	}
+
+	// If we get here, no match was found - provide helpful debug info
+	fmt.Printf("⚠️  Debug: Available Node.js files in SHASUMS256.txt: %v\n", candidateFiles)
+	fmt.Printf("   Looking for: %s\n", filename)
+	return "", fmt.Errorf("checksum not found for Node.js file %s", filename)
+}
+
+// getNodeFilename determines the correct Node.js filename based on version and platform
+func (cr *ChecksumRegistry) getNodeFilename(version string) string {
+	platform := ""
+	switch runtime.GOOS {
+	case "linux":
+		if runtime.GOARCH == "arm64" {
+			platform = "linux-arm64"
+		} else {
+			platform = "linux-x64"
+		}
+	case "darwin":
+		if runtime.GOARCH == "arm64" {
+			platform = "darwin-arm64"
+		} else {
+			platform = "darwin-x64"
+		}
+	case "windows":
+		platform = "win-x64"
+	}
+
+	// Windows uses zip, others tar.xz
+	if runtime.GOOS == "windows" {
+		return fmt.Sprintf("node-v%s-%s.zip", version, platform)
+	}
+	return fmt.Sprintf("node-v%s-%s.tar.xz", version, platform)
 }
