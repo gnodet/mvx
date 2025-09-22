@@ -227,7 +227,7 @@ func TestJavaGetFileExtension(t *testing.T) {
 		{"https://example.com/jdk-21.dmg", ".dmg"},
 		{"https://example.com/jdk-21.zip", ".zip"},
 		{"https://example.com/jdk-21.tar.xz", ".tar.xz"},
-		{"https://example.com/jdk-21", ".tar.gz"}, // default
+		{"https://example.com/jdk-21", ".tar.gz"},         // default
 		{"https://example.com/jdk-21.unknown", ".tar.gz"}, // default
 	}
 

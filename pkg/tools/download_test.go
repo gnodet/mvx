@@ -57,7 +57,7 @@ func TestValidateDmg(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			err := validateDmg(test.header)
 			hasError := err != nil
-			
+
 			if test.expected && hasError {
 				t.Errorf("validateDmg() failed for %s: %v", test.name, err)
 			} else if !test.expected && !hasError {
@@ -110,7 +110,7 @@ func TestValidateFileFormat(t *testing.T) {
 
 			err := validateFileFormat(tmpFile, test.url)
 			hasError := err != nil
-			
+
 			if test.expected && hasError {
 				t.Errorf("validateFileFormat() failed for %s: %v", test.name, err)
 			} else if !test.expected && !hasError {
