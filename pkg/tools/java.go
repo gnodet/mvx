@@ -514,10 +514,13 @@ func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, rel
 	return downloadURL, nil
 }
 
-// downloadAndExtract downloads and extracts a tar.gz file with checksum verification
+// downloadAndExtract downloads and extracts Java archives with checksum verification
 func (j *JavaTool) downloadAndExtract(url, destDir, version string, cfg config.ToolConfig) error {
-	// Create temporary file for download
-	tmpFile, err := os.CreateTemp("", "java-*.tar.gz")
+	// Determine file extension from URL
+	fileExt := j.getFileExtension(url)
+
+	// Create temporary file for download with appropriate extension
+	tmpFile, err := os.CreateTemp("", "java-*"+fileExt)
 	if err != nil {
 		return fmt.Errorf("failed to create temporary file: %w", err)
 	}
@@ -552,8 +555,8 @@ func (j *JavaTool) downloadAndExtract(url, destDir, version string, cfg config.T
 	}
 	defer file.Close()
 
-	// Extract the downloaded archive
-	return j.extractTarGz(tmpFile.Name(), destDir)
+	// Extract the downloaded archive based on file type
+	return j.extractArchive(tmpFile.Name(), destDir, url)
 }
 
 // extractTarGz extracts a tar.gz file from disk
@@ -623,4 +626,206 @@ func (j *JavaTool) extractFile(tarReader *tar.Reader, targetPath string, mode os
 	// Copy content
 	_, err = io.Copy(file, tarReader)
 	return err
+}
+
+// getFileExtension determines the file extension from URL
+func (j *JavaTool) getFileExtension(url string) string {
+	if strings.HasSuffix(url, ".tar.gz") {
+		return ".tar.gz"
+	} else if strings.HasSuffix(url, ".tgz") {
+		return ".tgz"
+	} else if strings.HasSuffix(url, ".dmg") {
+		return ".dmg"
+	} else if strings.HasSuffix(url, ".zip") {
+		return ".zip"
+	} else if strings.HasSuffix(url, ".tar.xz") {
+		return ".tar.xz"
+	}
+	// Default to .tar.gz for unknown extensions
+	return ".tar.gz"
+}
+
+// extractArchive extracts an archive based on its file type
+func (j *JavaTool) extractArchive(archivePath, destDir, url string) error {
+	if strings.HasSuffix(url, ".dmg") {
+		return j.extractDmg(archivePath, destDir)
+	} else if strings.HasSuffix(url, ".zip") {
+		return j.extractZip(archivePath, destDir)
+	} else if strings.HasSuffix(url, ".tar.xz") {
+		return j.extractTarXz(archivePath, destDir)
+	} else {
+		// Default to tar.gz extraction for .tar.gz, .tgz, and unknown formats
+		return j.extractTarGz(archivePath, destDir)
+	}
+}
+
+// extractDmg extracts a DMG file on macOS using hdiutil
+func (j *JavaTool) extractDmg(dmgPath, destDir string) error {
+	if runtime.GOOS != "darwin" {
+		return fmt.Errorf("DMG extraction is only supported on macOS")
+	}
+
+	logVerbose("Extracting DMG file: %s to %s", dmgPath, destDir)
+
+	// Mount the DMG file
+	mountCmd := exec.Command("hdiutil", "attach", "-quiet", "-nobrowse", "-plist", dmgPath)
+	mountOutput, err := mountCmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to mount DMG: %w", err)
+	}
+
+	// Parse the plist output to get mount point
+	mountPoint, err := j.parseMountPoint(mountOutput)
+	if err != nil {
+		return fmt.Errorf("failed to parse mount point: %w", err)
+	}
+
+	logVerbose("DMG mounted at: %s", mountPoint)
+
+	// Ensure we unmount the DMG when done
+	defer func() {
+		logVerbose("Unmounting DMG from: %s", mountPoint)
+		unmountCmd := exec.Command("hdiutil", "detach", "-quiet", mountPoint)
+		if err := unmountCmd.Run(); err != nil {
+			fmt.Printf("  ⚠️  Warning: failed to unmount DMG: %v\n", err)
+		}
+	}()
+
+	// Find JDK contents in the mounted volume
+	return j.copyJdkFromMount(mountPoint, destDir)
+}
+
+// parseMountPoint parses hdiutil plist output to extract mount point
+func (j *JavaTool) parseMountPoint(plistData []byte) (string, error) {
+	// Simple parsing of hdiutil plist output
+	// Look for mount-point in the plist data
+	plistStr := string(plistData)
+
+	// Find the mount-point key and extract the path
+	lines := strings.Split(plistStr, "\n")
+	for i, line := range lines {
+		if strings.Contains(line, "<key>mount-point</key>") && i+1 < len(lines) {
+			nextLine := strings.TrimSpace(lines[i+1])
+			if strings.HasPrefix(nextLine, "<string>") && strings.HasSuffix(nextLine, "</string>") {
+				mountPoint := strings.TrimPrefix(nextLine, "<string>")
+				mountPoint = strings.TrimSuffix(mountPoint, "</string>")
+				return mountPoint, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("could not find mount point in hdiutil output")
+}
+
+// copyJdkFromMount copies JDK contents from mounted DMG to destination
+func (j *JavaTool) copyJdkFromMount(mountPoint, destDir string) error {
+	logVerbose("Searching for JDK in mount point: %s", mountPoint)
+
+	// Look for common JDK patterns in DMG
+	// 1. Direct .jdk bundle (e.g., jdk-21.jdk)
+	// 2. Contents/Home structure
+	// 3. Nested directory structure
+
+	entries, err := os.ReadDir(mountPoint)
+	if err != nil {
+		return fmt.Errorf("failed to read mount point: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			entryPath := filepath.Join(mountPoint, entry.Name())
+			logVerbose("Checking directory: %s", entryPath)
+
+			// Check if this looks like a JDK bundle (.jdk extension or Contents/Home structure)
+			if strings.HasSuffix(entry.Name(), ".jdk") || j.hasJdkStructure(entryPath) {
+				logVerbose("Found JDK structure at: %s", entryPath)
+				return j.copyDirectory(entryPath, destDir)
+			}
+		}
+	}
+
+	return fmt.Errorf("no JDK structure found in DMG")
+}
+
+// hasJdkStructure checks if a directory has JDK structure (Contents/Home/bin/java)
+func (j *JavaTool) hasJdkStructure(dirPath string) bool {
+	javaExe := filepath.Join(dirPath, "Contents", "Home", "bin", "java")
+	_, err := os.Stat(javaExe)
+	return err == nil
+}
+
+// copyDirectory recursively copies a directory
+func (j *JavaTool) copyDirectory(src, dst string) error {
+	logVerbose("Copying directory from %s to %s", src, dst)
+
+	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Calculate relative path
+		relPath, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+
+		dstPath := filepath.Join(dst, relPath)
+
+		if info.IsDir() {
+			return os.MkdirAll(dstPath, info.Mode())
+		}
+
+		return j.copyFile(path, dstPath, info.Mode())
+	})
+}
+
+// copyFile copies a single file
+func (j *JavaTool) copyFile(src, dst string, mode os.FileMode) error {
+	// Create parent directory
+	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+		return err
+	}
+
+	// Open source file
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
+
+	// Create destination file
+	dstFile, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+
+	// Copy content
+	_, err = io.Copy(dstFile, srcFile)
+	return err
+}
+
+// extractZip extracts a ZIP file
+func (j *JavaTool) extractZip(zipPath, destDir string) error {
+	// Import archive/zip at the top of the file if not already imported
+	return fmt.Errorf("ZIP extraction for Java not yet implemented - please use tar.gz version")
+}
+
+// extractTarXz extracts a tar.xz file using system tar command
+func (j *JavaTool) extractTarXz(archivePath, destDir string) error {
+	// Create destination directory
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return fmt.Errorf("failed to create destination directory: %w", err)
+	}
+
+	// Use system tar to extract .tar.xz
+	cmd := exec.Command("tar", "-xJf", archivePath, "-C", destDir)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to extract tar.xz: %w", err)
+	}
+
+	return nil
 }

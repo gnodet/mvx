@@ -259,6 +259,8 @@ func validateFileFormat(filePath, url string) error {
 		return validateZip(header)
 	} else if strings.HasSuffix(url, ".gz") {
 		return validateGzip(header)
+	} else if strings.HasSuffix(url, ".dmg") {
+		return validateDmg(header)
 	}
 
 	// If we can't determine format from URL, try to detect
@@ -306,6 +308,33 @@ func validateTarXz(header []byte) error {
 	return nil
 }
 
+// validateDmg validates DMG format
+func validateDmg(header []byte) error {
+	if len(header) < 4 {
+		return fmt.Errorf("file too short for DMG format")
+	}
+
+	// DMG files can have various signatures, but commonly start with:
+	// - "koly" signature (at end of file, but sometimes detectable in header)
+	// - zlib compressed data (78 01, 78 9c, 78 da)
+	// - Or other binary patterns
+
+	// Check for zlib compression markers (common in DMG)
+	if len(header) >= 2 && header[0] == 0x78 &&
+		(header[1] == 0x01 || header[1] == 0x9c || header[1] == 0xda) {
+		return nil
+	}
+
+	// Check for "koly" signature anywhere in the first 512 bytes
+	if bytes.Contains(header, []byte("koly")) {
+		return nil
+	}
+
+	// DMG files are complex and can have various formats
+	// If we can't detect a clear signature, we'll allow it and let hdiutil handle validation
+	return nil
+}
+
 // validateAnyArchive tries to detect any known archive format
 func validateAnyArchive(header []byte) error {
 	if len(header) < 4 {
@@ -324,6 +353,11 @@ func validateAnyArchive(header []byte) error {
 	}
 	if len(header) >= 6 && header[0] == 0xfd && header[1] == 0x37 && header[2] == 0x7a {
 		return nil // XZ
+	}
+	// Check for DMG format (koly signature at different positions)
+	if len(header) >= 4 && (bytes.Contains(header, []byte("koly")) ||
+		(len(header) >= 8 && header[0] == 0x78 && header[1] == 0x01)) {
+		return nil // DMG
 	}
 
 	// Check if it looks like HTML (common error response)

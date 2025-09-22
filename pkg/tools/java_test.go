@@ -209,3 +209,66 @@ func TestJavaToolWithSystemJava(t *testing.T) {
 		t.Error("IsInstalled should return false when system Java version doesn't match requested version")
 	}
 }
+
+func TestJavaGetFileExtension(t *testing.T) {
+	manager, err := NewManager()
+	if err != nil {
+		t.Fatalf("Failed to create manager: %v", err)
+	}
+
+	javaTool := &JavaTool{manager: manager}
+
+	tests := []struct {
+		url      string
+		expected string
+	}{
+		{"https://example.com/jdk-21.tar.gz", ".tar.gz"},
+		{"https://example.com/jdk-21.tgz", ".tgz"},
+		{"https://example.com/jdk-21.dmg", ".dmg"},
+		{"https://example.com/jdk-21.zip", ".zip"},
+		{"https://example.com/jdk-21.tar.xz", ".tar.xz"},
+		{"https://example.com/jdk-21", ".tar.gz"}, // default
+		{"https://example.com/jdk-21.unknown", ".tar.gz"}, // default
+	}
+
+	for _, test := range tests {
+		result := javaTool.getFileExtension(test.url)
+		if result != test.expected {
+			t.Errorf("getFileExtension(%s) = %s, expected %s", test.url, result, test.expected)
+		}
+	}
+}
+
+func TestJavaHasJdkStructure(t *testing.T) {
+	manager, err := NewManager()
+	if err != nil {
+		t.Fatalf("Failed to create manager: %v", err)
+	}
+
+	javaTool := &JavaTool{manager: manager}
+
+	// Create a temporary directory structure
+	tmpDir := t.TempDir()
+
+	// Test directory without JDK structure
+	if javaTool.hasJdkStructure(tmpDir) {
+		t.Error("hasJdkStructure should return false for directory without JDK structure")
+	}
+
+	// Create JDK structure
+	jdkDir := filepath.Join(tmpDir, "Contents", "Home", "bin")
+	if err := os.MkdirAll(jdkDir, 0755); err != nil {
+		t.Fatalf("Failed to create JDK directory structure: %v", err)
+	}
+
+	// Create java executable
+	javaExe := filepath.Join(jdkDir, "java")
+	if err := os.WriteFile(javaExe, []byte("#!/bin/bash\necho java"), 0755); err != nil {
+		t.Fatalf("Failed to create java executable: %v", err)
+	}
+
+	// Test directory with JDK structure
+	if !javaTool.hasJdkStructure(tmpDir) {
+		t.Error("hasJdkStructure should return true for directory with JDK structure")
+	}
+}
