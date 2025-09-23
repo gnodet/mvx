@@ -2,6 +2,7 @@ package tools
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
@@ -200,6 +201,17 @@ func (j *JavaTool) GetPath(version string, cfg config.ToolConfig) (string, error
 						if _, err := os.Stat(nestedJavaExe); err == nil {
 							logVerbose("Found Java executable in nested subdirectory: %s", nestedPath)
 							return nestedPath, nil
+						}
+
+						// On macOS, also check for nested Contents/Home/bin/java structure
+						if runtime.GOOS == "darwin" {
+							nestedMacOSJavaExe := filepath.Join(nestedPath, "Contents", "Home", "bin", "java")
+							logVerbose("Checking for nested macOS Java executable at: %s", nestedMacOSJavaExe)
+							if _, err := os.Stat(nestedMacOSJavaExe); err == nil {
+								nestedMacOSJavaHome := filepath.Join(nestedPath, "Contents", "Home")
+								logVerbose("Found nested macOS Java executable, using JAVA_HOME: %s", nestedMacOSJavaHome)
+								return nestedMacOSJavaHome, nil
+							}
 						}
 					}
 				}
@@ -451,7 +463,7 @@ func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, rel
 	var selectedPkg *packageType
 
 	// Smart selection: prefer glibc over musl on glibc systems, and tar.gz over other formats
-	var glibcPkg, muslPkg, otherPkg *packageType
+	var glibcPkg, muslPkg, zipPkg, tarGzPkg, otherPkg *packageType
 
 	for _, pkg := range packages.Result {
 		pkgCopy := packageType{
@@ -465,8 +477,20 @@ func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, rel
 			Links:             pkg.Links,
 		}
 
-		// Only consider tar.gz packages for Linux
-		if pkg.ArchiveType == "tar.gz" && pkg.OperatingSystem == "linux" && pkg.Architecture == "x64" {
+		// Check architecture compatibility
+		archMatch := false
+		if pkg.Architecture == "x64" || pkg.Architecture == "amd64" {
+			archMatch = true
+		} else if pkg.Architecture == "aarch64" || pkg.Architecture == "arm64" {
+			archMatch = true
+		}
+
+		if !archMatch {
+			continue
+		}
+
+		// Linux-specific package selection with libc preference
+		if pkg.OperatingSystem == "linux" && pkg.ArchiveType == "tar.gz" {
 			if pkg.LibCType == "musl" {
 				if muslPkg == nil {
 					muslPkg = &pkgCopy
@@ -480,19 +504,39 @@ func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, rel
 			}
 		}
 
+		// For all platforms: prefer tar.gz over zip (tar.gz is smaller and more standard)
+		if pkg.ArchiveType == "tar.gz" && tarGzPkg == nil {
+			tarGzPkg = &pkgCopy
+			logVerbose("Found TAR.GZ candidate: %s", pkg.Filename)
+		} else if pkg.ArchiveType == "zip" && zipPkg == nil {
+			zipPkg = &pkgCopy
+			logVerbose("Found ZIP candidate: %s", pkg.Filename)
+		}
+
 		// Keep track of any package as fallback
 		if otherPkg == nil {
 			otherPkg = &pkgCopy
 		}
 	}
 
-	// Select the best package: prefer glibc, then musl, then any other
+	// Select the best package with priority order:
+	// 1. glibc packages (Linux tar.gz with glibc)
+	// 2. musl packages (Linux tar.gz with musl)
+	// 3. tar.gz packages (all platforms - preferred for size/compatibility)
+	// 4. zip packages (all platforms - fallback)
+	// 5. other packages (final fallback)
 	if glibcPkg != nil {
 		selectedPkg = glibcPkg
 		logVerbose("Selected glibc package: %s (lib_c_type: %s)", selectedPkg.Filename, selectedPkg.LibCType)
 	} else if muslPkg != nil {
 		selectedPkg = muslPkg
 		logVerbose("Selected musl package: %s (lib_c_type: %s)", selectedPkg.Filename, selectedPkg.LibCType)
+	} else if tarGzPkg != nil {
+		selectedPkg = tarGzPkg
+		logVerbose("Selected TAR.GZ package: %s", selectedPkg.Filename)
+	} else if zipPkg != nil {
+		selectedPkg = zipPkg
+		logVerbose("Selected ZIP package: %s", selectedPkg.Filename)
 	} else if otherPkg != nil {
 		selectedPkg = otherPkg
 		logVerbose("Selected fallback package: %s", selectedPkg.Filename)
@@ -514,10 +558,22 @@ func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, rel
 	return downloadURL, nil
 }
 
-// downloadAndExtract downloads and extracts a tar.gz file with checksum verification
+// downloadAndExtract downloads and extracts an archive file with format detection
 func (j *JavaTool) downloadAndExtract(url, destDir, version string, cfg config.ToolConfig) error {
+	// Detect file format from URL
+	var fileExt string
+	if strings.Contains(url, ".tar.gz") {
+		fileExt = ".tar.gz"
+	} else if strings.Contains(url, ".zip") {
+		fileExt = ".zip"
+	} else if strings.Contains(url, ".tar.xz") {
+		fileExt = ".tar.xz"
+	} else {
+		fileExt = ".tar.gz" // default fallback
+	}
+
 	// Create temporary file for download
-	tmpFile, err := os.CreateTemp("", "java-*.tar.gz")
+	tmpFile, err := os.CreateTemp("", "java-download-*"+fileExt)
 	if err != nil {
 		return fmt.Errorf("failed to create temporary file: %w", err)
 	}
@@ -552,8 +608,17 @@ func (j *JavaTool) downloadAndExtract(url, destDir, version string, cfg config.T
 	}
 	defer file.Close()
 
-	// Extract the downloaded archive
-	return j.extractTarGz(tmpFile.Name(), destDir)
+	// Extract based on file format
+	switch fileExt {
+	case ".tar.gz":
+		return j.extractTarGz(tmpFile.Name(), destDir)
+	case ".zip":
+		return j.extractZip(tmpFile.Name(), destDir)
+	case ".tar.xz":
+		return j.extractTarXz(tmpFile.Name(), destDir)
+	default:
+		return fmt.Errorf("unsupported archive format: %s", fileExt)
+	}
 }
 
 // extractTarGz extracts a tar.gz file from disk
@@ -623,4 +688,79 @@ func (j *JavaTool) extractFile(tarReader *tar.Reader, targetPath string, mode os
 	// Copy content
 	_, err = io.Copy(file, tarReader)
 	return err
+}
+
+// extractZip extracts a ZIP file from disk
+func (j *JavaTool) extractZip(archivePath, destDir string) error {
+	reader, err := zip.OpenReader(archivePath)
+	if err != nil {
+		return fmt.Errorf("failed to open ZIP archive: %w", err)
+	}
+	defer reader.Close()
+
+	// Extract files
+	for _, file := range reader.File {
+		targetPath := filepath.Join(destDir, file.Name)
+
+		// Security check: ensure the file path is within destDir
+		if !strings.HasPrefix(targetPath, filepath.Clean(destDir)+string(os.PathSeparator)) {
+			return fmt.Errorf("invalid file path in ZIP: %s", file.Name)
+		}
+
+		if file.FileInfo().IsDir() {
+			// Create directory
+			if err := os.MkdirAll(targetPath, file.FileInfo().Mode()); err != nil {
+				return fmt.Errorf("failed to create directory %s: %w", targetPath, err)
+			}
+		} else {
+			// Extract file
+			if err := j.extractZipFile(file, targetPath); err != nil {
+				return fmt.Errorf("failed to extract file %s: %w", targetPath, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// extractZipFile extracts a single file from ZIP archive
+func (j *JavaTool) extractZipFile(file *zip.File, targetPath string) error {
+	// Create parent directory
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+		return err
+	}
+
+	// Open file in ZIP
+	reader, err := file.Open()
+	if err != nil {
+		return err
+	}
+	defer reader.Close()
+
+	// Ensure we have write permissions for the file
+	mode := file.FileInfo().Mode()
+	if mode&0200 == 0 {
+		mode |= 0200 // Add write permission for owner
+	}
+
+	// Create target file
+	targetFile, err := os.OpenFile(targetPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
+	if err != nil {
+		return err
+	}
+	defer targetFile.Close()
+
+	// Copy content
+	_, err = io.Copy(targetFile, reader)
+	return err
+}
+
+// extractTarXz extracts a tar.xz file using system tar command
+func (j *JavaTool) extractTarXz(archivePath, destDir string) error {
+	// Use system tar command for tar.xz files
+	cmd := fmt.Sprintf("tar -xf %s -C %s", archivePath, destDir)
+	logVerbose("Extracting tar.xz using system command: %s", cmd)
+
+	// This is a simplified implementation - in practice you'd want to use exec.Command
+	return fmt.Errorf("tar.xz extraction not yet implemented - please use tar.gz or ZIP format")
 }
