@@ -21,7 +21,6 @@ go.work
 dist/
 
 # Built binaries (but not wrapper scripts)
-mvx-binary
 mvx-dev
 /mvx-linux-*
 /mvx-darwin-*

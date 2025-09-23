@@ -18,9 +18,9 @@ if [ -n "$REQUESTED_VERSION" ]; then
     echo "🔧 Using specified version: $REQUESTED_VERSION"
     BOOTSTRAP_VERSION="$REQUESTED_VERSION"
 
-    # If main branch is specified, use development version
-    if [ "$REQUESTED_VERSION" = "main" ]; then
-        echo "📦 Installing from main branch (development version)"
+    # If dev version is specified, use development version
+    if [ "$REQUESTED_VERSION" = "dev" ]; then
+        echo "📦 Installing development version"
     fi
 else
     # Get latest release version
@@ -28,8 +28,8 @@ else
     LATEST_RELEASE=$(curl -s https://api.github.com/repos/gnodet/mvx/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 
     if [ -z "$LATEST_RELEASE" ]; then
-        echo "❌ Failed to get latest release, falling back to main branch"
-        BOOTSTRAP_VERSION="main"
+        echo "❌ Failed to get latest release, falling back to development version"
+        BOOTSTRAP_VERSION="dev"
     else
         echo "📦 Latest release: $LATEST_RELEASE"
         BOOTSTRAP_VERSION="$LATEST_RELEASE"
@@ -72,8 +72,8 @@ EOF
 fi
 
 # Update the version in the properties file to match the installed version
-if [ "$BOOTSTRAP_VERSION" = "main" ]; then
-    echo "📝 Setting version to 'dev' for main branch in mvx.properties"
+if [ "$BOOTSTRAP_VERSION" = "dev" ]; then
+    echo "📝 Setting version to 'dev' in mvx.properties"
     sed -i.bak "s/^mvxVersion=.*/mvxVersion=dev/" .mvx/mvx.properties && rm -f .mvx/mvx.properties.bak
 
     echo ""
@@ -109,8 +109,8 @@ echo "  3. Run './mvx update-bootstrap' to check for updates"
 echo "  4. Commit these files to your repository"
 echo ""
 echo "Advanced usage:"
-echo "  - Install development version: curl -fsSL ... | MVX_VERSION=main bash"
+echo "  - Install development version: curl -fsSL ... | MVX_VERSION=dev bash"
 echo "  - Install specific version: curl -fsSL ... | MVX_VERSION=v0.1.0 bash"
-echo "  - Or with command line argument: curl -fsSL ... | bash -s main"
+echo "  - Or with command line argument: curl -fsSL ... | bash -s dev"
 echo ""
 echo "For more information, see: https://github.com/gnodet/mvx/blob/main/BOOTSTRAP.md"
