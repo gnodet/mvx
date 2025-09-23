@@ -65,6 +65,40 @@ export MVX_USE_SYSTEM_GO=true      # Coming soon
 3. If compatible, creates a symlink to integrate with mvx's tool management
 4. If incompatible or unavailable, falls back to downloading
 
+## Version Overrides
+
+Need to temporarily use a different tool version without modifying your configuration? Use environment variable overrides:
+
+```bash
+# Use Java 21 instead of what's configured
+MVX_JAVA_VERSION=21 mvx setup
+
+# Use Maven 3.9.6 instead of what's configured
+MVX_MAVEN_VERSION=3.9.6 mvx build
+
+# Use multiple overrides together
+MVX_JAVA_VERSION=21 MVX_MAVEN_VERSION=4.0.0-rc-4 mvx setup
+
+# Test with different Python version
+MVX_PYTHON_VERSION=3.11 mvx test
+```
+
+**Supported override variables:**
+- `MVX_JAVA_VERSION` - Override Java version
+- `MVX_MAVEN_VERSION` - Override Maven version
+- `MVX_GO_VERSION` - Override Go version
+- `MVX_NODE_VERSION` - Override Node.js version
+- `MVX_PYTHON_VERSION` - Override Python version
+
+**Benefits:**
+- 🧪 **Testing**: Quickly test with different tool versions
+- 🚀 **CI/CD**: Use specific versions in different pipeline stages
+- 🐛 **Debugging**: Isolate issues by switching versions
+- 👥 **Team coordination**: Temporarily align on specific versions
+- 📝 **No config changes**: Keep your configuration file unchanged
+
+> **💡 Tip**: Use `MVX_VERBOSE=true` to see when version overrides are active. See the [Configuration Guide](/configuration#version-overrides) for complete details.
+
 ## Supported Tools
 
 ## Java Ecosystem

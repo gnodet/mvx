@@ -450,11 +450,29 @@ func (m *Manager) SetupProjectEnvironment(cfg *config.Config, projectPath string
 
 // resolveVersion resolves a version specification to a concrete version
 func (m *Manager) resolveVersion(toolName string, toolConfig config.ToolConfig) (string, error) {
+	// Check for environment variable override first
+	if overrideVersion := getToolVersionOverride(toolName); overrideVersion != "" {
+		logVerbose("Using version override from %s: %s", getToolVersionOverrideEnvVar(toolName), overrideVersion)
+		// Fast path: Check if override version is already concrete
+		if m.isConcreteVersion(toolName, overrideVersion) {
+			return overrideVersion, nil
+		}
+		// If override version needs resolution, use it instead of config version
+		overrideConfig := toolConfig
+		overrideConfig.Version = overrideVersion
+		return m.resolveVersionInternal(toolName, overrideConfig)
+	}
+
 	// Fast path: Check if version is already concrete (no resolution needed)
 	if m.isConcreteVersion(toolName, toolConfig.Version) {
 		return toolConfig.Version, nil
 	}
 
+	return m.resolveVersionInternal(toolName, toolConfig)
+}
+
+// resolveVersionInternal performs the actual version resolution logic
+func (m *Manager) resolveVersionInternal(toolName string, toolConfig config.ToolConfig) (string, error) {
 	distribution := toolConfig.Distribution
 
 	// Check cache first

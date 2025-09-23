@@ -273,6 +273,7 @@ For production environments, enable checksum verification:
 - [Learn about configuration options](/configuration)
 - [Explore supported tools](/tools)
 - [Discover custom commands](/commands)
+- [Use version overrides for testing](/configuration#version-overrides)
 - [Check out the GitHub repository](https://github.com/gnodet/mvx)
 
 ## Need Help?
