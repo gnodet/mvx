@@ -20,6 +20,14 @@ curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-mvx.sh | sh
 
 This installs mvx to `~/.mvx/bin/mvx` and adds it to your PATH.
 
+### Development Version
+
+Install the latest development version (may be unstable):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-mvx.sh | MVX_VERSION=dev bash
+```
+
 ### Manual Installation
 
 1. Download the latest release for your platform from [GitHub Releases](https://github.com/gnodet/mvx/releases)

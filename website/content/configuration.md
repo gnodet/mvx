@@ -6,7 +6,7 @@ layout: page
 
 # Configuration Guide
 
-mvx uses a JSON5 configuration file (`.mvx/config.json5`) to define your project's tools, commands, and settings. JSON5 allows comments and unquoted keys for better readability.
+mvx uses a JSON5 configuration file (`.mvx/config.json5`) to define your project's tools, commands, and settings. JSON5 allows comments, unquoted keys, trailing commas, and line continuation for better readability and maintainability.
 
 ## Configuration File Structure
 
@@ -17,7 +17,7 @@ mvx uses a JSON5 configuration file (`.mvx/config.json5`) to define your project
     name: "my-project",
     description: "Optional project description"
   },
-  
+
   // Tool definitions
   tools: {
     maven: { version: "3.9.6" },
@@ -25,7 +25,7 @@ mvx uses a JSON5 configuration file (`.mvx/config.json5`) to define your project
     go: { version: "1.21.0" },
     node: { version: "20.0.0" }
   },
-  
+
   // Custom commands
   commands: {
     build: {
@@ -35,10 +35,58 @@ mvx uses a JSON5 configuration file (`.mvx/config.json5`) to define your project
     test: {
       description: "Run tests",
       script: "mvn test"
+    },
+    // Multi-line scripts with line continuation
+    "complex-build": {
+      description: "Complex build with multiple steps",
+      script: "mvn clean compile && \
+               mvn test && \
+               mvn package"
     }
-  },
-  
+  }
+}
+```
 
+## JSON5 Features
+
+mvx supports all standard JSON5 features for enhanced configuration readability:
+
+### Comments
+```json5
+{
+  // Single-line comments
+  tools: {
+    /* Multi-line comments
+       for detailed explanations */
+    maven: { version: "3.9.6" }
+  }
+}
+```
+
+### Unquoted Keys and Trailing Commas
+```json5
+{
+  tools: {
+    maven: { version: "3.9.6" },
+    java: { version: "21" },  // Trailing comma allowed
+  },
+}
+```
+
+### Line Continuation
+Use backslash (`\`) for multi-line strings:
+
+```json5
+{
+  commands: {
+    deploy: {
+      description: "Deploy with multiple steps",
+      script: "echo 'Starting deployment...' && \
+               mvn clean package && \
+               docker build -t myapp . && \
+               docker push myapp:latest"
+    }
+  }
 }
 ```
 
@@ -244,6 +292,14 @@ Define custom commands that become available as `./mvx <command>`:
         "mvn test",
         "mvn package"
       ]
+    },
+    // Alternative: single script with line continuation
+    "full-build-single": {
+      description: "Complete build as single command",
+      script: "mvn clean && \
+               mvn compile && \
+               mvn test && \
+               mvn package"
     }
   }
 }
@@ -389,6 +445,30 @@ export MVX_RETRY_DELAY="5s"
 - **CI/CD systems**: Configure longer timeouts for reliable builds
 - **Corporate networks**: Handle proxy delays and security scanning
 - **Apache servers**: Some Apache servers (like archive.apache.org) can be slow
+
+#### Development Version Control
+
+Control which version of mvx to use:
+
+```bash
+# Use development version (built locally as mvx-dev)
+export MVX_VERSION=dev
+
+# Use specific release version
+export MVX_VERSION=0.3.0
+
+# Use latest stable version (default)
+export MVX_VERSION=latest
+```
+
+**Development Binary Priority:**
+- Development binaries (`mvx-dev`) are only used when `MVX_VERSION=dev` is explicitly set
+- Specific versions (e.g., `MVX_VERSION=0.3.0`) always take precedence over local development binaries
+- This ensures consistent behavior across environments
+
+**Development Binary Locations:**
+1. Project-specific: `./mvx-dev` (current directory)
+2. Global development: `~/.mvx/dev/mvx` (shared across projects)
 
 #### Other System Variables
 
