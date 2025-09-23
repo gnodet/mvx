@@ -46,8 +46,8 @@
     },
 
     build: {
-      description: "Build mvx binary with platform-optimized settings",
-      script: "go build -o mvx-binary .",
+      description: "Build mvx binary with platform-optimized settings and install to ~/.mvx/dev/",
+      script: "go build -o mvx-dev . && mkdir -p ~/.mvx/dev && cp mvx-dev ~/.mvx/dev/mvx && echo '✅ Built mvx-dev and installed to ~/.mvx/dev/mvx'",
       override: true
     },
 
@@ -96,7 +96,7 @@
 
     clean: {
       description: "Clean build artifacts",
-      script: "rm -f mvx-binary mvx-dev && rm -rf dist/ && rm -rf .mvx/local/ .mvx/tools/ .mvx/versions/",
+      script: "rm -f mvx-dev && rm -rf dist/ && rm -rf .mvx/local/ .mvx/tools/ .mvx/versions/ && rm -f ~/.mvx/dev/mvx && echo '🧹 Cleaned local and global dev binaries'",
       override: true
     }
   }
