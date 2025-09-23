@@ -61,6 +61,10 @@ func TestMvxBinary(t *testing.T) {
 	t.Run("CustomCommands", func(t *testing.T) {
 		testCustomCommands(t, mvxBinary)
 	})
+
+	t.Run("MavenArgumentParsing", func(t *testing.T) {
+		testMavenArgumentParsing(t, mvxBinary)
+	})
 }
 
 func findMvxBinary(t *testing.T) string {
@@ -398,4 +402,260 @@ func buildCurrentVersionForBenchmark(b *testing.B) bool {
 	}
 	b.Logf("Successfully built current version")
 	return true
+}
+
+// testMavenArgumentParsing tests the enhanced Maven argument parsing functionality
+func testMavenArgumentParsing(t *testing.T, mvxBinary string) {
+	// Create a temporary directory for testing
+	tempDir, err := os.MkdirTemp("", "mvx-maven-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp directory: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create a minimal Maven project structure
+	setupMavenTestProject(t, tempDir)
+
+	// Change to the test directory
+	originalDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current directory: %v", err)
+	}
+	defer os.Chdir(originalDir)
+
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("Failed to change to temp directory: %v", err)
+	}
+
+	t.Run("MavenVersionFlag", func(t *testing.T) {
+		testMavenVersionFlag(t, mvxBinary)
+	})
+
+	t.Run("MavenDebugFlag", func(t *testing.T) {
+		testMavenDebugFlag(t, mvxBinary)
+	})
+
+	t.Run("MavenProfileFlag", func(t *testing.T) {
+		testMavenProfileFlag(t, mvxBinary)
+	})
+
+	t.Run("CombinedMvxMavenFlags", func(t *testing.T) {
+		testCombinedMvxMavenFlags(t, mvxBinary)
+	})
+
+	t.Run("BackwardCompatibility", func(t *testing.T) {
+		testBackwardCompatibility(t, mvxBinary)
+	})
+
+	t.Run("ComplexMavenCommands", func(t *testing.T) {
+		testComplexMavenCommands(t, mvxBinary)
+	})
+
+	t.Run("MavenArgumentParsingErrorCases", func(t *testing.T) {
+		testMavenArgumentParsingErrorCases(t, mvxBinary)
+	})
+}
+
+// setupMavenTestProject creates a minimal Maven project for testing
+func setupMavenTestProject(t *testing.T, dir string) {
+	// Create .mvx directory
+	mvxDir := filepath.Join(dir, ".mvx")
+	if err := os.MkdirAll(mvxDir, 0755); err != nil {
+		t.Fatalf("Failed to create .mvx directory: %v", err)
+	}
+
+	// Create mvx configuration
+	configContent := `{
+  project: {
+    name: "maven-test-project"
+  },
+  tools: {
+    maven: {
+      version: "3.9.6"
+    },
+    java: {
+      version: "17"
+    }
+  }
+}`
+
+	configPath := filepath.Join(mvxDir, "config.json5")
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to write config file: %v", err)
+	}
+
+	// Create a minimal pom.xml
+	pomContent := `<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>maven-test</artifactId>
+    <version>1.0.0</version>
+
+    <properties>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+    </properties>
+</project>`
+
+	pomPath := filepath.Join(dir, "pom.xml")
+	if err := os.WriteFile(pomPath, []byte(pomContent), 0644); err != nil {
+		t.Fatalf("Failed to write pom.xml: %v", err)
+	}
+}
+
+// testMavenVersionFlag tests that Maven -V flag works without -- separator
+func testMavenVersionFlag(t *testing.T, mvxBinary string) {
+	cmd := exec.Command(mvxBinary, "mvn", "-V")
+	output, _ := cmd.CombinedOutput()
+
+	// Maven -V should work but may fail due to missing goals, that's expected
+	outputStr := string(output)
+
+	// Check that we get Maven version output (not mvx argument parsing error)
+	if strings.Contains(outputStr, "unknown shorthand flag") {
+		t.Errorf("Maven -V flag should not trigger mvx argument parsing error. Output: %s", outputStr)
+	}
+
+	// Should contain Maven version information
+	if !strings.Contains(outputStr, "Apache Maven") {
+		t.Errorf("Expected Maven version output to contain 'Apache Maven'. Output: %s", outputStr)
+	}
+
+	t.Logf("Maven -V flag test passed. Output contains Maven version info.")
+}
+
+// testMavenDebugFlag tests that Maven -X flag works
+func testMavenDebugFlag(t *testing.T, mvxBinary string) {
+	cmd := exec.Command(mvxBinary, "mvn", "-X", "validate")
+	output, _ := cmd.CombinedOutput()
+
+	outputStr := string(output)
+
+	// Check that we don't get mvx argument parsing error
+	if strings.Contains(outputStr, "unknown shorthand flag") {
+		t.Errorf("Maven -X flag should not trigger mvx argument parsing error. Output: %s", outputStr)
+	}
+
+	// Should contain debug output indicators
+	if !strings.Contains(outputStr, "[DEBUG]") && !strings.Contains(outputStr, "Debug") {
+		t.Errorf("Expected Maven debug output to contain debug indicators. Output: %s", outputStr)
+	}
+
+	t.Logf("Maven -X flag test passed. Output contains debug information.")
+}
+
+// testMavenProfileFlag tests that Maven -P flag works
+func testMavenProfileFlag(t *testing.T, mvxBinary string) {
+	cmd := exec.Command(mvxBinary, "mvn", "-Pnonexistent-profile", "validate")
+	output, _ := cmd.CombinedOutput()
+
+	outputStr := string(output)
+
+	// Check that we don't get mvx argument parsing error
+	if strings.Contains(outputStr, "unknown shorthand flag") {
+		t.Errorf("Maven -P flag should not trigger mvx argument parsing error. Output: %s", outputStr)
+	}
+
+	// Should get Maven profile error (expected since profile doesn't exist)
+	if !strings.Contains(outputStr, "could not be activated") && !strings.Contains(outputStr, "profile") {
+		t.Errorf("Expected Maven profile error message. Output: %s", outputStr)
+	}
+
+	t.Logf("Maven -P flag test passed. Maven processed the profile flag.")
+}
+
+// testCombinedMvxMavenFlags tests combining mvx global flags with Maven flags
+func testCombinedMvxMavenFlags(t *testing.T, mvxBinary string) {
+	cmd := exec.Command(mvxBinary, "--verbose", "mvn", "-V")
+	output, _ := cmd.CombinedOutput()
+
+	outputStr := string(output)
+
+	// Check that we don't get mvx argument parsing error
+	if strings.Contains(outputStr, "unknown shorthand flag") {
+		t.Errorf("Combined flags should not trigger mvx argument parsing error. Output: %s", outputStr)
+	}
+
+	// Should contain Maven version information (Maven -V processed)
+	if !strings.Contains(outputStr, "Apache Maven") {
+		t.Errorf("Expected Maven version output. Output: %s", outputStr)
+	}
+
+	// Note: We can't easily test for verbose output since it goes to stderr
+	// and the verbose flag affects mvx internal logging
+
+	t.Logf("Combined mvx --verbose and Maven -V flags test passed.")
+}
+
+// testBackwardCompatibility tests that -- separator still works with warnings
+func testBackwardCompatibility(t *testing.T, mvxBinary string) {
+	cmd := exec.Command(mvxBinary, "mvn", "--", "-V")
+	output, _ := cmd.CombinedOutput()
+
+	outputStr := string(output)
+
+	// Should contain migration warning
+	if !strings.Contains(outputStr, "no longer needed") || !strings.Contains(outputStr, "Warning") {
+		t.Errorf("Expected backward compatibility warning message. Output: %s", outputStr)
+	}
+
+	// Should still contain Maven version information (functionality preserved)
+	if !strings.Contains(outputStr, "Apache Maven") {
+		t.Errorf("Expected Maven version output with -- separator. Output: %s", outputStr)
+	}
+
+	t.Logf("Backward compatibility test passed. Warning shown and functionality preserved.")
+}
+
+// testComplexMavenCommands tests complex Maven commands with multiple flags
+func testComplexMavenCommands(t *testing.T, mvxBinary string) {
+	// Test complex Maven command with multiple flags
+	cmd := exec.Command(mvxBinary, "mvn", "-X", "-Dmaven.test.skip=true", "validate")
+	output, _ := cmd.CombinedOutput()
+
+	outputStr := string(output)
+
+	// Check that we don't get mvx argument parsing error
+	if strings.Contains(outputStr, "unknown shorthand flag") {
+		t.Errorf("Complex Maven command should not trigger mvx argument parsing error. Output: %s", outputStr)
+	}
+
+	// Should contain debug output (from -X flag)
+	if !strings.Contains(outputStr, "[DEBUG]") && !strings.Contains(outputStr, "Debug") {
+		t.Errorf("Expected debug output from -X flag. Output: %s", outputStr)
+	}
+
+	t.Logf("Complex Maven command test passed.")
+}
+
+// testMavenArgumentParsingErrorCases tests error scenarios
+func testMavenArgumentParsingErrorCases(t *testing.T, mvxBinary string) {
+	// Test that mvx help for mvn command works
+	cmd := exec.Command(mvxBinary, "help", "mvn")
+	output, _ := cmd.CombinedOutput()
+
+	outputStr := string(output)
+
+	// Should show mvx mvn command help
+	if !strings.Contains(outputStr, "Run Apache Maven") {
+		t.Errorf("Expected mvx mvn command help. Output: %s", outputStr)
+	}
+
+	// Test that Maven's --help is passed through correctly (shows Maven help, not mvx help)
+	cmd2 := exec.Command(mvxBinary, "mvn", "--help")
+	output2, _ := cmd2.CombinedOutput()
+
+	outputStr2 := string(output2)
+
+	// Should show Maven's help (contains Maven-specific options)
+	if !strings.Contains(outputStr2, "usage: mvn") || !strings.Contains(outputStr2, "--batch-mode") {
+		t.Errorf("Expected Maven help output. Output: %s", outputStr2)
+	}
+
+	t.Logf("Maven argument parsing error cases test passed.")
 }
