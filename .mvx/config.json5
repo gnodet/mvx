@@ -47,7 +47,7 @@
 
     build: {
       description: "Build mvx binary with platform-optimized settings",
-      script: "go build -o mvx-binary . && echo 'Installing global development binary...' && mkdir -p ~/.mvx/dev && cp mvx-binary ~/.mvx/dev/mvx && chmod +x ~/.mvx/dev/mvx && echo '✅ Global development binary installed at ~/.mvx/dev/mvx' && echo '   All projects using mvxVersion=dev will now use this binary automatically'",
+      script: "go build -o mvx-dev . && echo 'Installing global development binary...' && mkdir -p ~/.mvx/dev && cp mvx-dev ~/.mvx/dev/mvx && chmod +x ~/.mvx/dev/mvx && echo '✅ Global development binary installed at ~/.mvx/dev/mvx' && echo '   All projects using mvxVersion=dev will now use this binary automatically'",
       override: true
     },
 
@@ -96,13 +96,7 @@
 
     clean: {
       description: "Clean build artifacts",
-      script: "rm -f mvx-binary && rm -rf dist/ && rm -f ~/.mvx/dev/mvx && echo '🧹 Cleaned local and global dev binaries'",
-      override: true
-    },
-
-    clean: {
-      description: "Clean build artifacts",
-      script: "rm -f mvx-binary mvx-dev && rm -rf dist/ && rm -rf .mvx/local/ .mvx/tools/ .mvx/versions/",
+      script: "rm -f mvx-dev && rm -rf dist/ && rm -f ~/.mvx/dev/mvx && echo '🧹 Cleaned local and global dev binaries'",
       override: true
     }
   }
