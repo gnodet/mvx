@@ -2,6 +2,7 @@ package tools
 
 import (
 	"os"
+	"os/exec"
 	"testing"
 
 	"github.com/gnodet/mvx/pkg/config"
@@ -49,6 +50,7 @@ func TestMavenToolWithSystemMaven(t *testing.T) {
 	originalUseSystemMaven := os.Getenv("MVX_USE_SYSTEM_MAVEN")
 	originalMavenHome := os.Getenv("MAVEN_HOME")
 	originalM2Home := os.Getenv("M2_HOME")
+	originalPath := os.Getenv("PATH")
 	defer func() {
 		if originalUseSystemMaven != "" {
 			os.Setenv("MVX_USE_SYSTEM_MAVEN", originalUseSystemMaven)
@@ -65,6 +67,8 @@ func TestMavenToolWithSystemMaven(t *testing.T) {
 		} else {
 			os.Unsetenv("M2_HOME")
 		}
+		// Restore original PATH
+		os.Setenv("PATH", originalPath)
 	}()
 
 	// Create a mock manager
@@ -79,24 +83,32 @@ func TestMavenToolWithSystemMaven(t *testing.T) {
 	os.Unsetenv("MVX_USE_SYSTEM_MAVEN")
 	os.Unsetenv("MAVEN_HOME")
 	os.Unsetenv("M2_HOME")
+	// Set empty PATH to ensure no Maven is found in system PATH
+	os.Setenv("PATH", "")
 
 	cfg := config.ToolConfig{
-		Version: "3.9.6",
+		Version: "3.9.999", // Use a version that's definitely not installed
 	}
 
-	// IsInstalled should return false when no Maven is installed and MVX_USE_SYSTEM_MAVEN is not set
-	if mavenTool.IsInstalled("3.9.6", cfg) {
-		t.Error("IsInstalled should return false when no Maven is installed")
+	// IsInstalled should return false when the specific Maven version is not installed and MVX_USE_SYSTEM_MAVEN is not set
+	if mavenTool.IsInstalled("3.9.999", cfg) {
+		t.Error("IsInstalled should return false when the specific Maven version is not installed")
 	}
 
 	// Test with MVX_USE_SYSTEM_MAVEN=true but no MAVEN_HOME or M2_HOME
 	os.Setenv("MVX_USE_SYSTEM_MAVEN", "true")
 	os.Unsetenv("MAVEN_HOME")
 	os.Unsetenv("M2_HOME")
+	// Keep empty PATH to ensure no Maven is found in system PATH
+
+	// Verify that mvn is not found in PATH
+	if _, err := exec.LookPath("mvn"); err == nil {
+		t.Skip("Maven found in PATH even with empty PATH - skipping test (system-dependent behavior)")
+	}
 
 	// IsInstalled should return false when Maven environment variables are not set
-	// (unless mvn is found in PATH with a compatible version)
-	if mavenTool.IsInstalled("3.9.6", cfg) {
-		t.Log("Maven found in PATH with compatible version")
+	// and Maven is not found in PATH
+	if mavenTool.IsInstalled("3.9.999", cfg) {
+		t.Error("IsInstalled should return false when MVX_USE_SYSTEM_MAVEN=true but no Maven is available")
 	}
 }
