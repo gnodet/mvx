@@ -132,58 +132,68 @@ jobs:
 
       - name: Generate release notes
         run: |
-          cat > release_notes.md << 'EOF'
+          # Make sure the changelog script is executable
+          chmod +x ./scripts/generate-changelog.sh
+
+          # Get the previous tag for changelog generation
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 ${{ steps.version.outputs.version }}^ 2>/dev/null || echo "")
+
+          # Generate the changelog section
+          if [ -n "$PREVIOUS_TAG" ]; then
+            echo "Generating changelog from $PREVIOUS_TAG to ${{ steps.version.outputs.version }}"
+            CHANGELOG=$(./scripts/generate-changelog.sh "$PREVIOUS_TAG" "${{ steps.version.outputs.version }}")
+          else
+            echo "No previous tag found, using generic changelog"
+            CHANGELOG="## 🚀 What's New
+
+          This is the first release of mvx!"
+          fi
+
+          # Create the complete release notes
+          cat > release_notes.md << EOF
           ## mvx ${{ steps.version.outputs.version_no_v }}
-          
+
+          $CHANGELOG
+
           ### 🚀 Installation
-          
+
           **Using the wrapper (recommended):**
-          ```bash
+          \`\`\`bash
           curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-wrapper.sh | bash
           ./mvx version
-          ```
-          
+          \`\`\`
+
           **Direct download:**
-          ```bash
+          \`\`\`bash
           # Linux x64
           curl -fsSL https://github.com/gnodet/mvx/releases/download/${{ steps.version.outputs.version }}/mvx-linux-amd64 -o mvx
           chmod +x mvx
-          
+
           # macOS x64
           curl -fsSL https://github.com/gnodet/mvx/releases/download/${{ steps.version.outputs.version }}/mvx-darwin-amd64 -o mvx
           chmod +x mvx
-          
+
           # Windows x64
           curl -fsSL https://github.com/gnodet/mvx/releases/download/${{ steps.version.outputs.version }}/mvx-windows-amd64.exe -o mvx.exe
-          ```
-          
+          \`\`\`
+
           ### 📦 Assets
-          
+
           | Platform | Architecture | Binary | Checksum |
           |----------|--------------|--------|----------|
-          | Linux | x64 | `mvx-linux-amd64` | `mvx-linux-amd64.sha256` |
-          | Linux | ARM64 | `mvx-linux-arm64` | `mvx-linux-arm64.sha256` |
-          | macOS | x64 | `mvx-darwin-amd64` | `mvx-darwin-amd64.sha256` |
-          | macOS | ARM64 | `mvx-darwin-arm64` | `mvx-darwin-arm64.sha256` |
-          | Windows | x64 | `mvx-windows-amd64.exe` | `mvx-windows-amd64.exe.sha256` |
-          
+          | Linux | x64 | \`mvx-linux-amd64\` | \`mvx-linux-amd64.sha256\` |
+          | Linux | ARM64 | \`mvx-linux-arm64\` | \`mvx-linux-arm64.sha256\` |
+          | macOS | x64 | \`mvx-darwin-amd64\` | \`mvx-darwin-amd64.sha256\` |
+          | macOS | ARM64 | \`mvx-darwin-arm64\` | \`mvx-darwin-arm64.sha256\` |
+          | Windows | x64 | \`mvx-windows-amd64.exe\` | \`mvx-windows-amd64.exe.sha256\` |
+
           ### 🔐 Verification
-          
+
           Verify checksums:
-          ```bash
+          \`\`\`bash
           curl -fsSL https://github.com/gnodet/mvx/releases/download/${{ steps.version.outputs.version }}/checksums.txt
           sha256sum -c checksums.txt
-          ```
-          
-          ### 📋 What's New
-          
-          - Universal build environment bootstrap tool
-          - Zero-dependency installation via wrapper scripts
-          - Cross-platform support (Linux, macOS, Windows)
-          - Multi-architecture support (amd64, arm64)
-          - Tool management for Java, Maven, Node.js, Python, and more
-          - Project-specific environment configuration
-          
+          \`\`\`
           EOF
 
       - name: Create release

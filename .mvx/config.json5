@@ -98,6 +98,11 @@
       description: "Clean build artifacts",
       script: "rm -f mvx-dev && rm -rf dist/ && rm -f ~/.mvx/dev/mvx && echo '🧹 Cleaned local and global dev binaries'",
       override: true
+    },
+
+    changelog: {
+      description: "Generate changelog between two git tags/commits",
+      script: "./scripts/generate-changelog.sh"
     }
   }
 }
