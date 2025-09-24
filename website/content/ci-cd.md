@@ -1,3 +1,8 @@
+---
+title: CI/CD Integration
+description: Complete guide to configuring mvx for your CI/CD pipelines
+layout: page
+---
 # CI/CD Integration
 
 This guide covers how to integrate mvx with various CI/CD platforms, with special focus on optimizing build performance through caching.
@@ -204,6 +209,80 @@ jobs:
         if: runner.os == 'Windows'
         run: .\mvx.cmd mvn clean verify
 ```
+
+## Version Overrides in CI/CD
+
+Use environment variable overrides to test different tool versions without modifying your configuration:
+
+### Matrix Testing with Version Overrides
+
+```yaml
+name: Test Multiple Tool Versions
+on: [push, pull_request]
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        java: [17, 21]
+        maven: [3.9.6, 4.0.0-rc-4]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache mvx tools
+        uses: actions/cache@v4
+        with:
+          path: ~/.mvx/tools
+          key: mvx-tools-${{ runner.os }}-java${{ matrix.java }}-maven${{ matrix.maven }}
+
+      - name: Test with specific versions
+        env:
+          MVX_JAVA_VERSION: ${{ matrix.java }}
+          MVX_MAVEN_VERSION: ${{ matrix.maven }}
+        run: |
+          ./mvx setup
+          ./mvx test
+```
+
+### Environment-Specific Versions
+
+```yaml
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Use Java 17 for tests, Java 21 for production builds
+      - name: Run tests
+        env:
+          MVX_JAVA_VERSION: 17
+        run: ./mvx test
+
+      - name: Build for production
+        env:
+          MVX_JAVA_VERSION: 21
+          MVX_MAVEN_VERSION: 4.0.0-rc-4
+        run: ./mvx build
+```
+
+### Debugging CI Issues
+
+```yaml
+      - name: Debug with specific versions
+        env:
+          MVX_JAVA_VERSION: 21.0.2  # Use exact version for debugging
+          MVX_VERBOSE: true          # Enable verbose logging
+        run: ./mvx build
+```
+
+**Benefits:**
+- 🧪 **Test compatibility** across multiple tool versions
+- 🚀 **Stage-specific versions** (test vs production)
+- 🐛 **Debug issues** with specific tool versions
+- 📝 **No config changes** required
 
 ## Cache Key Strategies
 

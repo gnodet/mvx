@@ -470,6 +470,45 @@ export MVX_VERSION=latest
 1. Project-specific: `./mvx-dev` (current directory)
 2. Global development: `~/.mvx/dev/mvx` (shared across projects)
 
+#### Version Overrides
+
+Override tool versions specified in your configuration file using environment variables:
+
+```bash
+# Override Java version (uses Java 21 instead of config version)
+export MVX_JAVA_VERSION=21
+
+# Override Maven version (uses Maven 3.9.6 instead of config version)
+export MVX_MAVEN_VERSION=3.9.6
+
+# Override Go version
+export MVX_GO_VERSION=1.21.0
+
+# Override Node.js version
+export MVX_NODE_VERSION=20.0.0
+
+# Override Python version
+export MVX_PYTHON_VERSION=3.12.0
+
+# Use multiple overrides together
+export MVX_JAVA_VERSION=21
+export MVX_MAVEN_VERSION=4.0.0-rc-4
+mvx setup
+```
+
+**How version overrides work:**
+- ✅ **Takes precedence**: Environment variables override configuration file settings
+- ✅ **Temporary**: Only affects the current command execution
+- ✅ **Flexible**: Supports both exact versions (e.g., "21.0.2") and version patterns (e.g., "21")
+- ✅ **Verbose logging**: Use `MVX_VERBOSE=true` to see when overrides are active
+- ✅ **Version resolution**: Patterns like "21" are resolved to latest available (e.g., "21.0.2")
+
+**Use cases:**
+- **Testing**: Test your project with different tool versions
+- **CI/CD**: Use specific versions in different pipeline stages
+- **Debugging**: Quickly switch versions to isolate issues
+- **Team coordination**: Temporarily align on specific versions
+
 #### Other System Variables
 
 ```bash

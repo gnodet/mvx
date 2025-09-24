@@ -10,6 +10,18 @@ import (
 	"strings"
 )
 
+// isVerbose checks if verbose logging is enabled
+func isVerbose() bool {
+	return os.Getenv("MVX_VERBOSE") == "true"
+}
+
+// logVerbose prints verbose log messages
+func logVerbose(format string, args ...interface{}) {
+	if isVerbose() {
+		fmt.Printf("[VERBOSE] "+format+"\n", args...)
+	}
+}
+
 // useSystemTool checks if a system tool should be used instead of downloading
 // by checking the MVX_USE_SYSTEM_<TOOL> environment variable
 func useSystemTool(toolName string) bool {
@@ -20,6 +32,18 @@ func useSystemTool(toolName string) bool {
 // getSystemToolEnvVar returns the environment variable name for a tool
 func getSystemToolEnvVar(toolName string) string {
 	return fmt.Sprintf("MVX_USE_SYSTEM_%s", strings.ToUpper(toolName))
+}
+
+// getToolVersionOverride checks for environment variable override for tool version
+// Returns the override version if set, empty string otherwise
+func getToolVersionOverride(toolName string) string {
+	envVar := fmt.Sprintf("MVX_%s_VERSION", strings.ToUpper(toolName))
+	return os.Getenv(envVar)
+}
+
+// getToolVersionOverrideEnvVar returns the environment variable name for tool version override
+func getToolVersionOverrideEnvVar(toolName string) string {
+	return fmt.Sprintf("MVX_%s_VERSION", strings.ToUpper(toolName))
 }
 
 // SystemToolDetector provides methods for detecting and validating system tools
