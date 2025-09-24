@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -44,18 +45,29 @@ type ChecksumConfig struct {
 // CommandConfig represents a command definition
 type CommandConfig struct {
 	Description string             `json:"description" yaml:"description"`
-	Script      string             `json:"script" yaml:"script"`
+	Script      interface{}        `json:"script" yaml:"script"` // Can be string or PlatformScript
 	WorkingDir  string             `json:"working_dir,omitempty" yaml:"working_dir,omitempty"`
 	Requires    []string           `json:"requires,omitempty" yaml:"requires,omitempty"`
 	Args        []CommandArgConfig `json:"args,omitempty" yaml:"args,omitempty"`
 	Environment map[string]string  `json:"environment,omitempty" yaml:"environment,omitempty"`
+	Interpreter string             `json:"interpreter,omitempty" yaml:"interpreter,omitempty"` // "native" (default), "mvx-shell"
 
 	// Hooks for built-in commands
-	Pre  string `json:"pre,omitempty" yaml:"pre,omitempty"`   // Script to run before built-in command
-	Post string `json:"post,omitempty" yaml:"post,omitempty"` // Script to run after built-in command
+	Pre  interface{} `json:"pre,omitempty" yaml:"pre,omitempty"`   // Script to run before built-in command (string or PlatformScript)
+	Post interface{} `json:"post,omitempty" yaml:"post,omitempty"` // Script to run after built-in command (string or PlatformScript)
 
 	// Override built-in command behavior
 	Override bool `json:"override,omitempty" yaml:"override,omitempty"` // If true, replace built-in command entirely
+}
+
+// PlatformScript represents platform-specific script definitions
+type PlatformScript struct {
+	Windows string `json:"windows,omitempty" yaml:"windows,omitempty"`
+	Unix    string `json:"unix,omitempty" yaml:"unix,omitempty"`
+	Linux   string `json:"linux,omitempty" yaml:"linux,omitempty"`
+	MacOS   string `json:"macos,omitempty" yaml:"macos,omitempty"`
+	Darwin  string `json:"darwin,omitempty" yaml:"darwin,omitempty"` // Alias for macOS
+	Default string `json:"default,omitempty" yaml:"default,omitempty"`
 }
 
 // CommandArgConfig represents a command argument
@@ -167,15 +179,20 @@ func (c *Config) Validate() error {
 	for cmdName, cmdConfig := range c.Commands {
 		// For override commands or custom commands, script is required
 		if cmdConfig.Override || !isBuiltinCommand(cmdName) {
-			if cmdConfig.Script == "" {
+			if !HasValidScript(cmdConfig.Script) {
 				return fmt.Errorf("command %s: script is required", cmdName)
 			}
 		}
 		// For built-in commands with hooks, at least one of pre/post/script should be present
 		if isBuiltinCommand(cmdName) && !cmdConfig.Override {
-			if cmdConfig.Script == "" && cmdConfig.Pre == "" && cmdConfig.Post == "" {
+			if !HasValidScript(cmdConfig.Script) && !HasValidScript(cmdConfig.Pre) && !HasValidScript(cmdConfig.Post) {
 				return fmt.Errorf("command %s: at least one of script, pre, or post is required for built-in command hooks", cmdName)
 			}
+		}
+
+		// Validate interpreter field
+		if cmdConfig.Interpreter != "" && cmdConfig.Interpreter != "native" && cmdConfig.Interpreter != "mvx-shell" {
+			return fmt.Errorf("command %s: invalid interpreter '%s', must be 'native' or 'mvx-shell'", cmdName, cmdConfig.Interpreter)
 		}
 	}
 
@@ -230,7 +247,7 @@ func (c *Config) HasCommandOverride(commandName string) bool {
 // HasCommandHooks checks if a built-in command has pre/post hooks
 func (c *Config) HasCommandHooks(commandName string) bool {
 	if cmd, exists := c.Commands[commandName]; exists {
-		return isBuiltinCommand(commandName) && !cmd.Override && (cmd.Pre != "" || cmd.Post != "")
+		return isBuiltinCommand(commandName) && !cmd.Override && (HasValidScript(cmd.Pre) || HasValidScript(cmd.Post))
 	}
 	return false
 }
@@ -239,4 +256,229 @@ func (c *Config) HasCommandHooks(commandName string) bool {
 func (c *Config) GetCommandConfig(commandName string) (CommandConfig, bool) {
 	config, exists := c.Commands[commandName]
 	return config, exists
+}
+
+// ResolvePlatformScript resolves a script based on the current platform
+func ResolvePlatformScript(script interface{}) (string, error) {
+	switch s := script.(type) {
+	case string:
+		return s, nil // Simple string script
+	case map[string]interface{}:
+		// Convert to PlatformScript for easier handling
+		platformScript := PlatformScript{}
+
+		// Handle both simple string values and nested objects with script/interpreter
+		for platform, value := range s {
+			var scriptValue string
+
+			if str, ok := value.(string); ok {
+				scriptValue = str
+			} else if nested, ok := value.(map[string]interface{}); ok {
+				if scriptField, exists := nested["script"]; exists {
+					if scriptStr, ok := scriptField.(string); ok {
+						scriptValue = scriptStr
+					}
+				}
+			}
+
+			switch platform {
+			case "windows":
+				platformScript.Windows = scriptValue
+			case "unix":
+				platformScript.Unix = scriptValue
+			case "linux":
+				platformScript.Linux = scriptValue
+			case "macos":
+				platformScript.MacOS = scriptValue
+			case "darwin":
+				platformScript.Darwin = scriptValue
+			case "default":
+				platformScript.Default = scriptValue
+			}
+		}
+		return resolvePlatformScriptStruct(platformScript)
+	case PlatformScript:
+		return resolvePlatformScriptStruct(s)
+	default:
+		return "", fmt.Errorf("invalid script type: %T", script)
+	}
+}
+
+// resolvePlatformScriptStruct resolves a PlatformScript struct to a string
+func resolvePlatformScriptStruct(ps PlatformScript) (string, error) {
+	platform := runtime.GOOS
+
+	// Try specific platform first
+	switch platform {
+	case "windows":
+		if ps.Windows != "" {
+			return ps.Windows, nil
+		}
+	case "linux":
+		if ps.Linux != "" {
+			return ps.Linux, nil
+		}
+		// Fall back to unix for Linux
+		if ps.Unix != "" {
+			return ps.Unix, nil
+		}
+	case "darwin":
+		// Try macOS first, then darwin, then unix
+		if ps.MacOS != "" {
+			return ps.MacOS, nil
+		}
+		if ps.Darwin != "" {
+			return ps.Darwin, nil
+		}
+		if ps.Unix != "" {
+			return ps.Unix, nil
+		}
+	default:
+		// For other Unix-like systems, try unix
+		if ps.Unix != "" {
+			return ps.Unix, nil
+		}
+	}
+
+	// Fallback to default
+	if ps.Default != "" {
+		return ps.Default, nil
+	}
+
+	return "", fmt.Errorf("no script defined for platform %s", platform)
+}
+
+// ResolvePlatformScriptWithInterpreter resolves both script and interpreter from platform-specific configuration
+func ResolvePlatformScriptWithInterpreter(script interface{}, defaultInterpreter string) (string, string, error) {
+	switch s := script.(type) {
+	case string:
+		// Simple string scripts default to mvx-shell (cross-platform by nature)
+		interpreter := defaultInterpreter
+		if interpreter == "" {
+			interpreter = "mvx-shell"
+		}
+		return s, interpreter, nil
+	case map[string]interface{}:
+		platform := runtime.GOOS
+
+		// Try to find platform-specific configuration
+		var platformValue interface{}
+		var found bool
+
+		// Try specific platform first
+		switch platform {
+		case "windows":
+			if platformValue, found = s["windows"]; found {
+				break
+			}
+		case "linux":
+			if platformValue, found = s["linux"]; found {
+				break
+			}
+			// Fall back to unix for Linux
+			if platformValue, found = s["unix"]; found {
+				break
+			}
+		case "darwin":
+			// Try macOS first, then darwin, then unix
+			if platformValue, found = s["macos"]; found {
+				break
+			}
+			if platformValue, found = s["darwin"]; found {
+				break
+			}
+			if platformValue, found = s["unix"]; found {
+				break
+			}
+		default:
+			// For other Unix-like systems, try unix
+			if platformValue, found = s["unix"]; found {
+				break
+			}
+		}
+
+		// Fallback to default
+		if !found {
+			if platformValue, found = s["default"]; found {
+				// Use default
+			} else {
+				return "", "", fmt.Errorf("no script defined for platform %s", platform)
+			}
+		}
+
+		// Extract script and interpreter from platform value
+		if str, ok := platformValue.(string); ok {
+			// Platform-specific string scripts default to native (platform-specific by nature)
+			interpreter := defaultInterpreter
+			if interpreter == "" {
+				interpreter = "native"
+			}
+			return str, interpreter, nil
+		} else if nested, ok := platformValue.(map[string]interface{}); ok {
+			scriptStr := ""
+			interpreterStr := defaultInterpreter
+
+			if scriptField, exists := nested["script"]; exists {
+				if s, ok := scriptField.(string); ok {
+					scriptStr = s
+				}
+			}
+			if interpreterField, exists := nested["interpreter"]; exists {
+				if i, ok := interpreterField.(string); ok {
+					interpreterStr = i
+				}
+			}
+
+			// Platform-specific nested scripts default to native if no interpreter specified
+			if interpreterStr == "" {
+				interpreterStr = "native"
+			}
+
+			if scriptStr == "" {
+				return "", "", fmt.Errorf("no script defined in nested configuration for platform %s", platform)
+			}
+
+			return scriptStr, interpreterStr, nil
+		}
+
+		return "", "", fmt.Errorf("invalid script configuration for platform %s", platform)
+	case PlatformScript:
+		resolvedScript, err := resolvePlatformScriptStruct(s)
+		// Platform-specific scripts default to native
+		interpreter := defaultInterpreter
+		if interpreter == "" {
+			interpreter = "native"
+		}
+		return resolvedScript, interpreter, err
+	default:
+		return "", "", fmt.Errorf("invalid script type: %T", script)
+	}
+}
+
+// HasValidScript checks if a script field has a valid value
+func HasValidScript(script interface{}) bool {
+	switch s := script.(type) {
+	case string:
+		return s != ""
+	case map[string]interface{}:
+		// Check if any platform has a script defined
+		for _, value := range s {
+			if str, ok := value.(string); ok && str != "" {
+				return true
+			}
+			// Check for nested script objects with interpreter
+			if nested, ok := value.(map[string]interface{}); ok {
+				if scriptField, exists := nested["script"]; exists {
+					if scriptStr, ok := scriptField.(string); ok && scriptStr != "" {
+						return true
+					}
+				}
+			}
+		}
+		return false
+	case PlatformScript:
+		return s.Windows != "" || s.Unix != "" || s.Linux != "" || s.MacOS != "" || s.Darwin != "" || s.Default != ""
+	default:
+		return false
+	}
 }

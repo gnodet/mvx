@@ -35,10 +35,10 @@ layout: index
 
    <div class="feature-card">
        <div class="feature-icon">🌍</div>
-       <h3 class="feature-title">Cross-Platform Universal</h3>
+       <h3 class="feature-title">Cross-Platform Scripts</h3>
        <p class="feature-description">
-           Works seamlessly on <strong>Linux, macOS, and Windows</strong>. ARM64 and x86_64 architectures
-           supported. One tool, any platform, consistent results everywhere.
+           Write scripts that work on <strong>Linux, macOS, and Windows</strong>. Platform-specific scripts
+           or built-in cross-platform interpreter. No more "works on my machine" script issues.
        </p>
    </div>
 
@@ -96,7 +96,10 @@ layout: index
     "java": { "version": "21" }
   },
   "commands": {
-    "build": { "script": "mvn clean install" }
+    "build": {
+      "script": "mvn clean install",
+      "interpreter": "mvx-shell"
+    }
   }
 }</code></pre>
             </div>

@@ -641,6 +641,155 @@ commands:
         default: web
 ```
 
+## 🌍 Cross-Platform Scripts
+
+mvx provides powerful cross-platform script support with two approaches:
+
+### Platform-Specific Scripts
+
+Define different scripts for different operating systems:
+
+```json5
+{
+  commands: {
+    "start-db": {
+      description: "Start database service",
+      script: {
+        windows: "net start postgresql",
+        linux: "sudo systemctl start postgresql",
+        darwin: "brew services start postgresql",
+        unix: "echo 'Please start PostgreSQL manually'",  // Fallback for Unix-like systems
+        default: "echo 'Platform not supported'"          // Final fallback
+      }
+    }
+  }
+}
+```
+
+**Platform Resolution Order:**
+1. Exact platform match (`windows`, `linux`, `darwin`)
+2. Platform family (`unix` for Linux/macOS)
+3. `default` fallback
+4. Error if no match found
+
+### Cross-Platform Interpreter (mvx-shell)
+
+Use the built-in `mvx-shell` interpreter for truly portable scripts:
+
+```json5
+{
+  commands: {
+    "build-all": {
+      description: "Build all modules",
+      script: "cd frontend && npm run build && cd ../backend && mvn clean install -DskipTests",
+      interpreter: "mvx-shell"  // Cross-platform interpreter
+    },
+
+    "open-results": {
+      description: "Open build results",
+      script: "open target/",     // Works on Windows, macOS, and Linux
+      interpreter: "mvx-shell"
+    },
+
+    "setup-dev": {
+      description: "Setup development environment",
+      script: "mkdir -p logs temp && copy .env.example .env",
+      interpreter: "mvx-shell"
+    }
+  }
+}
+```
+
+**mvx-shell Commands:**
+- `cd <dir>` - Change directory (cross-platform)
+- `mkdir <dir>` - Create directories (with `-p` behavior)
+- `copy <src> <dst>` - Copy files
+- `rm <path>` - Remove files/directories
+- `echo <text>` - Print text
+- `open <path>` - Open files/directories (platform-appropriate)
+- `<tool> <args>` - Execute any external command
+
+**Command Chaining:**
+- `&&` - Execute next command only if previous succeeded
+- `||` - Execute next command only if previous failed
+- `;` - Execute commands sequentially regardless of success/failure
+- `|` - Simple pipe support (sequential execution for now)
+- `()` - Parentheses for grouping (basic support)
+
+### Mixed Approach
+
+Combine both approaches for maximum flexibility:
+
+```json5
+{
+  commands: {
+    "dev-setup": {
+      description: "Setup development environment",
+      script: {
+        windows: {
+          script: "mkdir logs && copy config\\dev.properties config\\app.properties",
+          interpreter: "mvx-shell"
+        },
+        unix: {
+          script: "mkdir -p logs && cp config/dev.properties config/app.properties",
+          interpreter: "native"  // Use system shell
+        }
+      }
+    }
+  }
+}
+```
+
+### Interpreter Options
+
+**Intelligent Defaults:**
+- **Simple scripts**: Default to `mvx-shell` (cross-platform by nature)
+- **Platform-specific scripts**: Default to `native` (platform-specific by nature)
+
+**Available Interpreters:**
+- **`native`**: Use system shell (`/bin/bash` on Unix, `cmd` on Windows)
+- **`mvx-shell`**: Use built-in cross-platform interpreter
+
+**Examples:**
+```json5
+{
+  // This defaults to mvx-shell (cross-platform)
+  script: "mkdir dist && copy target/*.jar dist/"
+}
+```
+
+```json5
+{
+  // This defaults to native (platform-specific)
+  script: {
+    windows: "net start postgresql",
+    unix: "sudo systemctl start postgresql"
+  }
+}
+```
+
+### Built-in Command Hooks
+
+Cross-platform scripts work with built-in command hooks too:
+
+```json5
+{
+  commands: {
+    "test": {
+      description: "Run tests with setup and cleanup",
+      pre: {
+        script: "mkdir -p test-results && echo Preparing tests",
+        interpreter: "mvx-shell"
+      },
+      post: {
+        script: "echo Tests completed && open test-results/",
+        interpreter: "mvx-shell"
+      }
+    }
+  }
+}
+```
+
 ## 🚦 Current Status
 
 **Early Development** - This project is in the conceptual and early implementation phase.
