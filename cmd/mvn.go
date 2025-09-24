@@ -77,15 +77,40 @@ Examples:
 		if err != nil {
 			return err
 		}
-		var env []string
+
+		// Create environment map starting with existing environment
+		envVars := make(map[string]string)
+		for _, envVar := range os.Environ() {
+			parts := strings.SplitN(envVar, "=", 2)
+			if len(parts) == 2 {
+				envVars[parts[0]] = parts[1]
+			}
+		}
+
+		// Override with mvx-managed environment variables (these take precedence)
 		for k, v := range envMap {
+			envVars[k] = v
+		}
+
+		// Convert back to slice format
+		var env []string
+		for k, v := range envVars {
 			env = append(env, fmt.Sprintf("%s=%s", k, v))
 		}
-		// Preserve existing environment variables
-		env = append(env, os.Environ()...)
 
 		mvnTool, _ := mgr.GetTool("maven")
-		bin, err := mvnTool.GetBinPath(toolCfg.Version, toolCfg)
+
+		// Resolve Maven version to handle any overrides
+		resolvedVersion, err := mgr.ResolveVersion("maven", toolCfg)
+		if err != nil {
+			return fmt.Errorf("failed to resolve Maven version: %w", err)
+		}
+
+		// Create resolved config for Maven
+		resolvedToolCfg := toolCfg
+		resolvedToolCfg.Version = resolvedVersion
+
+		bin, err := mvnTool.GetBinPath(resolvedVersion, resolvedToolCfg)
 		if err != nil {
 			return err
 		}

@@ -448,6 +448,11 @@ func (m *Manager) SetupProjectEnvironment(cfg *config.Config, projectPath string
 	return env, nil
 }
 
+// ResolveVersion resolves a version specification to a concrete version
+func (m *Manager) ResolveVersion(toolName string, toolConfig config.ToolConfig) (string, error) {
+	return m.resolveVersion(toolName, toolConfig)
+}
+
 // resolveVersion resolves a version specification to a concrete version
 func (m *Manager) resolveVersion(toolName string, toolConfig config.ToolConfig) (string, error) {
 	// Check for environment variable override first
