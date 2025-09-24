@@ -3,6 +3,7 @@ package shell
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -244,7 +245,7 @@ func TestMVXShell_Echo(t *testing.T) {
 	tempDir := t.TempDir()
 	shell := NewMVXShell(tempDir, os.Environ())
 
-	err := shell.echo([]string{"hello", "world"})
+	err := shell.echo([]string{"hello", "world"}, nil)
 	if err != nil {
 		t.Errorf("echo() error = %v", err)
 	}
@@ -632,6 +633,188 @@ func TestParseCommandsErrorCases(t *testing.T) {
 				t.Errorf("parseCommands() unexpected error = %v: %s", err, tt.description)
 			}
 		})
+	}
+}
+
+func TestMVXShell_EnvironmentVariables(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create environment with test variables
+	env := []string{
+		"TEST_VAR=test_value",
+		"PATH=/usr/bin:/bin",
+		"HOME=" + tempDir,
+	}
+	shell := NewMVXShell(tempDir, env)
+
+	tests := []struct {
+		name        string
+		command     Command
+		description string
+	}{
+		{
+			name: "command with environment variables",
+			command: Command{
+				Name: "echo",
+				Args: []string{"$TEST_VAR"},
+				Env: map[string]string{
+					"CUSTOM_VAR": "custom_value",
+				},
+			},
+			description: "Command should have access to both shell and command-specific environment variables",
+		},
+		{
+			name: "command overriding environment variable",
+			command: Command{
+				Name: "echo",
+				Args: []string{"$TEST_VAR"},
+				Env: map[string]string{
+					"TEST_VAR": "overridden_value",
+				},
+			},
+			description: "Command-specific environment variables should override shell environment",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Test that the command can be executed without error
+			err := shell.executeCommand(tt.command)
+			if err != nil {
+				t.Errorf("executeCommand() error = %v, description: %s", err, tt.description)
+			}
+		})
+	}
+}
+
+func TestMVXShell_VariableExpansion(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create environment with test variables
+	env := []string{
+		"TEST_VAR=hello",
+		"ANOTHER_VAR=world",
+		"PATH=/usr/bin:/bin",
+	}
+	shell := NewMVXShell(tempDir, env)
+
+	tests := []struct {
+		name     string
+		input    string
+		envVars  map[string]string
+		expected string
+	}{
+		{
+			name:     "simple variable expansion",
+			input:    "$TEST_VAR",
+			envVars:  nil,
+			expected: "hello",
+		},
+		{
+			name:     "multiple variable expansion",
+			input:    "$TEST_VAR $ANOTHER_VAR",
+			envVars:  nil,
+			expected: "hello world",
+		},
+		{
+			name:     "variable expansion with command-specific env",
+			input:    "$CUSTOM_VAR",
+			envVars:  map[string]string{"CUSTOM_VAR": "custom"},
+			expected: "custom",
+		},
+		{
+			name:     "variable expansion with override",
+			input:    "$TEST_VAR",
+			envVars:  map[string]string{"TEST_VAR": "overridden"},
+			expected: "overridden",
+		},
+		{
+			name:     "text with variable expansion",
+			input:    "Hello $TEST_VAR!",
+			envVars:  nil,
+			expected: "Hello hello!",
+		},
+		{
+			name:     "braced variable expansion",
+			input:    "${TEST_VAR}_suffix",
+			envVars:  nil,
+			expected: "hello_suffix",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create combined environment map for variable expansion
+			envMap := make(map[string]string)
+
+			// Start with shell environment
+			for _, envVar := range shell.env {
+				parts := strings.SplitN(envVar, "=", 2)
+				if len(parts) == 2 {
+					envMap[parts[0]] = parts[1]
+				}
+			}
+
+			// Override with command-specific environment variables
+			for key, value := range tt.envVars {
+				envMap[key] = value
+			}
+
+			result := shell.ExpandVariables(tt.input, envMap)
+			if result != tt.expected {
+				t.Errorf("ExpandVariables(%q) = %q, expected %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestMVXShell_CommandWithVariableExpansion(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create environment with test variables
+	env := []string{
+		"TEST_DIR=testdir",
+		"TEST_FILE=testfile.txt",
+	}
+	shell := NewMVXShell(tempDir, env)
+
+	// Test that commands properly expand variables
+	tests := []struct {
+		name        string
+		script      string
+		expectError bool
+		description string
+	}{
+		{
+			name:        "mkdir with variable expansion",
+			script:      "mkdir $TEST_DIR",
+			expectError: false,
+			description: "mkdir should expand variables in directory name",
+		},
+		{
+			name:        "echo with variable expansion",
+			script:      "echo Hello $TEST_DIR",
+			expectError: false,
+			description: "echo should expand variables in arguments",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := shell.Execute(tt.script)
+
+			if tt.expectError && err == nil {
+				t.Errorf("Expected error for script %q, but it succeeded", tt.script)
+			} else if !tt.expectError && err != nil {
+				t.Errorf("Script %q failed unexpectedly: %v", tt.script, err)
+			}
+		})
+	}
+
+	// Verify that the directory was created with the expanded name
+	expectedDir := filepath.Join(tempDir, "testdir")
+	if _, err := os.Stat(expectedDir); os.IsNotExist(err) {
+		t.Errorf("Directory with expanded name was not created: %s", expectedDir)
 	}
 }
 

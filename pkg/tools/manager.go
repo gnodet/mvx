@@ -448,7 +448,7 @@ func (m *Manager) SetupProjectEnvironment(cfg *config.Config, projectPath string
 	return env, nil
 }
 
-// ResolveVersion resolves a version specification to a concrete version
+// ResolveVersion resolves a version specification to a concrete version (public method)
 func (m *Manager) ResolveVersion(toolName string, toolConfig config.ToolConfig) (string, error) {
 	return m.resolveVersion(toolName, toolConfig)
 }

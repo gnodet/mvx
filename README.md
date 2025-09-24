@@ -2,7 +2,7 @@
 
 > A universal build environment bootstrap tool that goes beyond Maven
 
-📖 **[Documentation & Website](https://gnodet.github.io/mvx/)** | 🚀 **[Getting Started](https://gnodet.github.io/mvx/getting-started/)** | 🛠️ **[Tools](https://gnodet.github.io/mvx/tools/)**
+📖 **[Documentation & Website](https://gnodet.github.io/mvx/)** | 🚀 **[Getting Started](https://gnodet.github.io/mvx/getting-started/)** | 🛠️ **[Tools](https://gnodet.github.io/mvx/tools/)** | ⚙️ **[Interpreters](https://gnodet.github.io/mvx/interpreters/)**
 
 ## 🎯 Goals
 
@@ -388,6 +388,14 @@ The bootstrap scripts (`mvx` and `mvx.cmd`) are **shell/batch scripts** (not bin
 - [x] Verbose and quiet modes
 - [x] Built-in help system
 - [x] Command validation and error handling
+
+#### Command Execution & Interpreters
+
+- [x] **Multiple interpreter support** - Choose between native shell and cross-platform mvx-shell
+- [x] **Automatic PATH management** - mvx-managed tools automatically available in PATH
+- [x] **Environment variable support** - Global and command-specific environment variables
+- [x] **Intelligent interpreter selection** - Automatic selection based on script complexity
+- [x] **Cross-platform compatibility** - Commands work consistently across operating systems
 
 ### 🚧 Planned Features
 

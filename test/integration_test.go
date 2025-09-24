@@ -70,7 +70,7 @@ func TestMvxBinary(t *testing.T) {
 func findMvxBinary(t *testing.T) string {
 	// First try to build the current version
 	if buildCurrentVersion(t) {
-		binary := "../mvx-current"
+		binary := "../mvx-dev"
 		if _, err := os.Stat(binary); err == nil {
 			abs, _ := filepath.Abs(binary)
 			t.Logf("Using built mvx binary: %s", abs)
@@ -92,7 +92,7 @@ func findMvxBinary(t *testing.T) string {
 
 func buildCurrentVersion(t *testing.T) bool {
 	// Try to build the current version for testing
-	cmd := exec.Command("go", "build", "-o", "mvx-current", ".")
+	cmd := exec.Command("go", "build", "-o", "mvx-dev", ".")
 	cmd.Dir = ".."
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -393,7 +393,7 @@ func findMvxBinaryForBenchmark(b *testing.B, t *testing.T) string {
 
 func buildCurrentVersionForBenchmark(b *testing.B) bool {
 	// Try to build the current version for benchmarking
-	cmd := exec.Command("go", "build", "-o", "mvx-current", ".")
+	cmd := exec.Command("go", "build", "-o", "mvx-dev", ".")
 	cmd.Dir = ".."
 	output, err := cmd.CombinedOutput()
 	if err != nil {

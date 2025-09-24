@@ -44,6 +44,7 @@ func (s *MVXShell) Execute(script string) error {
 type Command struct {
 	Name string
 	Args []string
+	Env  map[string]string // Environment variables for this command
 }
 
 // CommandChain represents a chain of commands with operators
@@ -231,16 +232,64 @@ func parseTokens(tokens []Token) ([]CommandChain, error) {
 }
 
 // parseCommand parses a command string into Command struct
+// Supports environment variable assignments like: VAR=value command args
 func parseCommand(cmdStr string) (Command, error) {
 	fields := strings.Fields(cmdStr)
 	if len(fields) == 0 {
 		return Command{}, fmt.Errorf("empty command")
 	}
 
+	env := make(map[string]string)
+	var cmdStart int
+
+	// Parse environment variable assignments at the beginning
+	for i, field := range fields {
+		if strings.Contains(field, "=") && !strings.HasPrefix(field, "-") {
+			// This looks like an environment variable assignment
+			parts := strings.SplitN(field, "=", 2)
+			if len(parts) == 2 && isValidEnvVarName(parts[0]) {
+				env[parts[0]] = parts[1]
+				cmdStart = i + 1
+				continue
+			}
+		}
+		// First non-env-var field is the command
+		cmdStart = i
+		break
+	}
+
+	if cmdStart >= len(fields) {
+		return Command{}, fmt.Errorf("no command found after environment variables")
+	}
+
 	return Command{
-		Name: fields[0],
-		Args: fields[1:],
+		Name: fields[cmdStart],
+		Args: fields[cmdStart+1:],
+		Env:  env,
 	}, nil
+}
+
+// isValidEnvVarName checks if a string is a valid environment variable name
+func isValidEnvVarName(name string) bool {
+	if len(name) == 0 {
+		return false
+	}
+
+	// First character must be letter or underscore
+	first := name[0]
+	if !((first >= 'A' && first <= 'Z') || (first >= 'a' && first <= 'z') || first == '_') {
+		return false
+	}
+
+	// Remaining characters must be letters, digits, or underscores
+	for i := 1; i < len(name); i++ {
+		c := name[i]
+		if !((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_') {
+			return false
+		}
+	}
+
+	return true
 }
 
 // executeCommandChain executes a chain of commands with operators
@@ -294,22 +343,52 @@ func (s *MVXShell) executeCommandChain(chain CommandChain) error {
 
 // executeCommand executes a single command
 func (s *MVXShell) executeCommand(cmd Command) error {
-	switch cmd.Name {
+	// Create environment map for variable expansion
+	envMap := make(map[string]string)
+
+	// Start with shell environment
+	for _, envVar := range s.env {
+		parts := strings.SplitN(envVar, "=", 2)
+		if len(parts) == 2 {
+			envMap[parts[0]] = parts[1]
+		}
+	}
+
+	// Override with command-specific environment variables
+	for key, value := range cmd.Env {
+		envMap[key] = value
+	}
+
+	// Expand variables in command name and arguments
+	expandedName := s.ExpandVariables(cmd.Name, envMap)
+	expandedArgs := make([]string, len(cmd.Args))
+	for i, arg := range cmd.Args {
+		expandedArgs[i] = s.ExpandVariables(arg, envMap)
+	}
+
+	// Create new command with expanded values
+	expandedCmd := Command{
+		Name: expandedName,
+		Args: expandedArgs,
+		Env:  cmd.Env,
+	}
+
+	switch expandedCmd.Name {
 	case "cd":
-		return s.changeDirectory(cmd.Args)
+		return s.changeDirectory(expandedCmd.Args)
 	case "echo":
-		return s.echo(cmd.Args)
+		return s.echo(expandedCmd.Args, expandedCmd.Env)
 	case "mkdir":
-		return s.makeDirectory(cmd.Args)
+		return s.makeDirectory(expandedCmd.Args)
 	case "rm":
-		return s.remove(cmd.Args)
+		return s.remove(expandedCmd.Args)
 	case "copy", "cp":
-		return s.copy(cmd.Args)
+		return s.copy(expandedCmd.Args)
 	case "open":
-		return s.open(cmd.Args)
+		return s.open(expandedCmd.Args)
 	default:
 		// Execute as external command
-		return s.executeExternal(cmd)
+		return s.executeExternal(expandedCmd)
 	}
 }
 
@@ -333,10 +412,61 @@ func (s *MVXShell) changeDirectory(args []string) error {
 	return nil
 }
 
-// echo prints text to stdout
-func (s *MVXShell) echo(args []string) error {
+// echo prints text to stdout (variable expansion handled at command level)
+func (s *MVXShell) echo(args []string, cmdEnv map[string]string) error {
 	fmt.Println(strings.Join(args, " "))
 	return nil
+}
+
+// ExpandVariables expands $VAR and ${VAR} syntax in a string
+func (s *MVXShell) ExpandVariables(text string, envMap map[string]string) string {
+	result := text
+
+	// Handle ${VAR} syntax
+	for {
+		start := strings.Index(result, "${")
+		if start == -1 {
+			break
+		}
+		end := strings.Index(result[start:], "}")
+		if end == -1 {
+			break
+		}
+		end += start
+
+		varName := result[start+2 : end]
+		varValue := envMap[varName]
+		result = result[:start] + varValue + result[end+1:]
+	}
+
+	// Handle $VAR syntax (simple variable names)
+	for {
+		start := strings.Index(result, "$")
+		if start == -1 {
+			break
+		}
+
+		// Find the end of the variable name
+		end := start + 1
+		for end < len(result) {
+			c := result[end]
+			if !((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_') {
+				break
+			}
+			end++
+		}
+
+		if end == start+1 {
+			// Just a $ with no variable name, skip it
+			break
+		}
+
+		varName := result[start+1 : end]
+		varValue := envMap[varName]
+		result = result[:start] + varValue + result[end:]
+	}
+
+	return result
 }
 
 // makeDirectory creates directories
@@ -431,11 +561,58 @@ func (s *MVXShell) open(args []string) error {
 	return cmd.Run()
 }
 
+// logVerbose prints verbose log messages for mvx-shell
+func logVerbose(format string, args ...interface{}) {
+	if os.Getenv("MVX_VERBOSE") == "true" {
+		fmt.Printf("[VERBOSE] "+format+"\n", args...)
+	}
+}
+
 // executeExternal executes an external command
 func (s *MVXShell) executeExternal(cmd Command) error {
+	logVerbose("mvx-shell executing external command: %s %v", cmd.Name, cmd.Args)
+	logVerbose("mvx-shell working directory: %s", s.workDir)
+	logVerbose("mvx-shell environment variables count: %d", len(s.env))
+
 	execCmd := exec.Command(cmd.Name, cmd.Args...)
 	execCmd.Dir = s.workDir
-	execCmd.Env = s.env
+
+	// Start with the shell's environment
+	env := make([]string, len(s.env))
+	copy(env, s.env)
+
+	// Apply command-specific environment variables
+	if len(cmd.Env) > 0 {
+		// Create a map of existing environment variables for easy lookup
+		envMap := make(map[string]string)
+		for _, envVar := range s.env {
+			parts := strings.SplitN(envVar, "=", 2)
+			if len(parts) == 2 {
+				envMap[parts[0]] = parts[1]
+			}
+		}
+
+		// Override with command-specific environment variables
+		for key, value := range cmd.Env {
+			envMap[key] = value
+		}
+
+		// Convert back to slice format
+		env = make([]string, 0, len(envMap))
+		for key, value := range envMap {
+			env = append(env, fmt.Sprintf("%s=%s", key, value))
+		}
+	}
+
+	// Log PATH specifically
+	for _, envVar := range env {
+		if strings.HasPrefix(envVar, "PATH=") {
+			logVerbose("mvx-shell PATH in environment: %s", envVar)
+			break
+		}
+	}
+
+	execCmd.Env = env
 	execCmd.Stdout = os.Stdout
 	execCmd.Stderr = os.Stderr
 	execCmd.Stdin = os.Stdin

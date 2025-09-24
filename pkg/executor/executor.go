@@ -13,6 +13,13 @@ import (
 	"github.com/gnodet/mvx/pkg/tools"
 )
 
+// logVerbose prints verbose log messages
+func logVerbose(format string, args ...interface{}) {
+	if os.Getenv("MVX_VERBOSE") == "true" {
+		fmt.Printf("[VERBOSE] "+format+"\n", args...)
+	}
+}
+
 // Executor handles command execution with proper environment setup
 type Executor struct {
 	config      *config.Config
@@ -178,23 +185,28 @@ func (e *Executor) GetCommandInfo(commandName string) (*config.CommandConfig, er
 
 // setupEnvironment prepares the environment for command execution
 func (e *Executor) setupEnvironment(cmdConfig config.CommandConfig) ([]string, error) {
-	// Start with current environment
-	env := os.Environ()
+	// Create environment map starting with current environment
+	envVars := make(map[string]string)
+	for _, envVar := range os.Environ() {
+		parts := strings.SplitN(envVar, "=", 2)
+		if len(parts) == 2 {
+			envVars[parts[0]] = parts[1]
+		}
+	}
 
-	// Add global environment variables from config
+	// Add global environment variables from config (these override system ones)
 	globalEnv, err := e.toolManager.SetupEnvironment(e.config)
 	if err != nil {
 		return nil, err
 	}
 
-	// Add global environment variables
 	for key, value := range globalEnv {
-		env = append(env, fmt.Sprintf("%s=%s", key, value))
+		envVars[key] = value
 	}
 
-	// Add command-specific environment variables
+	// Add command-specific environment variables (these override global ones)
 	for key, value := range cmdConfig.Environment {
-		env = append(env, fmt.Sprintf("%s=%s", key, value))
+		envVars[key] = value
 	}
 
 	// Add tool paths to PATH
@@ -208,40 +220,59 @@ func (e *Executor) setupEnvironment(cmdConfig config.CommandConfig) ([]string, e
 			requiredTools = append(requiredTools, toolName)
 		}
 	}
+	logVerbose("Required tools for command: %v", requiredTools)
 
 	// Add tool bin directories to PATH
 	for _, toolName := range requiredTools {
 		if toolConfig, exists := e.config.Tools[toolName]; exists {
 			tool, err := e.toolManager.GetTool(toolName)
 			if err != nil {
+				logVerbose("Skipping tool %s: %v", toolName, err)
 				continue // Skip unknown tools
 			}
 
-			if tool.IsInstalled(toolConfig.Version, toolConfig) {
-				binPath, err := tool.GetBinPath(toolConfig.Version, toolConfig)
+			// Resolve version to handle any overrides
+			resolvedVersion, err := e.toolManager.ResolveVersion(toolName, toolConfig)
+			if err != nil {
+				logVerbose("Skipping tool %s: version resolution failed: %v", toolName, err)
+				continue // Skip tools with resolution errors
+			}
+
+			// Create resolved config
+			resolvedConfig := toolConfig
+			resolvedConfig.Version = resolvedVersion
+
+			if tool.IsInstalled(resolvedVersion, resolvedConfig) {
+				binPath, err := tool.GetBinPath(resolvedVersion, resolvedConfig)
 				if err != nil {
+					logVerbose("Skipping tool %s: failed to get bin path: %v", toolName, err)
 					continue
 				}
+				logVerbose("Adding %s bin path to PATH: %s", toolName, binPath)
 				pathDirs = append(pathDirs, binPath)
+			} else {
+				logVerbose("Tool %s version %s is not installed", toolName, resolvedVersion)
 			}
 		}
 	}
 
 	// Prepend tool paths to existing PATH
 	if len(pathDirs) > 0 {
-		currentPath := os.Getenv("PATH")
+		currentPath := envVars["PATH"]
 		newPath := strings.Join(pathDirs, string(os.PathListSeparator))
 		if currentPath != "" {
 			newPath = newPath + string(os.PathListSeparator) + currentPath
 		}
+		envVars["PATH"] = newPath
+		logVerbose("Updated PATH with %d tool directories: %s", len(pathDirs), newPath)
+	} else {
+		logVerbose("No tool directories added to PATH")
+	}
 
-		// Update PATH in environment
-		for i, envVar := range env {
-			if strings.HasPrefix(envVar, "PATH=") {
-				env[i] = "PATH=" + newPath
-				break
-			}
-		}
+	// Convert environment map back to slice format
+	var env []string
+	for key, value := range envVars {
+		env = append(env, fmt.Sprintf("%s=%s", key, value))
 	}
 
 	return env, nil
@@ -278,8 +309,11 @@ func (e *Executor) executeScript(script, workDir string, env []string) error {
 
 // executeScriptWithInterpreter executes a script using the specified interpreter
 func (e *Executor) executeScriptWithInterpreter(script, workDir string, env []string, interpreter string) error {
+	logVerbose("executeScriptWithInterpreter called with interpreter: '%s', script: '%s'", interpreter, script)
+
 	// Default to native interpreter if not specified
 	if interpreter == "" || interpreter == "native" {
+		logVerbose("Using native interpreter")
 		return e.executeNativeScript(script, workDir, env)
 	}
 
@@ -301,6 +335,18 @@ func (e *Executor) executeNativeScript(script, workDir string, env []string) err
 	if runtime.GOOS == "windows" {
 		shell = "cmd"
 		shellArgs = []string{"/c"}
+	}
+
+	logVerbose("Executing native script: %s", script)
+	logVerbose("Working directory: %s", workDir)
+	logVerbose("Environment variables count: %d", len(env))
+
+	// Log PATH specifically
+	for _, envVar := range env {
+		if strings.HasPrefix(envVar, "PATH=") {
+			logVerbose("PATH in environment: %s", envVar)
+			break
+		}
 	}
 
 	// Create command
