@@ -200,7 +200,10 @@ For production environments, enable checksum verification:
   commands: {
     "secure-build": {
       description: "Build with security verification",
-      script: "mvn clean verify -Dsecurity.check=true"
+      script: "mvn clean verify \
+               -Dsecurity.check=true \
+               -Dchecksum.verify=true && \
+               echo Security verification complete"
     }
   }
 }
@@ -218,12 +221,16 @@ For production environments, enable checksum verification:
   },
   commands: {
     build: {
-      description: "Build Go binary",
-      script: "go build -o bin/app ."
+      description: "Build Go binary with optimization",
+      script: "mkdir -p bin && \
+               go build -ldflags='-s -w' -o bin/app . && \
+               echo Binary built successfully"
     },
     test: {
       description: "Run tests with coverage",
-      script: "go test -v -cover ./..."
+      script: "go test -v -cover ./... && \
+               go test -race ./... && \
+               echo All tests passed"
     },
     run: {
       description: "Run the application",
@@ -246,19 +253,63 @@ For production environments, enable checksum verification:
   commands: {
     build: {
       description: "Build for production",
-      script: "npm run build"
+      script: "npm ci && \
+               npm run build && \
+               echo Production build complete"
     },
     dev: {
-      description: "Start development server",
-      script: "npm run dev"
+      description: "Start development server with hot reload",
+      script: "npm install && \
+               npm run dev && \
+               echo Development server started"
     },
     test: {
-      description: "Run tests",
-      script: "npm test"
+      description: "Run comprehensive tests",
+      script: "npm run test:unit && \
+               npm run test:integration && \
+               echo All tests completed"
     }
   }
 }
 ```
+
+## Cross-Platform Scripts
+
+mvx provides powerful cross-platform script support, making your commands work seamlessly across Windows, Linux, and macOS:
+
+### Platform-Specific Scripts
+
+```json5
+{
+  commands: {
+    "start-db": {
+      description: "Start database service",
+      script: {
+        windows: "net start postgresql",
+        linux: "sudo systemctl start postgresql",
+        darwin: "brew services start postgresql",
+        default: "echo 'Please start PostgreSQL manually'"
+      }
+    }
+  }
+}
+```
+
+### Cross-Platform Interpreter
+
+```json5
+{
+  commands: {
+    "build-all": {
+      description: "Build all modules",
+      script: "cd frontend && npm run build && cd ../backend && mvn clean install || echo Build failed"
+      // No interpreter specified - automatically uses mvx-shell (cross-platform)
+    }
+  }
+}
+```
+
+**Learn more**: [Cross-Platform Scripts Guide](/cross-platform-scripts)
 
 ## Key Benefits
 
@@ -271,6 +322,7 @@ For production environments, enable checksum verification:
 ## Next Steps
 
 - [Learn about configuration options](/configuration)
+- [Write cross-platform scripts](/cross-platform-scripts)
 - [Explore supported tools](/tools)
 - [Discover custom commands](/commands)
 - [Use version overrides for testing](/configuration#version-overrides)
@@ -279,6 +331,7 @@ For production environments, enable checksum verification:
 ## Need Help?
 
 - 📖 [Configuration Guide](/configuration)
+- 🌍 [Cross-Platform Scripts](/cross-platform-scripts)
 - 🔧 [Supported Tools](/tools)
 - 💬 [GitHub Discussions](https://github.com/gnodet/mvx/discussions)
 - 🐛 [Report Issues](https://github.com/gnodet/mvx/issues)

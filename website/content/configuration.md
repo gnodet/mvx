@@ -305,18 +305,142 @@ Define custom commands that become available as `./mvx <command>`:
 }
 ```
 
-### Platform-Specific Commands
+### Cross-Platform Scripts
 
-> **Note**: Platform-specific script syntax is not yet implemented. See [issue #21](https://github.com/gnodet/mvx/issues/21) for planned cross-platform script support.
+mvx provides powerful cross-platform script support with two approaches:
 
-For now, use conditional logic within scripts:
+#### Platform-Specific Scripts
+
+Define different scripts for different operating systems:
 
 ```json5
 {
   commands: {
     "start-db": {
-      description: "Start database (cross-platform)",
-      script: "if [[ \"$OSTYPE\" == \"msys\" ]]; then ./start-db.bat; else ./start-db.sh; fi"
+      description: "Start database service",
+      script: {
+        windows: "net start postgresql",
+        linux: "sudo systemctl start postgresql",
+        darwin: "brew services start postgresql",
+        unix: "echo 'Please start PostgreSQL manually'",  // Fallback for Unix-like systems
+        default: "echo 'Platform not supported'"          // Final fallback
+      }
+    }
+  }
+}
+```
+
+**Platform Resolution Order:**
+1. Exact platform match (`windows`, `linux`, `darwin`)
+2. Platform family (`unix` for Linux/macOS)
+3. `default` fallback
+4. Error if no match found
+
+#### Cross-Platform Interpreter (mvx-shell)
+
+Use the built-in `mvx-shell` interpreter for truly portable scripts:
+
+```json5
+{
+  commands: {
+    "build-all": {
+      description: "Build all modules",
+      script: "cd frontend && npm run build && cd ../backend && mvn clean install -DskipTests",
+      interpreter: "mvx-shell"  // Cross-platform interpreter
+    },
+
+    "open-results": {
+      description: "Open build results",
+      script: "open target/",     // Works on Windows, macOS, and Linux
+      interpreter: "mvx-shell"
+    },
+
+    "setup-dev": {
+      description: "Setup development environment",
+      script: "mkdir -p logs temp && copy .env.example .env",
+      interpreter: "mvx-shell"
+    }
+  }
+}
+```
+
+**mvx-shell Commands:**
+- `cd <dir>` - Change directory (cross-platform)
+- `mkdir <dir>` - Create directories (with `-p` behavior)
+- `copy <src> <dst>` - Copy files
+- `rm <path>` - Remove files/directories
+- `echo <text>` - Print text
+- `open <path>` - Open files/directories (platform-appropriate)
+- `<tool> <args>` - Execute any external command
+
+**Command Chaining:**
+- `&&` - Execute next command only if previous succeeded
+- `||` - Execute next command only if previous failed
+- `;` - Execute commands sequentially regardless of success/failure
+- `|` - Simple pipe support (sequential execution)
+- `()` - Parentheses for grouping (basic support)
+
+#### Mixed Approach
+
+Combine both approaches for maximum flexibility:
+
+```json5
+{
+  commands: {
+    "dev-setup": {
+      description: "Setup development environment",
+      script: {
+        windows: {
+          script: "mkdir logs && \
+                   copy config\\dev.properties config\\app.properties && \
+                   echo Windows development environment ready",
+          interpreter: "mvx-shell"
+        },
+        unix: {
+          script: "mkdir -p logs && \
+                   cp config/dev.properties config/app.properties && \
+                   echo Unix development environment ready",
+          interpreter: "native"  // Use system shell
+        }
+      }
+    }
+  }
+}
+```
+
+#### Interpreter Options
+
+**Intelligent Defaults:**
+- **Simple scripts**: Default to `mvx-shell` (cross-platform by nature)
+- **Platform-specific scripts**: Default to `native` (platform-specific by nature)
+
+**Available Interpreters:**
+- **`native`**: Use system shell (`/bin/bash` on Unix, `cmd` on Windows)
+- **`mvx-shell`**: Use built-in cross-platform interpreter
+
+**Examples:**
+```json5
+{
+  commands: {
+    // This defaults to mvx-shell (cross-platform)
+    "build": {
+      script: "mkdir dist && \
+               copy target/*.jar dist/ && \
+               echo Build artifacts copied to dist/"
+    },
+
+    // This defaults to native (platform-specific)
+    "start-db": {
+      script: {
+        windows: "net start postgresql",
+        unix: "sudo systemctl start postgresql"
+      }
+    },
+
+    // Explicit interpreter override
+    "custom": {
+      script: "echo hello",
+      interpreter: "native"  // Force native even for simple script
     }
   }
 }
@@ -344,6 +468,28 @@ You can add pre and post hooks to built-in mvx commands by defining them within 
         "echo 'Tests completed!'",
         "echo 'Generating reports...'"
       ]
+    }
+  }
+}
+```
+
+### Cross-Platform Hooks
+
+Hooks also support cross-platform scripts and interpreters:
+
+```json5
+{
+  commands: {
+    "test": {
+      description: "Run tests with cross-platform setup and cleanup",
+      pre: {
+        script: "mkdir -p test-results && echo Preparing test environment",
+        interpreter: "mvx-shell"
+      },
+      post: {
+        script: "echo Tests completed && open test-results/",
+        interpreter: "mvx-shell"
+      }
     }
   }
 }
@@ -568,10 +714,13 @@ Specify working directory for commands:
   commands: {
     "build-all": {
       description: "Build frontend and backend",
-      script: [
-        "cd frontend && npm run build",
-        "cd backend && mvn clean install"
-      ]
+      script: "cd frontend && \
+               npm run build && \
+               echo Frontend build complete && \
+               cd ../backend && \
+               mvn clean install && \
+               echo Backend build complete",
+      interpreter: "mvx-shell"
     },
     "dev-frontend": {
       description: "Start frontend development server",
@@ -602,19 +751,29 @@ Specify working directory for commands:
   commands: {
     "build-all": {
       description: "Build all services",
-      script: [
-        "cd user-service && mvn clean install",
-        "cd order-service && mvn clean install",
-        "cd notification-service && go build"
-      ]
+      script: "cd user-service && \
+               mvn clean install && \
+               echo User service built && \
+               cd ../order-service && \
+               mvn clean install && \
+               echo Order service built && \
+               cd ../notification-service && \
+               go build && \
+               echo Notification service built",
+      interpreter: "mvx-shell"
     },
     "test-all": {
       description: "Test all services",
-      script: [
-        "cd user-service && mvn test",
-        "cd order-service && mvn test",
-        "cd notification-service && go test ./..."
-      ]
+      script: "cd user-service && \
+               mvn test && \
+               echo User service tests passed && \
+               cd ../order-service && \
+               mvn test && \
+               echo Order service tests passed && \
+               cd ../notification-service && \
+               go test ./... && \
+               echo Notification service tests passed",
+      interpreter: "mvx-shell"
     }
   }
 }

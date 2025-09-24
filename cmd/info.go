@@ -123,11 +123,24 @@ func showCommandInfo(commandName string) error {
 		printInfo("")
 	}
 
-	// Show script
+	// Show script and resolved interpreter
 	printInfo("Script:")
-	scriptLines := strings.Split(strings.TrimSpace(cmdInfo.Script), "\n")
-	for _, line := range scriptLines {
-		printInfo("  %s", line)
+	resolvedScript, resolvedInterpreter, err := config.ResolvePlatformScriptWithInterpreter(cmdInfo.Script, cmdInfo.Interpreter)
+	if err != nil {
+		printInfo("  Error resolving script: %v", err)
+	} else {
+		scriptLines := strings.Split(strings.TrimSpace(resolvedScript), "\n")
+		for _, line := range scriptLines {
+			printInfo("  %s", line)
+		}
+	}
+
+	// Show resolved interpreter
+	printInfo("Interpreter: %s", resolvedInterpreter)
+	if cmdInfo.Interpreter != "" && cmdInfo.Interpreter != resolvedInterpreter {
+		printInfo("  (explicitly set to: %s)", cmdInfo.Interpreter)
+	} else if cmdInfo.Interpreter == "" {
+		printInfo("  (intelligent default)")
 	}
 	printInfo("")
 
