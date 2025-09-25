@@ -101,6 +101,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Get version
         id: version
@@ -136,12 +138,13 @@ jobs:
           chmod +x ./scripts/generate-changelog.sh
 
           # Get the previous tag for changelog generation
-          PREVIOUS_TAG=$(git describe --tags --abbrev=0 ${{ steps.version.outputs.version }}^ 2>/dev/null || echo "")
+          # Use the latest tag that exists (since current tag hasn't been created yet)
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
 
           # Generate the changelog section
           if [ -n "$PREVIOUS_TAG" ]; then
-            echo "Generating changelog from $PREVIOUS_TAG to ${{ steps.version.outputs.version }}"
-            CHANGELOG=$(./scripts/generate-changelog.sh "$PREVIOUS_TAG" "${{ steps.version.outputs.version }}")
+            echo "Generating changelog from $PREVIOUS_TAG to HEAD"
+            CHANGELOG=$(./scripts/generate-changelog.sh "$PREVIOUS_TAG" "HEAD")
           else
             echo "No previous tag found, using generic changelog"
             CHANGELOG="## 🚀 What's New
