@@ -1,11 +1,8 @@
 package tools
 
 import (
-	"archive/zip"
 	"fmt"
-	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -13,9 +10,24 @@ import (
 	"github.com/gnodet/mvx/pkg/config"
 )
 
+// Compile-time interface validation
+var _ Tool = (*MvndTool)(nil)
+
+// useSystemMvnd checks if system Mvnd should be used instead of downloading
+func useSystemMvnd() bool {
+	return UseSystemTool("mvnd")
+}
+
 // MvndTool implements Tool interface for Maven Daemon management
 type MvndTool struct {
-	manager *Manager
+	*BaseTool
+}
+
+// NewMvndTool creates a new Mvnd tool instance
+func NewMvndTool(manager *Manager) *MvndTool {
+	return &MvndTool{
+		BaseTool: NewBaseTool(manager, "mvnd"),
+	}
 }
 
 // Name returns the tool name
@@ -25,35 +37,21 @@ func (m *MvndTool) Name() string {
 
 // Install downloads and installs the specified mvnd version
 func (m *MvndTool) Install(version string, cfg config.ToolConfig) error {
-	installDir := m.manager.GetToolVersionDir("mvnd", version, "")
-
-	// Create installation directory
-	if err := os.MkdirAll(installDir, 0755); err != nil {
-		return fmt.Errorf("failed to create installation directory: %w", err)
-	}
-
-	// Get download URL
-	downloadURL := m.getDownloadURL(version)
-
-	// Download and extract
-	fmt.Printf("  ⏳ Downloading Maven Daemon %s...\n", version)
-	if err := m.downloadAndExtract(downloadURL, installDir, version, cfg); err != nil {
-		return fmt.Errorf("failed to download and extract: %w", err)
-	}
-
-	return nil
+	return m.StandardInstall(version, cfg, m.getDownloadURL)
 }
 
 // IsInstalled checks if the specified version is installed
 func (m *MvndTool) IsInstalled(version string, cfg config.ToolConfig) bool {
-	installDir := m.manager.GetToolVersionDir("mvnd", version, "")
-
-	// Check if mvnd exists in any subdirectory (mvnd archives have nested structure)
-	return m.findMvndExecutable(installDir) != ""
+	return m.StandardIsInstalled(version, cfg, m.GetPath, "mvnd")
 }
 
-// GetPath returns the installation path for the specified version
+// GetPath returns the binary path for the specified version (for PATH management)
 func (m *MvndTool) GetPath(version string, cfg config.ToolConfig) (string, error) {
+	return m.StandardGetPath(version, cfg, m.getInstalledPath, "mvnd")
+}
+
+// getInstalledPath returns the path for an installed Mvnd version
+func (m *MvndTool) getInstalledPath(version string, cfg config.ToolConfig) (string, error) {
 	installDir := m.manager.GetToolVersionDir("mvnd", version, "")
 
 	// mvnd archives typically extract to maven-mvnd-{version}-{platform}/
@@ -71,55 +69,39 @@ func (m *MvndTool) GetPath(version string, cfg config.ToolConfig) (string, error
 				mvndExe += ".cmd"
 			}
 			if _, err := os.Stat(mvndExe); err == nil {
-				return subPath, nil
+				return filepath.Join(subPath, "bin"), nil
 			}
 		}
 	}
 
-	return installDir, nil
-}
-
-// GetBinPath returns the binary path for the specified version
-func (m *MvndTool) GetBinPath(version string, cfg config.ToolConfig) (string, error) {
-	mvndHome, err := m.GetPath(version, cfg)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(mvndHome, "bin"), nil
+	return filepath.Join(installDir, "bin"), nil
 }
 
 // Verify checks if the installation is working correctly
 func (m *MvndTool) Verify(version string, cfg config.ToolConfig) error {
-	binPath, err := m.GetBinPath(version, cfg)
-	if err != nil {
-		return err
-	}
-
-	mvndExe := filepath.Join(binPath, "mvnd")
-	if runtime.GOOS == "windows" {
-		mvndExe += ".cmd"
-	}
-
-	// Run mvnd --version to verify installation
-	cmd := exec.Command(mvndExe, "--version")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("mvnd verification failed: %w\nOutput: %s", err, output)
-	}
-
-	// Check if output contains expected version
-	outputStr := string(output)
-	if !strings.Contains(outputStr, version) {
-		return fmt.Errorf("mvnd version mismatch: expected %s, got %s", version, outputStr)
-	}
-
-	return nil
+	return m.StandardVerify(version, cfg, m.GetPath, "mvnd", []string{"--version"})
 }
 
 // ListVersions returns available mvnd versions
 func (m *MvndTool) ListVersions() ([]string, error) {
 	registry := m.manager.GetRegistry()
 	return registry.GetMvndVersions()
+}
+
+// GetDownloadOptions returns download options specific to Maven Daemon
+func (m *MvndTool) GetDownloadOptions() DownloadOptions {
+	return DownloadOptions{
+		FileExtension: ".zip",
+		ExpectedType:  "application",
+		MinSize:       5 * 1024 * 1024,   // 5MB
+		MaxSize:       100 * 1024 * 1024, // 100MB
+		ArchiveType:   "zip",
+	}
+}
+
+// GetDisplayName returns the display name for Maven Daemon
+func (m *MvndTool) GetDisplayName() string {
+	return "Maven Daemon"
 }
 
 // getDownloadURL returns the download URL for the specified version
@@ -158,142 +140,4 @@ func (m *MvndTool) getPlatformString() string {
 	default:
 		return "linux-amd64" // fallback
 	}
-}
-
-// downloadAndExtract downloads and extracts Maven Daemon with fallback URL support
-func (m *MvndTool) downloadAndExtract(url, destDir, version string, cfg config.ToolConfig) error {
-	// Try primary URL first (dist.apache.org)
-	err := m.attemptDownloadAndExtract(url, destDir, version, cfg, "dist")
-	if err == nil {
-		return nil
-	}
-
-	// If primary URL fails, try archive URL as fallback
-	fmt.Printf("  🔄 Primary download failed, trying archive fallback...\n")
-	archiveURL := m.getArchiveDownloadURL(version)
-	if archiveURL != url {
-		err = m.attemptDownloadAndExtract(archiveURL, destDir, version, cfg, "archive")
-		if err == nil {
-			fmt.Printf("  ✅ Successfully downloaded from archive fallback\n")
-			return nil
-		}
-	}
-
-	return fmt.Errorf("Maven Daemon download failed from both dist and archive: %w", err)
-}
-
-// attemptDownloadAndExtract performs a single download attempt
-func (m *MvndTool) attemptDownloadAndExtract(url, destDir, version string, cfg config.ToolConfig, source string) error {
-	// Create temporary file for download
-	tmpFile, err := os.CreateTemp("", "mvnd-*.zip")
-	if err != nil {
-		return fmt.Errorf("failed to create temporary file: %w", err)
-	}
-	defer os.Remove(tmpFile.Name())
-	defer tmpFile.Close()
-
-	fmt.Printf("  ⏳ Downloading Maven Daemon %s from %s...\n", version, source)
-
-	// Configure robust download with checksum verification
-	config := DefaultDownloadConfig(url, tmpFile.Name())
-	config.ExpectedType = "application" // Accept various application types
-	config.MinSize = 10 * 1024 * 1024   // Minimum 10MB for Maven Daemon distributions
-	config.MaxSize = 100 * 1024 * 1024  // Maximum 100MB for Maven Daemon distributions
-	config.ToolName = "mvnd"            // For progress reporting
-	config.Version = version            // For checksum verification
-	config.Config = cfg                 // Tool configuration
-	config.ChecksumRegistry = m.manager.GetChecksumRegistry()
-
-	// Perform robust download with checksum verification
-	result, err := RobustDownload(config)
-	if err != nil {
-		return fmt.Errorf("Maven Daemon download failed from %s: %s", source, DiagnoseDownloadError(url, err))
-	}
-
-	fmt.Printf("  📦 Downloaded %d bytes from %s (%s)\n", result.Size, result.FinalURL, source)
-
-	// Close temp file before extraction
-	tmpFile.Close()
-
-	// Extract zip file
-	return m.extractZip(tmpFile.Name(), destDir)
-}
-
-// extractZip extracts a zip file to the destination directory
-func (m *MvndTool) extractZip(src, dest string) error {
-	reader, err := zip.OpenReader(src)
-	if err != nil {
-		return err
-	}
-	defer reader.Close()
-
-	// Create destination directory
-	if err := os.MkdirAll(dest, 0755); err != nil {
-		return err
-	}
-
-	// Extract files
-	for _, file := range reader.File {
-		path := filepath.Join(dest, file.Name)
-
-		// Security check: ensure path is within destination
-		if !strings.HasPrefix(path, filepath.Clean(dest)+string(os.PathSeparator)) {
-			return fmt.Errorf("invalid file path: %s", file.Name)
-		}
-
-		if file.FileInfo().IsDir() {
-			os.MkdirAll(path, file.FileInfo().Mode())
-			continue
-		}
-
-		// Create parent directories
-		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-			return err
-		}
-
-		// Extract file
-		fileReader, err := file.Open()
-		if err != nil {
-			return err
-		}
-
-		targetFile, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, file.FileInfo().Mode())
-		if err != nil {
-			fileReader.Close()
-			return err
-		}
-
-		_, err = io.Copy(targetFile, fileReader)
-		fileReader.Close()
-		targetFile.Close()
-
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// findMvndExecutable searches for mvnd executable in installation directory
-func (m *MvndTool) findMvndExecutable(installDir string) string {
-	mvndName := "mvnd"
-	if runtime.GOOS == "windows" {
-		mvndName = "mvnd.cmd"
-	}
-
-	// Walk through directory tree to find mvnd executable
-	var mvndPath string
-	filepath.Walk(installDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil
-		}
-		if !info.IsDir() && info.Name() == mvndName {
-			mvndPath = path
-			return filepath.SkipDir
-		}
-		return nil
-	})
-
-	return mvndPath
 }

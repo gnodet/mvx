@@ -532,6 +532,87 @@ func TestMVXShell_Execute(t *testing.T) {
 	}
 }
 
+func TestParseShellArgs(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []string
+		hasError bool
+	}{
+		{
+			name:     "simple command",
+			input:    "echo hello",
+			expected: []string{"echo", "hello"},
+			hasError: false,
+		},
+		{
+			name:     "single quoted argument",
+			input:    "echo 'hello world'",
+			expected: []string{"echo", "hello world"},
+			hasError: false,
+		},
+		{
+			name:     "double quoted argument",
+			input:    "echo \"test string\"",
+			expected: []string{"echo", "test string"},
+			hasError: false,
+		},
+		{
+			name:     "mixed quotes",
+			input:    "echo 'single' \"double\" unquoted",
+			expected: []string{"echo", "single", "double", "unquoted"},
+			hasError: false,
+		},
+		{
+			name:     "quoted argument with spaces",
+			input:    "echo '   Global development binary installed at ~/.mvx/dev/mvx'",
+			expected: []string{"echo", "   Global development binary installed at ~/.mvx/dev/mvx"},
+			hasError: false,
+		},
+		{
+			name:     "unterminated single quote",
+			input:    "echo 'unterminated",
+			expected: nil,
+			hasError: true,
+		},
+		{
+			name:     "unterminated double quote",
+			input:    "echo \"unterminated",
+			expected: nil,
+			hasError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parseShellArgs(tt.input)
+
+			if tt.hasError {
+				if err == nil {
+					t.Errorf("parseShellArgs() expected error but got none")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("parseShellArgs() unexpected error = %v", err)
+				return
+			}
+
+			if len(result) != len(tt.expected) {
+				t.Errorf("parseShellArgs() got %d args, expected %d", len(result), len(tt.expected))
+				return
+			}
+
+			for i, arg := range result {
+				if arg != tt.expected[i] {
+					t.Errorf("parseShellArgs() arg[%d] = %q, expected %q", i, arg, tt.expected[i])
+				}
+			}
+		})
+	}
+}
+
 func TestTokenizeErrorCases(t *testing.T) {
 	tests := []struct {
 		name        string

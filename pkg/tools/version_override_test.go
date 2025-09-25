@@ -72,7 +72,6 @@ func TestGetToolVersionOverrideEnvVar(t *testing.T) {
 		{"java", "MVX_JAVA_VERSION"},
 		{"maven", "MVX_MAVEN_VERSION"},
 		{"go", "MVX_GO_VERSION"},
-		{"python", "MVX_PYTHON_VERSION"},
 		{"node", "MVX_NODE_VERSION"},
 	}
 

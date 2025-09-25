@@ -1,11 +1,8 @@
 package tools
 
 import (
-	"archive/zip"
 	"fmt"
-	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -13,50 +10,43 @@ import (
 	"github.com/gnodet/mvx/pkg/config"
 )
 
+// Compile-time interface validation
+var _ Tool = (*NodeTool)(nil)
+
+// useSystemNode checks if system Node should be used instead of downloading
+func useSystemNode() bool {
+	return UseSystemTool("node")
+}
+
 // NodeTool manages Node.js
 // Downloads from https://nodejs.org/dist/
 type NodeTool struct {
-	manager *Manager
+	*BaseTool
+}
+
+// NewNodeTool creates a new Node tool instance
+func NewNodeTool(manager *Manager) *NodeTool {
+	return &NodeTool{
+		BaseTool: NewBaseTool(manager, "node"),
+	}
 }
 
 func (n *NodeTool) Name() string { return "node" }
 
 func (n *NodeTool) Install(version string, cfg config.ToolConfig) error {
-	installDir := n.manager.GetToolVersionDir("node", version, "")
-	if err := os.MkdirAll(installDir, 0755); err != nil {
-		return fmt.Errorf("failed to create installation directory: %w", err)
-	}
-
-	url := n.getDownloadURL(version)
-	fmt.Printf("  ⏳ Downloading Node.js %s...\n", version)
-	if err := n.downloadAndExtract(url, installDir, version, cfg); err != nil {
-		return fmt.Errorf("failed to download and extract: %w", err)
-	}
-	return nil
+	return n.StandardInstall(version, cfg, n.getDownloadURL)
 }
 
 func (n *NodeTool) IsInstalled(version string, cfg config.ToolConfig) bool {
-	installDir := n.manager.GetToolVersionDir("node", version, "")
-	bin := filepath.Join(installDir, "bin", n.nodeBinaryName())
-	if _, err := os.Stat(bin); err == nil {
-		return true
-	}
-	// also search recursively (archives include subdir)
-	found := ""
-	filepath.Walk(installDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil
-		}
-		if !info.IsDir() && strings.EqualFold(info.Name(), n.nodeBinaryName()) {
-			found = path
-			return filepath.SkipDir
-		}
-		return nil
-	})
-	return found != ""
+	return n.StandardIsInstalled(version, cfg, n.GetPath, "node")
 }
 
 func (n *NodeTool) GetPath(version string, cfg config.ToolConfig) (string, error) {
+	return n.StandardGetPath(version, cfg, n.getInstalledPath, "node")
+}
+
+// getInstalledPath returns the path for an installed Node version
+func (n *NodeTool) getInstalledPath(version string, cfg config.ToolConfig) (string, error) {
 	installDir := n.manager.GetToolVersionDir("node", version, "")
 	entries, err := os.ReadDir(installDir)
 	if err != nil {
@@ -64,47 +54,48 @@ func (n *NodeTool) GetPath(version string, cfg config.ToolConfig) (string, error
 	}
 	for _, e := range entries {
 		if e.IsDir() && strings.HasPrefix(e.Name(), "node-") {
-			return filepath.Join(installDir, e.Name()), nil
+			home := filepath.Join(installDir, e.Name())
+			bin := filepath.Join(home, "bin")
+			if info, err := os.Stat(bin); err == nil && info.IsDir() {
+				return bin, nil
+			}
+			// On Windows, Node distributes binaries at root (no bin dir)
+			return home, nil
 		}
 	}
-	return installDir, nil
-}
 
-func (n *NodeTool) GetBinPath(version string, cfg config.ToolConfig) (string, error) {
-	home, err := n.GetPath(version, cfg)
-	if err != nil {
-		return "", err
-	}
-	bin := filepath.Join(home, "bin")
+	// Check if binaries are directly in install directory
+	bin := filepath.Join(installDir, "bin")
 	if info, err := os.Stat(bin); err == nil && info.IsDir() {
 		return bin, nil
 	}
 	// On Windows, Node distributes binaries at root (no bin dir)
-	return home, nil
+	return installDir, nil
 }
 
 func (n *NodeTool) Verify(version string, cfg config.ToolConfig) error {
-	bin, err := n.GetBinPath(version, cfg)
-	if err != nil {
-		return err
-	}
-	nodeExe := filepath.Join(bin, n.nodeBinaryName())
-	cmd := exec.Command(nodeExe, "--version")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("node verification failed: %w\nOutput: %s", err, out)
-	}
-	if !strings.Contains(string(out), version) {
-		// Allow 'v' prefix in output
-		if !strings.Contains(string(out), "v"+version) {
-			return fmt.Errorf("node version mismatch: expected %s, got %s", version, out)
-		}
-	}
-	return nil
+	return n.StandardVerify(version, cfg, n.GetPath, "node", []string{"--version"})
 }
 
 func (n *NodeTool) ListVersions() ([]string, error) {
-	return n.manager.registry.GetNodeVersions()
+	registry := n.manager.GetRegistry()
+	return registry.GetNodeVersions()
+}
+
+// GetDownloadOptions returns download options specific to Node.js
+func (n *NodeTool) GetDownloadOptions() DownloadOptions {
+	return DownloadOptions{
+		FileExtension: ".tar.xz",
+		ExpectedType:  "application",
+		MinSize:       15 * 1024 * 1024, // 15MB (Node.js 18.17.0 is ~19.5MB)
+		MaxSize:       80 * 1024 * 1024, // 80MB
+		ArchiveType:   "tar.xz",
+	}
+}
+
+// GetDisplayName returns the display name for Node.js
+func (n *NodeTool) GetDisplayName() string {
+	return "Node.js"
 }
 
 func (n *NodeTool) nodeBinaryName() string {
@@ -138,99 +129,3 @@ func (n *NodeTool) getDownloadURL(version string) string {
 	}
 	return fmt.Sprintf("https://nodejs.org/dist/v%[1]s/node-v%[1]s-%[2]s.tar.xz", version, platform)
 }
-
-func (n *NodeTool) downloadAndExtract(url, destDir, version string, cfg config.ToolConfig) error {
-	// Create temporary file for download with appropriate extension
-	var tmpFilePattern string
-	if runtime.GOOS == "windows" {
-		tmpFilePattern = "node-*.zip"
-	} else {
-		tmpFilePattern = "node-*.tar.xz"
-	}
-
-	tmpFile, err := os.CreateTemp("", tmpFilePattern)
-	if err != nil {
-		return fmt.Errorf("failed to create temporary file: %w", err)
-	}
-	defer os.Remove(tmpFile.Name())
-	defer tmpFile.Close()
-
-	// Configure robust download with checksum verification
-	config := DefaultDownloadConfig(url, tmpFile.Name())
-	config.ExpectedType = "application" // Accept various application types
-	config.MinSize = 10 * 1024 * 1024   // Minimum 10MB for Node.js distributions
-	config.MaxSize = 100 * 1024 * 1024  // Maximum 100MB for Node.js distributions
-	config.ToolName = "node"            // For progress reporting
-	config.Version = version            // For checksum verification
-	config.Config = cfg                 // Tool configuration
-	config.ChecksumRegistry = n.manager.GetChecksumRegistry()
-
-	// Perform robust download with checksum verification
-	result, err := RobustDownload(config)
-	if err != nil {
-		return fmt.Errorf("Node.js download failed: %s", DiagnoseDownloadError(url, err))
-	}
-
-	fmt.Printf("  📦 Downloaded %d bytes from %s\n", result.Size, result.FinalURL)
-
-	// Close temp file before extraction
-	tmpFile.Close()
-
-	if strings.HasSuffix(url, ".zip") {
-		return extractZipFile(tmpFile.Name(), destDir)
-	}
-	// Use system tar to extract .tar.xz
-	if err := os.MkdirAll(destDir, 0755); err != nil {
-		return err
-	}
-	cmd := exec.Command("tar", "-xJf", tmpFile.Name(), "-C", destDir)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
-func extractZipFile(src, dest string) error {
-	r, err := zip.OpenReader(src)
-	if err != nil {
-		return err
-	}
-	defer r.Close()
-	if err := os.MkdirAll(dest, 0755); err != nil {
-		return err
-	}
-	for _, f := range r.File {
-		path := filepath.Join(dest, f.Name)
-		if !strings.HasPrefix(path, filepath.Clean(dest)+string(os.PathSeparator)) {
-			return fmt.Errorf("invalid path: %s", f.Name)
-		}
-		if f.FileInfo().IsDir() {
-			if err := os.MkdirAll(path, f.Mode()); err != nil {
-				return err
-			}
-			continue
-		}
-		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-			return err
-		}
-		rc, err := f.Open()
-		if err != nil {
-			return err
-		}
-		out, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, f.Mode())
-		if err != nil {
-			rc.Close()
-			return err
-		}
-		_, err = io.Copy(out, rc)
-		rc.Close()
-		out.Close()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// ToolConfig is referenced to avoid import cycle; re-use config.ToolConfig via type alias
-// but here inline to keep file self-contained for tool implementation
-// In real code, we use config.ToolConfig; manager passes it in.

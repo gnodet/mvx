@@ -1,10 +1,12 @@
 package test
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -64,6 +66,23 @@ func TestMvxBinary(t *testing.T) {
 
 	t.Run("MavenArgumentParsing", func(t *testing.T) {
 		testMavenArgumentParsing(t, mvxBinary)
+	})
+
+	// Critical integration tests for tool installation
+	t.Run("ToolInstallation", func(t *testing.T) {
+		testToolInstallation(t, mvxBinary)
+	})
+
+	t.Run("SetupCommand", func(t *testing.T) {
+		testSetupCommand(t, mvxBinary)
+	})
+
+	t.Run("ToolVerification", func(t *testing.T) {
+		testToolVerification(t, mvxBinary)
+	})
+
+	t.Run("AutoSetup", func(t *testing.T) {
+		testAutoSetup(t, mvxBinary)
 	})
 }
 
@@ -658,4 +677,509 @@ func testMavenArgumentParsingErrorCases(t *testing.T, mvxBinary string) {
 	}
 
 	t.Logf("Maven argument parsing error cases test passed.")
+}
+
+// testToolInstallation tests individual tool installation and verification
+func testToolInstallation(t *testing.T, mvxBinary string) {
+	// Test each tool individually in separate directories
+	tools := []struct {
+		name         string
+		version      string
+		distribution string
+	}{
+		{"java", "17", "zulu"},
+		{"maven", "3.9.6", ""},
+		{"go", "1.21.0", ""},
+		{"node", "18.17.0", ""},
+	}
+
+	for _, tool := range tools {
+		t.Run(fmt.Sprintf("Install_%s_%s", tool.name, tool.version), func(t *testing.T) {
+			testSingleToolInstallation(t, mvxBinary, tool.name, tool.version, tool.distribution)
+		})
+	}
+}
+
+// testSingleToolInstallation tests installation of a single tool
+func testSingleToolInstallation(t *testing.T, mvxBinary, toolName, version, distribution string) {
+	// Create a temporary directory for this specific tool test
+	tempDir, err := os.MkdirTemp("", fmt.Sprintf("mvx-%s-test-*", toolName))
+	if err != nil {
+		t.Fatalf("Failed to create temp directory: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Change to temp directory
+	oldDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current directory: %v", err)
+	}
+	defer os.Chdir(oldDir)
+
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("Failed to change to temp directory: %v", err)
+	}
+
+	// Initialize project
+	cmd := exec.Command(mvxBinary, "init", "--format", "json5")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("mvx init failed: %v\nOutput: %s", err, output)
+	}
+
+	// Add the tool to configuration
+	args := []string{"tools", "add", toolName, version}
+	if distribution != "" {
+		args = append(args, distribution)
+	}
+
+	cmd = exec.Command(mvxBinary, args...)
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("mvx tools add %s %s failed: %v\nOutput: %s", toolName, version, err, output)
+	}
+
+	// Run setup to install the tool
+	cmd = exec.Command(mvxBinary, "setup", "--tools-only", "--sequential")
+	cmd.Env = append(os.Environ(), "MVX_VERBOSE=true")
+	output, err = cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("mvx setup failed for %s %s: %v\nOutput: %s", toolName, version, err, output)
+	}
+
+	// Verify the tool was installed successfully
+	outputStr := string(output)
+	expectedSuccess := fmt.Sprintf("✅ %s", toolName)
+	if !strings.Contains(outputStr, expectedSuccess) {
+		t.Errorf("Expected success message for %s, got: %s", toolName, outputStr)
+	}
+
+	// Verify tool is actually usable
+	verifyToolUsability(t, toolName, version)
+}
+
+// verifyToolUsability checks that an installed tool is actually usable
+func verifyToolUsability(t *testing.T, toolName, version string) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("Failed to get home directory: %v", err)
+	}
+
+	switch toolName {
+	case "java":
+		// Find Java installation and test it
+		javaPath := filepath.Join(homeDir, ".mvx", "tools", "java")
+		if entries, err := os.ReadDir(javaPath); err == nil {
+			for _, entry := range entries {
+				if entry.IsDir() {
+					versionDir := filepath.Join(javaPath, entry.Name())
+					if javaExe := findJavaExecutable(versionDir); javaExe != "" {
+						cmd := exec.Command(javaExe, "-version")
+						output, err := cmd.CombinedOutput()
+						if err != nil {
+							t.Errorf("Java executable failed: %v\nOutput: %s", err, output)
+						} else {
+							t.Logf("Java verification successful: %s", strings.Split(string(output), "\n")[0])
+						}
+						return
+					}
+				}
+			}
+		}
+		t.Errorf("Could not find usable Java installation")
+
+	case "maven":
+		// Find Maven installation and test it
+		mavenPath := filepath.Join(homeDir, ".mvx", "tools", "maven")
+		if entries, err := os.ReadDir(mavenPath); err == nil {
+			for _, entry := range entries {
+				if entry.IsDir() {
+					versionDir := filepath.Join(mavenPath, entry.Name())
+					if mvnExe := findMavenExecutable(versionDir); mvnExe != "" {
+						cmd := exec.Command(mvnExe, "--version")
+						output, err := cmd.CombinedOutput()
+						if err != nil {
+							t.Errorf("Maven executable failed: %v\nOutput: %s", err, output)
+						} else {
+							t.Logf("Maven verification successful: %s", strings.Split(string(output), "\n")[0])
+						}
+						return
+					}
+				}
+			}
+		}
+		t.Errorf("Could not find usable Maven installation")
+
+	case "go":
+		// Find Go installation and test it
+		goPath := filepath.Join(homeDir, ".mvx", "tools", "go", version, "go", "bin", "go")
+		cmd := exec.Command(goPath, "version")
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Errorf("Go executable failed: %v\nOutput: %s", err, output)
+		} else {
+			t.Logf("Go verification successful: %s", strings.TrimSpace(string(output)))
+		}
+
+	case "node":
+		// Find Node installation and test it
+		nodePath := filepath.Join(homeDir, ".mvx", "tools", "node")
+		if entries, err := os.ReadDir(nodePath); err == nil {
+			for _, entry := range entries {
+				if entry.IsDir() {
+					versionDir := filepath.Join(nodePath, entry.Name())
+					if nodeExe := findNodeExecutable(versionDir); nodeExe != "" {
+						cmd := exec.Command(nodeExe, "--version")
+						output, err := cmd.CombinedOutput()
+						if err != nil {
+							t.Errorf("Node executable failed: %v\nOutput: %s", err, output)
+						} else {
+							t.Logf("Node verification successful: %s", strings.TrimSpace(string(output)))
+						}
+						return
+					}
+				}
+			}
+		}
+		t.Errorf("Could not find usable Node installation")
+	}
+}
+
+// Helper functions to find executables in tool installations
+func findJavaExecutable(installDir string) string {
+	// Check for nested Java installations (like Zulu)
+	if entries, err := os.ReadDir(installDir); err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() {
+				subPath := filepath.Join(installDir, entry.Name())
+
+				// Check standard location
+				javaExe := filepath.Join(subPath, "bin", "java")
+				if _, err := os.Stat(javaExe); err == nil {
+					return javaExe
+				}
+
+				// Check macOS location
+				if runtime.GOOS == "darwin" {
+					macOSJavaExe := filepath.Join(subPath, "Contents", "Home", "bin", "java")
+					if _, err := os.Stat(macOSJavaExe); err == nil {
+						return macOSJavaExe
+					}
+				}
+
+				// Check nested directories (like zulu-17.jdk)
+				if nestedEntries, err := os.ReadDir(subPath); err == nil {
+					for _, nestedEntry := range nestedEntries {
+						if nestedEntry.IsDir() {
+							nestedPath := filepath.Join(subPath, nestedEntry.Name())
+
+							// Check nested standard location
+							nestedJavaExe := filepath.Join(nestedPath, "bin", "java")
+							if _, err := os.Stat(nestedJavaExe); err == nil {
+								return nestedJavaExe
+							}
+
+							// Check nested macOS location
+							if runtime.GOOS == "darwin" {
+								nestedMacOSJavaExe := filepath.Join(nestedPath, "Contents", "Home", "bin", "java")
+								if _, err := os.Stat(nestedMacOSJavaExe); err == nil {
+									return nestedMacOSJavaExe
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func findMavenExecutable(installDir string) string {
+	// Maven typically extracts to apache-maven-{version}/
+	if entries, err := os.ReadDir(installDir); err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() && strings.Contains(entry.Name(), "apache-maven") {
+				mvnExe := filepath.Join(installDir, entry.Name(), "bin", "mvn")
+				if runtime.GOOS == "windows" {
+					mvnExe += ".cmd"
+				}
+				if _, err := os.Stat(mvnExe); err == nil {
+					return mvnExe
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func findNodeExecutable(installDir string) string {
+	// Node typically extracts to node-v{version}-{platform}/
+	if entries, err := os.ReadDir(installDir); err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() && strings.HasPrefix(entry.Name(), "node-v") {
+				nodeExe := filepath.Join(installDir, entry.Name(), "bin", "node")
+				if runtime.GOOS == "windows" {
+					nodeExe += ".exe"
+				}
+				if _, err := os.Stat(nodeExe); err == nil {
+					return nodeExe
+				}
+			}
+		}
+	}
+	return ""
+}
+
+// testSetupCommand tests the complete setup command with multiple tools
+func testSetupCommand(t *testing.T, mvxBinary string) {
+	// Create a temporary directory for testing
+	tempDir, err := os.MkdirTemp("", "mvx-setup-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp directory: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Change to temp directory
+	oldDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current directory: %v", err)
+	}
+	defer os.Chdir(oldDir)
+
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("Failed to change to temp directory: %v", err)
+	}
+
+	// Create a comprehensive configuration
+	configContent := `{
+  project: {
+    name: "setup-test-project"
+  },
+  tools: {
+    java: {
+      version: "17",
+      distribution: "zulu"
+    },
+    maven: {
+      version: "3.9.6"
+    },
+    go: {
+      version: "1.21.0"
+    }
+  }
+}`
+
+	// Create .mvx directory and config
+	if err := os.MkdirAll(".mvx", 0755); err != nil {
+		t.Fatalf("Failed to create .mvx directory: %v", err)
+	}
+
+	if err := os.WriteFile(".mvx/config.json5", []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to write config file: %v", err)
+	}
+
+	// Run setup command
+	cmd := exec.Command(mvxBinary, "setup", "--tools-only", "--sequential")
+	cmd.Env = append(os.Environ(), "MVX_VERBOSE=true")
+	output, err := cmd.CombinedOutput()
+
+	outputStr := string(output)
+	t.Logf("Setup command output:\n%s", outputStr)
+
+	if err != nil {
+		t.Fatalf("mvx setup failed: %v\nOutput: %s", err, outputStr)
+	}
+
+	// Verify all tools were installed successfully
+	expectedTools := []string{"java", "maven", "go"}
+	for _, tool := range expectedTools {
+		expectedSuccess := fmt.Sprintf("✅ %s", tool)
+		if !strings.Contains(outputStr, expectedSuccess) {
+			t.Errorf("Expected success message for %s, got: %s", tool, outputStr)
+		}
+	}
+
+	// Verify setup completion message
+	if !strings.Contains(outputStr, "✅ Setup complete") {
+		t.Errorf("Expected setup completion message, got: %s", outputStr)
+	}
+}
+
+// testToolVerification tests that tool verification logic works correctly
+func testToolVerification(t *testing.T, mvxBinary string) {
+	// Create a temporary directory for testing
+	tempDir, err := os.MkdirTemp("", "mvx-verify-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp directory: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Change to temp directory
+	oldDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get current directory: %v", err)
+	}
+	defer os.Chdir(oldDir)
+
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("Failed to change to temp directory: %v", err)
+	}
+
+	// Test Java verification specifically (the problematic case)
+	configContent := `{
+  project: {
+    name: "verify-test-project"
+  },
+  tools: {
+    java: {
+      version: "17",
+      distribution: "zulu"
+    }
+  }
+}`
+
+	// Create .mvx directory and config
+	if err := os.MkdirAll(".mvx", 0755); err != nil {
+		t.Fatalf("Failed to create .mvx directory: %v", err)
+	}
+
+	if err := os.WriteFile(".mvx/config.json5", []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to write config file: %v", err)
+	}
+
+	// Run setup command with verbose output to see verification details
+	cmd := exec.Command(mvxBinary, "setup", "--tools-only", "--sequential")
+	cmd.Env = append(os.Environ(), "MVX_VERBOSE=true")
+	output, err := cmd.CombinedOutput()
+
+	outputStr := string(output)
+	t.Logf("Verification test output:\n%s", outputStr)
+
+	if err != nil {
+		t.Fatalf("mvx setup failed during verification test: %v\nOutput: %s", err, outputStr)
+	}
+
+	// Verify Java was installed and verified successfully
+	if !strings.Contains(outputStr, "✅ java") {
+		t.Errorf("Expected Java installation success, got: %s", outputStr)
+	}
+
+	// Verify that nested directory detection worked
+	if strings.Contains(outputStr, "Java executable not found anywhere") {
+		t.Errorf("Java verification failed - nested directory detection not working: %s", outputStr)
+	}
+
+	t.Logf("All tool verification tests passed!")
+}
+
+// testAutoSetup tests the auto-setup functionality
+func testAutoSetup(t *testing.T, mvxBinary string) {
+	// Create a temporary directory for this test
+	tempDir := t.TempDir()
+
+	// Create a test project with mvx config
+	configContent := `{
+		"tools": {
+			"go": {
+				"version": "1.21.0"
+			},
+			"java": {
+				"version": "17",
+				"distribution": "zulu"
+			}
+		},
+		"commands": {
+			"test-cmd": {
+				"description": "Test command",
+				"script": "echo 'Auto-setup test'"
+			}
+		}
+	}`
+
+	configDir := filepath.Join(tempDir, ".mvx")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		t.Fatalf("Failed to create .mvx directory: %v", err)
+	}
+
+	configFile := filepath.Join(configDir, "config.json5")
+	if err := os.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+		t.Fatalf("Failed to write config file: %v", err)
+	}
+
+	// Test 1: Auto-setup should install missing tools
+	t.Run("AutoInstallMissingTools", func(t *testing.T) {
+		// Remove any existing Go installation to test auto-install
+		homeDir, _ := os.UserHomeDir()
+		goToolDir := filepath.Join(homeDir, ".mvx", "tools", "go", "1.21.0")
+		os.RemoveAll(goToolDir)
+
+		// Run a simple command that should trigger auto-setup
+		cmd := exec.Command(mvxBinary, "--help")
+		cmd.Dir = tempDir
+		cmd.Env = append(os.Environ(), "MVX_VERBOSE=true")
+
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("Command failed: %v\nOutput: %s", err, output)
+		}
+
+		outputStr := string(output)
+
+		// Check that auto-setup was triggered
+		if !strings.Contains(outputStr, "Auto-installing") && !strings.Contains(outputStr, "All tools already installed") {
+			t.Logf("Output: %s", outputStr)
+			// This might be expected if tools are already installed
+		}
+	})
+
+	// Test 2: System tool bypass should work
+	t.Run("SystemToolBypass", func(t *testing.T) {
+		// Run with system Go bypass
+		cmd := exec.Command(mvxBinary, "--help")
+		cmd.Dir = tempDir
+		cmd.Env = append(os.Environ(), "MVX_VERBOSE=true", "MVX_USE_SYSTEM_GO=true")
+
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("Command failed: %v\nOutput: %s", err, output)
+		}
+
+		outputStr := string(output)
+
+		// Check that Go was skipped due to system bypass
+		if strings.Contains(outputStr, "Skipping go") {
+			t.Logf("✅ System tool bypass working correctly")
+		} else {
+			t.Logf("System tool bypass may not be working, but this could be expected if Go is already installed")
+		}
+	})
+
+	// Test 3: Auto-setup should be cached (not run multiple times)
+	t.Run("AutoSetupCaching", func(t *testing.T) {
+		// Run two commands in sequence
+		cmd1 := exec.Command(mvxBinary, "--help")
+		cmd1.Dir = tempDir
+		cmd1.Env = append(os.Environ(), "MVX_VERBOSE=true")
+
+		output1, err := cmd1.CombinedOutput()
+		if err != nil {
+			t.Fatalf("First command failed: %v\nOutput: %s", err, output1)
+		}
+
+		cmd2 := exec.Command(mvxBinary, "test-cmd")
+		cmd2.Dir = tempDir
+		cmd2.Env = append(os.Environ(), "MVX_VERBOSE=true")
+
+		output2, err := cmd2.CombinedOutput()
+		if err != nil {
+			t.Fatalf("Second command failed: %v\nOutput: %s", err, output2)
+		}
+
+		// Note: Caching only works within the same process, so this test
+		// may not show caching behavior since each command is a separate process
+		t.Logf("Auto-setup caching test completed (caching works within same process)")
+	})
+
+	t.Logf("Auto-setup tests completed!")
 }

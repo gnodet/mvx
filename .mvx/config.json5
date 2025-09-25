@@ -20,9 +20,6 @@
     node: {
       version: "lts"
     },
-    python: {
-      version: "3.12"
-    },
     go: {
       version: "1.24.2"
     }

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/gnodet/mvx/pkg/config"
 	"github.com/gnodet/mvx/pkg/executor"
@@ -21,6 +22,9 @@ var (
 	// Global flags
 	verbose bool
 	quiet   bool
+
+	// Auto-setup cache to avoid repeated setup
+	autoSetupDone bool
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -49,6 +53,12 @@ For more information, visit: https://github.com/gnodet/mvx`,
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() error {
+	// Auto-setup tools and environment before executing any command
+	if err := autoSetupEnvironment(); err != nil {
+		// Don't fail completely if auto-setup fails, but warn the user
+		printVerbose("Auto-setup failed: %v", err)
+	}
+
 	// Add dynamic custom commands before execution
 	if err := addCustomCommands(); err != nil {
 		// If we can't load custom commands, continue with built-in commands only
@@ -96,6 +106,183 @@ func printInfo(format string, args ...interface{}) {
 
 func printError(format string, args ...interface{}) {
 	fmt.Fprintf(os.Stderr, "Error: "+format+"\n", args...)
+}
+
+// autoSetupEnvironment automatically installs tools and sets up environment
+func autoSetupEnvironment() error {
+	// Skip auto-setup if already done in this process
+	if autoSetupDone {
+		printVerbose("Auto-setup already completed in this process")
+		return nil
+	}
+
+	// Skip auto-setup if explicitly disabled
+	if os.Getenv("MVX_NO_AUTO_SETUP") == "true" {
+		printVerbose("Auto-setup disabled by MVX_NO_AUTO_SETUP")
+		autoSetupDone = true
+		return nil
+	}
+
+	// Try to find project root
+	projectRoot, err := findProjectRoot()
+	if err != nil {
+		// No project found, skip auto-setup
+		printVerbose("No mvx project found, skipping auto-setup")
+		return nil
+	}
+
+	// Try to load configuration
+	cfg, err := config.LoadConfig(projectRoot)
+	if err != nil {
+		// No valid config found, skip auto-setup
+		printVerbose("No valid mvx config found, skipping auto-setup")
+		return nil
+	}
+
+	// Skip if no tools configured
+	if len(cfg.Tools) == 0 {
+		printVerbose("No tools configured, skipping auto-setup")
+		return nil
+	}
+
+	// Create tool manager
+	manager, err := tools.NewManager()
+	if err != nil {
+		return fmt.Errorf("failed to create tool manager: %w", err)
+	}
+
+	// Check if tools need installation (excluding system tools)
+	toolsToInstall, err := manager.GetToolsNeedingInstallation(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to check tool installation status: %w", err)
+	}
+
+	// Filter out tools that should use system versions
+	filteredToolsToInstall := make(map[string]config.ToolConfig)
+	for toolName, toolConfig := range toolsToInstall {
+		systemEnvVar := fmt.Sprintf("MVX_USE_SYSTEM_%s", strings.ToUpper(toolName))
+		if os.Getenv(systemEnvVar) == "true" {
+			printVerbose("Skipping %s installation: %s=true (using system tool)", toolName, systemEnvVar)
+			continue
+		}
+		filteredToolsToInstall[toolName] = toolConfig
+	}
+
+	// Install missing tools if any
+	if len(filteredToolsToInstall) > 0 {
+		printInfo("🔧 Auto-installing %d missing tool(s)...", len(filteredToolsToInstall))
+
+		// Create a temporary config with only tools that need installation
+		tempCfg := *cfg
+		tempCfg.Tools = filteredToolsToInstall
+
+		opts := &tools.InstallOptions{
+			MaxConcurrent: 3,
+			Parallel:      true,
+			Verbose:       verbose,
+		}
+
+		if err := manager.InstallToolsWithOptions(&tempCfg, opts); err != nil {
+			return fmt.Errorf("failed to auto-install tools: %w", err)
+		}
+
+		printVerbose("Auto-installation complete")
+	} else {
+		printVerbose("All tools already installed or using system versions")
+	}
+
+	// Set up environment variables globally
+	if err := setupGlobalEnvironment(cfg, manager); err != nil {
+		return fmt.Errorf("failed to setup global environment: %w", err)
+	}
+
+	// Mark auto-setup as completed
+	autoSetupDone = true
+	printVerbose("Auto-setup completed successfully")
+
+	return nil
+}
+
+// setupGlobalEnvironment sets up PATH and environment variables globally
+func setupGlobalEnvironment(cfg *config.Config, manager *tools.Manager) error {
+	// Get environment variables from tool manager
+	env, err := manager.SetupEnvironment(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to get tool environment: %w", err)
+	}
+
+	// Set up PATH with tool bin directories
+	pathDirs := []string{}
+
+	// Add all configured tools to PATH (respecting system tool bypass)
+	for toolName, toolConfig := range cfg.Tools {
+		// Check if user wants to use system tool instead
+		systemEnvVar := fmt.Sprintf("MVX_USE_SYSTEM_%s", strings.ToUpper(toolName))
+		if os.Getenv(systemEnvVar) == "true" {
+			printVerbose("Skipping %s PATH setup: %s=true (using system tool)", toolName, systemEnvVar)
+			continue
+		}
+
+		tool, err := manager.GetTool(toolName)
+		if err != nil {
+			printVerbose("Skipping tool %s: %v", toolName, err)
+			continue
+		}
+
+		// Resolve version
+		resolvedVersion, err := manager.ResolveVersion(toolName, toolConfig)
+		if err != nil {
+			printVerbose("Skipping tool %s: version resolution failed: %v", toolName, err)
+			continue
+		}
+
+		// Create resolved config
+		resolvedConfig := toolConfig
+		resolvedConfig.Version = resolvedVersion
+
+		// Check if tool is installed
+		if tool.IsInstalled(resolvedVersion, resolvedConfig) {
+			binPath, err := tool.GetPath(resolvedVersion, resolvedConfig)
+			if err != nil {
+				printVerbose("Skipping tool %s: failed to get bin path: %v", toolName, err)
+				continue
+			}
+			printVerbose("Adding %s bin path to global PATH: %s", toolName, binPath)
+			pathDirs = append(pathDirs, binPath)
+		} else {
+			printVerbose("Tool %s version %s is not installed, skipping PATH setup", toolName, resolvedVersion)
+		}
+	}
+
+	// Update PATH environment variable
+	if len(pathDirs) > 0 {
+		currentPath := os.Getenv("PATH")
+		newPath := strings.Join(pathDirs, string(os.PathListSeparator))
+		if currentPath != "" {
+			newPath = newPath + string(os.PathListSeparator) + currentPath
+		}
+
+		// Set PATH globally for this process and all child processes
+		if err := os.Setenv("PATH", newPath); err != nil {
+			return fmt.Errorf("failed to set PATH: %w", err)
+		}
+
+		printVerbose("Updated global PATH with %d tool directories", len(pathDirs))
+		printVerbose("New PATH: %s", newPath)
+	}
+
+	// Set other tool-specific environment variables globally
+	for key, value := range env {
+		if key != "PATH" { // PATH is handled above
+			if err := os.Setenv(key, value); err != nil {
+				printVerbose("Failed to set environment variable %s: %v", key, err)
+			} else {
+				printVerbose("Set global environment variable: %s=%s", key, value)
+			}
+		}
+	}
+
+	return nil
 }
 
 func printWarning(format string, args ...interface{}) {

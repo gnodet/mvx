@@ -243,7 +243,7 @@ func (e *Executor) setupEnvironment(cmdConfig config.CommandConfig) ([]string, e
 			resolvedConfig.Version = resolvedVersion
 
 			if tool.IsInstalled(resolvedVersion, resolvedConfig) {
-				binPath, err := tool.GetBinPath(resolvedVersion, resolvedConfig)
+				binPath, err := tool.GetPath(resolvedVersion, resolvedConfig)
 				if err != nil {
 					logVerbose("Skipping tool %s: failed to get bin path: %v", toolName, err)
 					continue

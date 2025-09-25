@@ -46,8 +46,10 @@ For CI environments, corporate setups, or when you prefer to use existing tool i
 # Enable system tools individually
 export MVX_USE_SYSTEM_JAVA=true
 export MVX_USE_SYSTEM_MAVEN=true
-export MVX_USE_SYSTEM_NODE=true    # Coming soon
-export MVX_USE_SYSTEM_GO=true      # Coming soon
+export MVX_USE_SYSTEM_NODE=true
+export MVX_USE_SYSTEM_GO=true
+export MVX_USE_SYSTEM_PYTHON=true
+export MVX_USE_SYSTEM_MVND=true
 
 ./mvx setup
 ```
@@ -60,10 +62,10 @@ export MVX_USE_SYSTEM_GO=true      # Coming soon
 - 🔒 **Security**: Use centrally managed, approved tool versions
 
 **How it works:**
-1. When `MVX_USE_SYSTEM_<TOOL>=true` is set, mvx first tries to use the system installation
-2. Validates that the system tool version matches your configuration
-3. If compatible, creates a symlink to integrate with mvx's tool management
-4. If incompatible or unavailable, falls back to downloading
+1. When `MVX_USE_SYSTEM_<TOOL>=true` is set, mvx uses the system installation directly
+2. Validates that the system tool is available and accessible
+3. Skips adding mvx-managed tool paths to PATH, letting system PATH handle tool resolution
+4. If system tool is unavailable, the command fails (no fallback to downloading)
 
 ## Version Overrides
 

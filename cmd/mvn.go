@@ -110,7 +110,7 @@ Examples:
 		resolvedToolCfg := toolCfg
 		resolvedToolCfg.Version = resolvedVersion
 
-		bin, err := mvnTool.GetBinPath(resolvedVersion, resolvedToolCfg)
+		bin, err := mvnTool.GetPath(resolvedVersion, resolvedToolCfg)
 		if err != nil {
 			return err
 		}

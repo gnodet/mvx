@@ -441,6 +441,18 @@ func verifyChecksum(filePath string, config *DownloadConfig) error {
 			}
 		}
 
+		// Special handling for Go (go.dev API)
+		if config.ToolName == "go" && !hasChecksum {
+			fmt.Printf("  🔍 Fetching Go checksum from go.dev API...\n")
+			if goChecksum, err := config.ChecksumRegistry.GetGoChecksumFromAPI(config.Version, filename); err == nil {
+				checksumInfo = goChecksum
+				hasChecksum = true
+				fmt.Printf("  ✅ Found Go checksum from go.dev API\n")
+			} else {
+				fmt.Printf("  ⚠️  Failed to get Go checksum from go.dev API: %v\n", err)
+			}
+		}
+
 		// Fallback to URL patterns for other tools
 		if !hasChecksum {
 			checksumURL := config.ChecksumRegistry.GetChecksumURL(config.ToolName, config.Version, filename)

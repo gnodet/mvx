@@ -47,11 +47,8 @@ type Tool interface {
 	// IsInstalled checks if the specified version is installed
 	IsInstalled(version string, config config.ToolConfig) bool
 
-	// GetPath returns the installation path for the specified version
+	// GetPath returns the binary path for the specified version (for PATH management)
 	GetPath(version string, config config.ToolConfig) (string, error)
-
-	// GetBinPath returns the binary path for the specified version
-	GetBinPath(version string, config config.ToolConfig) (string, error)
 
 	// Verify checks if the installation is working correctly
 	Verify(version string, config config.ToolConfig) error
@@ -86,12 +83,11 @@ func NewManager() (*Manager, error) {
 	manager.loadVersionCache()
 
 	// Register built-in tools
-	manager.RegisterTool(&JavaTool{manager: manager})
-	manager.RegisterTool(&MavenTool{manager: manager})
-	manager.RegisterTool(&MvndTool{manager: manager})
-	manager.RegisterTool(&NodeTool{manager: manager})
-	manager.RegisterTool(&GoTool{manager: manager})
-	manager.RegisterTool(&PythonTool{manager: manager})
+	manager.RegisterTool(NewJavaTool(manager))
+	manager.RegisterTool(NewMavenTool(manager))
+	manager.RegisterTool(NewMvndTool(manager))
+	manager.RegisterTool(NewNodeTool(manager))
+	manager.RegisterTool(NewGoTool(manager))
 
 	return manager, nil
 }
@@ -129,10 +125,8 @@ func (m *Manager) InstallTool(name string, toolConfig config.ToolConfig) error {
 	resolvedConfig := toolConfig
 	resolvedConfig.Version = resolvedVersion
 
-	if tool.IsInstalled(resolvedVersion, resolvedConfig) {
-		fmt.Printf("✅ %s %s already installed\n", name, resolvedVersion)
-		return nil
-	}
+	// Skip installation check here since GetToolsNeedingInstallation already checked
+	// This avoids double-checking and redundant verbose output
 
 	fmt.Printf("Installing %s %s", name, resolvedVersion)
 	if toolConfig.Distribution != "" {
@@ -372,20 +366,25 @@ func (m *Manager) SetupEnvironment(cfg *config.Config) (map[string]string, error
 		// Set tool-specific environment variables
 		switch toolName {
 		case "java":
-			env["JAVA_HOME"] = toolPath
+			// For Java, we need JAVA_HOME to point to the Java installation directory, not the bin directory
+			if javaTool, ok := tool.(*JavaTool); ok {
+				if javaHome, err := javaTool.GetJavaHome(resolvedVersion, resolvedConfig); err == nil {
+					env["JAVA_HOME"] = javaHome
+				} else {
+					logVerbose("Failed to get JAVA_HOME for Java %s: %v", resolvedVersion, err)
+				}
+			}
 		case "maven":
 			env["MAVEN_HOME"] = toolPath
 		case "node":
 			env["NODE_HOME"] = toolPath
-		case "python":
-			env["PYTHON_HOME"] = toolPath
 		}
 	}
 
 	return env, nil
 }
 
-// SetupProjectEnvironment sets up project-specific environment for tools like Python
+// SetupProjectEnvironment sets up project-specific environment for tools
 func (m *Manager) SetupProjectEnvironment(cfg *config.Config, projectPath string) (map[string]string, error) {
 	env := make(map[string]string)
 
@@ -396,53 +395,6 @@ func (m *Manager) SetupProjectEnvironment(cfg *config.Config, projectPath string
 	}
 	for key, value := range baseEnv {
 		env[key] = value
-	}
-
-	// Handle Python project-specific environment
-	if pythonConfig, exists := cfg.Tools["python"]; exists {
-		tool, err := m.GetTool("python")
-		if err != nil {
-			return env, nil // Skip if Python tool not available
-		}
-
-		pythonTool, ok := tool.(*PythonTool)
-		if !ok {
-			return env, nil // Skip if not a Python tool
-		}
-
-		// Create project virtual environment if it doesn't exist
-		if err := pythonTool.CreateProjectVenv(pythonConfig.Version, pythonConfig, projectPath); err != nil {
-			return nil, fmt.Errorf("failed to create Python virtual environment: %w", err)
-		}
-
-		// Get project-specific Python environment
-		pythonEnv, err := pythonTool.GetProjectEnvironment(pythonConfig.Version, pythonConfig, projectPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get Python project environment: %w", err)
-		}
-
-		// Merge Python environment variables
-		for key, value := range pythonEnv {
-			env[key] = value
-		}
-
-		// Install requirements if specified
-		if requirementsFile, ok := pythonConfig.Options["requirements"]; ok {
-			if err := pythonTool.InstallProjectRequirements(pythonConfig.Version, pythonConfig, projectPath, requirementsFile); err != nil {
-				return nil, fmt.Errorf("failed to install Python requirements: %w", err)
-			}
-		} else {
-			// Try common requirements file names
-			for _, reqFile := range []string{"requirements.txt", "requirements.pip", "pyproject.toml"} {
-				if _, err := os.Stat(filepath.Join(projectPath, reqFile)); err == nil {
-					if err := pythonTool.InstallProjectRequirements(pythonConfig.Version, pythonConfig, projectPath, reqFile); err != nil {
-						// Don't fail if requirements installation fails, just warn
-						fmt.Printf("  ⚠️  Warning: failed to install requirements from %s: %v\n", reqFile, err)
-					}
-					break
-				}
-			}
-		}
 	}
 
 	return env, nil
@@ -500,8 +452,7 @@ func (m *Manager) resolveVersionInternal(toolName string, toolConfig config.Tool
 		resolved, err = m.registry.ResolveNodeVersion(toolConfig.Version)
 	case "go":
 		resolved, err = m.registry.ResolveGoVersion(toolConfig.Version)
-	case "python":
-		resolved, err = m.registry.ResolvePythonVersion(toolConfig.Version)
+
 	default:
 		// For unknown tools, return version as-is
 		resolved = toolConfig.Version

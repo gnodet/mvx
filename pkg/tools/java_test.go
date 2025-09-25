@@ -12,31 +12,31 @@ import (
 func TestUseSystemTool(t *testing.T) {
 	// Test when MVX_USE_SYSTEM_JAVA is not set
 	os.Unsetenv("MVX_USE_SYSTEM_JAVA")
-	if useSystemTool("java") {
-		t.Error("useSystemTool('java') should return false when MVX_USE_SYSTEM_JAVA is not set")
+	if UseSystemTool("java") {
+		t.Error("UseSystemTool('java') should return false when MVX_USE_SYSTEM_JAVA is not set")
 	}
 
 	// Test when MVX_USE_SYSTEM_JAVA is set to false
 	os.Setenv("MVX_USE_SYSTEM_JAVA", "false")
-	if useSystemTool("java") {
-		t.Error("useSystemTool('java') should return false when MVX_USE_SYSTEM_JAVA=false")
+	if UseSystemTool("java") {
+		t.Error("UseSystemTool('java') should return false when MVX_USE_SYSTEM_JAVA=false")
 	}
 
 	// Test when MVX_USE_SYSTEM_JAVA is set to true
 	os.Setenv("MVX_USE_SYSTEM_JAVA", "true")
-	if !useSystemTool("java") {
-		t.Error("useSystemTool('java') should return true when MVX_USE_SYSTEM_JAVA=true")
+	if !UseSystemTool("java") {
+		t.Error("UseSystemTool('java') should return true when MVX_USE_SYSTEM_JAVA=true")
 	}
 
 	// Test Maven tool
 	os.Unsetenv("MVX_USE_SYSTEM_MAVEN")
-	if useSystemTool("maven") {
-		t.Error("useSystemTool('maven') should return false when MVX_USE_SYSTEM_MAVEN is not set")
+	if UseSystemTool("maven") {
+		t.Error("UseSystemTool('maven') should return false when MVX_USE_SYSTEM_MAVEN is not set")
 	}
 
 	os.Setenv("MVX_USE_SYSTEM_MAVEN", "true")
-	if !useSystemTool("maven") {
-		t.Error("useSystemTool('maven') should return true when MVX_USE_SYSTEM_MAVEN=true")
+	if !UseSystemTool("maven") {
+		t.Error("UseSystemTool('maven') should return true when MVX_USE_SYSTEM_MAVEN=true")
 	}
 
 	// Clean up
@@ -68,8 +68,6 @@ func TestUseSystemJava(t *testing.T) {
 }
 
 func TestJavaSystemDetector(t *testing.T) {
-	detector := &JavaSystemDetector{}
-
 	// Save original JAVA_HOME
 	originalJavaHome := os.Getenv("JAVA_HOME")
 	defer func() {
@@ -82,22 +80,20 @@ func TestJavaSystemDetector(t *testing.T) {
 
 	// Test when JAVA_HOME is not set
 	os.Unsetenv("JAVA_HOME")
-	_, err := detector.GetSystemHome()
+	_, err := getSystemJavaHome()
 	if err == nil {
-		t.Error("GetSystemHome() should return error when JAVA_HOME is not set")
+		t.Error("getSystemJavaHome() should return error when JAVA_HOME is not set")
 	}
 
 	// Test when JAVA_HOME points to non-existent directory
 	os.Setenv("JAVA_HOME", "/non/existent/path")
-	_, err = detector.GetSystemHome()
+	_, err = getSystemJavaHome()
 	if err == nil {
-		t.Error("GetSystemHome() should return error when JAVA_HOME points to non-existent directory")
+		t.Error("getSystemJavaHome() should return error when JAVA_HOME points to non-existent directory")
 	}
 }
 
 func TestJavaSystemDetectorVersion(t *testing.T) {
-	detector := &JavaSystemDetector{}
-
 	// This test requires a real Java installation, so we'll skip it if JAVA_HOME is not set
 	javaHome := os.Getenv("JAVA_HOME")
 	if javaHome == "" {
@@ -114,21 +110,19 @@ func TestJavaSystemDetectorVersion(t *testing.T) {
 		t.Skip("Skipping test because Java executable not found at JAVA_HOME")
 	}
 
-	version, err := detector.GetSystemVersion(javaHome)
+	version, err := getSystemJavaVersion(javaHome)
 	if err != nil {
-		t.Errorf("GetSystemVersion() failed: %v", err)
+		t.Errorf("getSystemJavaVersion() failed: %v", err)
 	}
 
 	if version == "" {
-		t.Error("GetSystemVersion() returned empty version")
+		t.Error("getSystemJavaVersion() returned empty version")
 	}
 
 	t.Logf("Detected Java version: %s", version)
 }
 
 func TestJavaVersionCompatibility(t *testing.T) {
-	detector := &JavaSystemDetector{}
-
 	tests := []struct {
 		systemVersion    string
 		requestedVersion string
@@ -144,9 +138,9 @@ func TestJavaVersionCompatibility(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := detector.IsVersionCompatible(test.systemVersion, test.requestedVersion)
+		result := isJavaVersionCompatible(test.systemVersion, test.requestedVersion)
 		if result != test.expected {
-			t.Errorf("IsVersionCompatible(%s, %s) = %v, expected %v",
+			t.Errorf("isJavaVersionCompatible(%s, %s) = %v, expected %v",
 				test.systemVersion, test.requestedVersion, result, test.expected)
 		}
 	}
@@ -175,7 +169,7 @@ func TestJavaToolWithSystemJava(t *testing.T) {
 		t.Fatalf("Failed to create manager: %v", err)
 	}
 
-	javaTool := &JavaTool{manager: manager}
+	javaTool := NewJavaTool(manager)
 
 	// Test with MVX_USE_SYSTEM_JAVA=false (default behavior)
 	os.Unsetenv("MVX_USE_SYSTEM_JAVA")

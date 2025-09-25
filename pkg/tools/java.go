@@ -1,9 +1,6 @@
 package tools
 
 import (
-	"archive/tar"
-	"archive/zip"
-	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,19 +15,101 @@ import (
 	"github.com/gnodet/mvx/pkg/config"
 )
 
+// Compile-time interface validation
+var _ Tool = (*JavaTool)(nil)
+
 // useSystemJava checks if system Java should be used instead of downloading
 func useSystemJava() bool {
-	return useSystemTool("java")
+	return UseSystemTool("java")
 }
 
-// getSystemJavaDetector returns a system detector for Java
-func getSystemJavaDetector() SystemToolDetector {
-	return &JavaSystemDetector{}
+// getSystemJavaHome returns the system JAVA_HOME if available and valid
+func getSystemJavaHome() (string, error) {
+	javaHome := os.Getenv("JAVA_HOME")
+	if javaHome == "" {
+		return "", fmt.Errorf("JAVA_HOME environment variable not set")
+	}
+
+	// Check if JAVA_HOME points to a valid Java installation
+	javaExe := filepath.Join(javaHome, "bin", "java")
+	if runtime.GOOS == "windows" {
+		javaExe += ".exe"
+	}
+
+	if _, err := os.Stat(javaExe); err != nil {
+		return "", fmt.Errorf("Java executable not found at %s", javaExe)
+	}
+
+	return javaHome, nil
+}
+
+// getSystemJavaVersion returns the version of the system Java installation
+func getSystemJavaVersion(javaHome string) (string, error) {
+	javaExe := filepath.Join(javaHome, "bin", "java")
+	if runtime.GOOS == "windows" {
+		javaExe += ".exe"
+	}
+
+	cmd := exec.Command(javaExe, "-version")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to get Java version: %w", err)
+	}
+
+	// Parse version from output (e.g., "openjdk version "21.0.1" 2023-10-17")
+	outputStr := string(output)
+	lines := strings.Split(outputStr, "\n")
+	if len(lines) == 0 {
+		return "", fmt.Errorf("no version output from Java")
+	}
+
+	// Look for version pattern in first line
+	versionLine := lines[0]
+	// Extract version number (handles both old and new format)
+	if strings.Contains(versionLine, "\"") {
+		start := strings.Index(versionLine, "\"")
+		if start != -1 {
+			end := strings.Index(versionLine[start+1:], "\"")
+			if end != -1 {
+				version := versionLine[start+1 : start+1+end]
+				// Extract major version (e.g., "21.0.1" -> "21", "1.8.0_391" -> "8")
+				if strings.HasPrefix(version, "1.") {
+					// Old format (Java 8 and below): "1.8.0_391" -> "8"
+					parts := strings.Split(version, ".")
+					if len(parts) >= 2 {
+						return parts[1], nil
+					}
+				} else {
+					// New format (Java 9+): "21.0.1" -> "21"
+					parts := strings.Split(version, ".")
+					if len(parts) >= 1 {
+						return parts[0], nil
+					}
+				}
+			}
+		}
+	}
+
+	return "", fmt.Errorf("could not parse Java version from: %s", versionLine)
+}
+
+// isJavaVersionCompatible checks if the system Java version is compatible with the requested version
+func isJavaVersionCompatible(systemVersion, requestedVersion string) bool {
+	// For now, we require exact major version match
+	// This could be made more flexible in the future
+	return systemVersion == requestedVersion
 }
 
 // JavaTool implements Tool interface for Java/JDK management
 type JavaTool struct {
-	manager *Manager
+	*BaseTool
+}
+
+// NewJavaTool creates a new Java tool instance
+func NewJavaTool(manager *Manager) *JavaTool {
+	return &JavaTool{
+		BaseTool: NewBaseTool(manager, "java"),
+	}
 }
 
 // Name returns the tool name
@@ -51,13 +130,12 @@ func (j *JavaTool) Install(version string, cfg config.ToolConfig) error {
 	if useSystemJava() {
 		logVerbose("%s=true, forcing use of system Java", getSystemToolEnvVar("java"))
 
-		detector := getSystemJavaDetector()
-		systemJavaHome, err := detector.GetSystemHome()
+		systemJavaHome, err := getSystemJavaHome()
 		if err != nil {
 			return fmt.Errorf("MVX_USE_SYSTEM_JAVA=true but system Java not available: %v", err)
 		}
 
-		systemVersion, err := detector.GetSystemVersion(systemJavaHome)
+		systemVersion, err := getSystemJavaVersion(systemJavaHome)
 		if err != nil {
 			logVerbose("Could not determine system Java version: %v", err)
 			fmt.Printf("  🔗 Using system Java from JAVA_HOME: %s (version detection failed)\n", systemJavaHome)
@@ -65,7 +143,8 @@ func (j *JavaTool) Install(version string, cfg config.ToolConfig) error {
 			fmt.Printf("  🔗 Using system Java %s from JAVA_HOME: %s\n", systemVersion, systemJavaHome)
 		}
 
-		return detector.CreateSystemLink(systemJavaHome, installDir)
+		fmt.Printf("  ✅ System Java configured (mvx will use system PATH)\n")
+		return nil
 	}
 
 	// Create installation directory
@@ -81,7 +160,8 @@ func (j *JavaTool) Install(version string, cfg config.ToolConfig) error {
 
 	// Download and extract
 	fmt.Printf("  ⏳ Downloading Java %s (%s)...\n", version, distribution)
-	if err := j.downloadAndExtract(downloadURL, installDir, version, cfg); err != nil {
+	options := j.GetDownloadOptions()
+	if err := j.DownloadAndExtract(downloadURL, installDir, version, cfg, options); err != nil {
 		return fmt.Errorf("failed to download and extract: %w", err)
 	}
 
@@ -90,36 +170,75 @@ func (j *JavaTool) Install(version string, cfg config.ToolConfig) error {
 
 // IsInstalled checks if the specified version is installed
 func (j *JavaTool) IsInstalled(version string, cfg config.ToolConfig) bool {
-	distribution := cfg.Distribution
-	if distribution == "" {
-		distribution = "temurin"
-	}
-
-	// If using system Java, check if system Java is available (no version compatibility check)
+	// Check if we should use system Java instead of mvx-managed Java
 	if useSystemJava() {
-		detector := getSystemJavaDetector()
-		if systemJavaHome, err := detector.GetSystemHome(); err == nil {
-			logVerbose("System Java is available at %s (MVX_USE_SYSTEM_JAVA=true)", systemJavaHome)
-			return true
-		} else {
+		systemJavaHome, err := getSystemJavaHome()
+		if err != nil {
 			logVerbose("System Java not available: %v", err)
 			return false
 		}
+
+		// For system Java, we need to check if the version matches
+		systemVersion, err := getSystemJavaVersion(systemJavaHome)
+		if err != nil {
+			logVerbose("Could not determine system Java version: %v", err)
+			return false
+		}
+
+		// Check if system Java version is compatible with requested version
+		if !isJavaVersionCompatible(systemVersion, version) {
+			logVerbose("System Java version %s is not compatible with requested version %s", systemVersion, version)
+			return false
+		}
+
+		logVerbose("System Java version %s is compatible with requested version %s", systemVersion, version)
+		return true
 	}
 
-	// Try to get the actual Java path (which handles nested directories)
-	javaPath, err := j.GetPath(version, cfg)
-	if err != nil {
-		logVerbose("Java %s (%s) not installed: %v", version, distribution, err)
-		return false
-	}
-
-	logVerbose("Java %s (%s) found at: %s", version, distribution, javaPath)
-	return true
+	// Use standard mvx-managed installation check
+	return j.StandardIsInstalled(version, cfg, j.GetPath, "java")
 }
 
-// GetPath returns the installation path for the specified version
-func (j *JavaTool) GetPath(version string, cfg config.ToolConfig) (string, error) {
+// isVersionCompatible checks if the system Java version is compatible with the requested version
+func (j *JavaTool) isVersionCompatible(systemVersion, requestedVersion string) bool {
+	// Extract major version numbers for comparison
+	systemMajor := extractMajorVersion(systemVersion)
+	requestedMajor := extractMajorVersion(requestedVersion)
+
+	// For Java, we require exact major version match
+	return systemMajor == requestedMajor
+}
+
+// extractMajorVersion extracts the major version number from a Java version string
+func extractMajorVersion(version string) string {
+	// Handle different Java version formats:
+	// - "11.0.16" -> "11"
+	// - "17.0.2" -> "17"
+	// - "1.8.0_345" -> "8"
+	// - "21" -> "21"
+
+	// Remove any leading/trailing whitespace
+	version = strings.TrimSpace(version)
+
+	// Handle legacy format (1.x.y -> x)
+	if strings.HasPrefix(version, "1.") {
+		parts := strings.Split(version, ".")
+		if len(parts) >= 2 {
+			return parts[1]
+		}
+	}
+
+	// Handle modern format (x.y.z -> x)
+	parts := strings.Split(version, ".")
+	if len(parts) > 0 {
+		return parts[0]
+	}
+
+	return version
+}
+
+// GetJavaHome returns the JAVA_HOME path for the specified version
+func (j *JavaTool) GetJavaHome(version string, cfg config.ToolConfig) (string, error) {
 	distribution := cfg.Distribution
 	if distribution == "" {
 		distribution = "temurin"
@@ -127,8 +246,7 @@ func (j *JavaTool) GetPath(version string, cfg config.ToolConfig) (string, error
 
 	// If using system Java, return system JAVA_HOME if available (no version compatibility check)
 	if useSystemJava() {
-		detector := getSystemJavaDetector()
-		if systemJavaHome, err := detector.GetSystemHome(); err == nil {
+		if systemJavaHome, err := getSystemJavaHome(); err == nil {
 			logVerbose("Using system Java from JAVA_HOME: %s (MVX_USE_SYSTEM_JAVA=true)", systemJavaHome)
 			return systemJavaHome, nil
 		} else {
@@ -137,105 +255,68 @@ func (j *JavaTool) GetPath(version string, cfg config.ToolConfig) (string, error
 	}
 
 	installDir := j.manager.GetToolVersionDir("java", version, distribution)
+
+	// Check if installation directory exists
+	if _, err := os.Stat(installDir); os.IsNotExist(err) {
+		return "", fmt.Errorf("Java %s is not installed", version)
+	}
+
 	logVerbose("Checking Java installation in: %s", installDir)
 
-	// Check if there's a nested directory (common with JDK archives)
-	entries, err := os.ReadDir(installDir)
+	// Search for java executable recursively and determine JAVA_HOME from its location
+	javaExePath, err := j.findJavaExecutable(installDir)
 	if err != nil {
-		logVerbose("Failed to read installation directory %s: %v", installDir, err)
-		return "", fmt.Errorf("failed to read installation directory: %w", err)
+		logVerbose("Java executable not found in %s: %v", installDir, err)
+		return "", fmt.Errorf("Java executable not found in %s", installDir)
 	}
 
-	logVerbose("Found %d entries in installation directory", len(entries))
-
-	// Look for a subdirectory that looks like a JDK
-	for _, entry := range entries {
-		if entry.IsDir() {
-			subPath := filepath.Join(installDir, entry.Name())
-			logVerbose("Examining subdirectory: %s", subPath)
-
-			// Check standard location first
-			javaExe := filepath.Join(subPath, "bin", "java")
-			if runtime.GOOS == "windows" {
-				javaExe += ".exe"
-			}
-			logVerbose("Checking for Java executable at: %s", javaExe)
-			if _, err := os.Stat(javaExe); err == nil {
-				logVerbose("Found Java executable in subdirectory: %s", subPath)
-				return subPath, nil
-			}
-
-			// On macOS, also check Contents/Home/bin/java (common with JDK packages)
-			if runtime.GOOS == "darwin" {
-				macOSJavaExe := filepath.Join(subPath, "Contents", "Home", "bin", "java")
-				logVerbose("Checking for macOS Java executable at: %s", macOSJavaExe)
-				if _, err := os.Stat(macOSJavaExe); err == nil {
-					macOSJavaHome := filepath.Join(subPath, "Contents", "Home")
-					logVerbose("Found macOS Java executable, using JAVA_HOME: %s", macOSJavaHome)
-					return macOSJavaHome, nil
-				}
-			}
-
-			// For Alpine Linux and some other distributions, check nested subdirectories
-			if nestedEntries, err := os.ReadDir(subPath); err == nil {
-				for _, nestedEntry := range nestedEntries {
-					if nestedEntry.IsDir() {
-						nestedPath := filepath.Join(subPath, nestedEntry.Name())
-						nestedJavaExe := filepath.Join(nestedPath, "bin", "java")
-						if runtime.GOOS == "windows" {
-							nestedJavaExe += ".exe"
-						}
-						logVerbose("Checking for nested Java executable at: %s", nestedJavaExe)
-						if _, err := os.Stat(nestedJavaExe); err == nil {
-							logVerbose("Found Java executable in nested subdirectory: %s", nestedPath)
-							return nestedPath, nil
-						}
-
-						// On macOS, also check for nested Contents/Home/bin/java structure
-						if runtime.GOOS == "darwin" {
-							nestedMacOSJavaExe := filepath.Join(nestedPath, "Contents", "Home", "bin", "java")
-							logVerbose("Checking for nested macOS Java executable at: %s", nestedMacOSJavaExe)
-							if _, err := os.Stat(nestedMacOSJavaExe); err == nil {
-								nestedMacOSJavaHome := filepath.Join(nestedPath, "Contents", "Home")
-								logVerbose("Found nested macOS Java executable, using JAVA_HOME: %s", nestedMacOSJavaHome)
-								return nestedMacOSJavaHome, nil
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
-	// Also check if java is directly in the install directory (some distributions)
-	javaExe := filepath.Join(installDir, "bin", "java")
-	if runtime.GOOS == "windows" {
-		javaExe += ".exe"
-	}
-	logVerbose("Checking for Java executable directly at: %s", javaExe)
-	if _, err := os.Stat(javaExe); err == nil {
-		logVerbose("Found Java executable directly in install directory: %s", installDir)
-		return installDir, nil
-	}
-
-	// On macOS, also check Contents/Home/bin/java directly in install directory
-	if runtime.GOOS == "darwin" {
-		macOSJavaExe := filepath.Join(installDir, "Contents", "Home", "bin", "java")
-		logVerbose("Checking for macOS Java executable directly at: %s", macOSJavaExe)
-		if _, err := os.Stat(macOSJavaExe); err == nil {
-			macOSJavaHome := filepath.Join(installDir, "Contents", "Home")
-			logVerbose("Found macOS Java executable directly, using JAVA_HOME: %s", macOSJavaHome)
-			return macOSJavaHome, nil
-		}
-	}
-
-	logVerbose("Java executable not found anywhere in %s", installDir)
-	return "", fmt.Errorf("Java executable not found in %s", installDir)
+	// Determine JAVA_HOME from java executable path
+	// java executable is typically at $JAVA_HOME/bin/java
+	javaHome := filepath.Dir(filepath.Dir(javaExePath))
+	logVerbose("Found Java executable at: %s, using JAVA_HOME: %s", javaExePath, javaHome)
+	return javaHome, nil
 }
 
-// GetBinPath returns the binary path for the specified version
-func (j *JavaTool) GetBinPath(version string, cfg config.ToolConfig) (string, error) {
-	javaHome, err := j.GetPath(version, cfg)
+// findJavaExecutable recursively searches for the java executable in the given directory
+func (j *JavaTool) findJavaExecutable(dir string) (string, error) {
+	javaExeName := "java"
+	if runtime.GOOS == "windows" {
+		javaExeName = "java.exe"
+	}
+
+	var foundPath string
+	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return nil // Continue walking even if we can't read a directory
+		}
+
+		// Check if this is the java executable we're looking for
+		if !d.IsDir() && d.Name() == javaExeName {
+			// Verify it's in a bin directory (to avoid false positives)
+			if filepath.Base(filepath.Dir(path)) == "bin" {
+				logVerbose("Found Java executable at: %s", path)
+				foundPath = path
+				return filepath.SkipAll // Stop walking once we find it
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	if foundPath == "" {
+		return "", fmt.Errorf("java executable not found")
+	}
+
+	return foundPath, nil
+}
+
+// GetPath returns the binary path for the specified version (for PATH management)
+func (j *JavaTool) GetPath(version string, cfg config.ToolConfig) (string, error) {
+	javaHome, err := j.GetJavaHome(version, cfg)
 	if err != nil {
 		return "", err
 	}
@@ -249,7 +330,7 @@ func (j *JavaTool) Verify(version string, cfg config.ToolConfig) error {
 		distribution = "temurin"
 	}
 
-	binPath, err := j.GetBinPath(version, cfg)
+	binPath, err := j.GetPath(version, cfg)
 	if err != nil {
 		// Provide detailed debugging information
 		installDir := j.manager.GetToolVersionDir("java", version, distribution)
@@ -299,6 +380,22 @@ func (j *JavaTool) ListVersions() ([]string, error) {
 	// Use the registry to get versions from Disco API
 	registry := j.manager.GetRegistry()
 	return registry.GetJavaVersions("temurin") // Default to Temurin
+}
+
+// GetDownloadOptions returns download options specific to Java
+func (j *JavaTool) GetDownloadOptions() DownloadOptions {
+	return DownloadOptions{
+		FileExtension: ".tar.gz",
+		ExpectedType:  "application",
+		MinSize:       100 * 1024 * 1024, // 100MB
+		MaxSize:       500 * 1024 * 1024, // 500MB
+		ArchiveType:   "tar.gz",
+	}
+}
+
+// GetDisplayName returns the display name for Java
+func (j *JavaTool) GetDisplayName() string {
+	return "Java"
 }
 
 // getDownloadURL returns the download URL for the specified version and distribution using Disco API
@@ -544,211 +641,4 @@ func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, rel
 
 	logVerbose("Selected download URL: %s", downloadURL)
 	return downloadURL, nil
-}
-
-// downloadAndExtract downloads and extracts an archive file with format detection
-func (j *JavaTool) downloadAndExtract(url, destDir, version string, cfg config.ToolConfig) error {
-	// Detect file format from URL
-	var fileExt string
-	if strings.Contains(url, ".tar.gz") {
-		fileExt = ".tar.gz"
-	} else if strings.Contains(url, ".zip") {
-		fileExt = ".zip"
-	} else if strings.Contains(url, ".tar.xz") {
-		fileExt = ".tar.xz"
-	} else {
-		fileExt = ".tar.gz" // default fallback
-	}
-
-	// Create temporary file for download
-	tmpFile, err := os.CreateTemp("", "java-download-*"+fileExt)
-	if err != nil {
-		return fmt.Errorf("failed to create temporary file: %w", err)
-	}
-	defer os.Remove(tmpFile.Name())
-	defer tmpFile.Close()
-
-	// Configure robust download with checksum verification
-	config := DefaultDownloadConfig(url, tmpFile.Name())
-	config.ExpectedType = "application" // Accept various application types
-	config.MinSize = 50 * 1024 * 1024   // Minimum 50MB for Java distributions
-	config.MaxSize = 500 * 1024 * 1024  // Maximum 500MB for Java distributions
-	config.ToolName = "java"            // For progress reporting
-	config.Version = version            // For checksum verification
-	config.Config = cfg                 // Tool configuration
-	config.ChecksumRegistry = j.manager.GetChecksumRegistry()
-
-	// Perform robust download with checksum verification
-	result, err := RobustDownload(config)
-	if err != nil {
-		return fmt.Errorf("Java download failed: %s", DiagnoseDownloadError(url, err))
-	}
-
-	fmt.Printf("  📦 Downloaded %d bytes from %s\n", result.Size, result.FinalURL)
-
-	// Close temp file before extraction
-	tmpFile.Close()
-
-	// Open the downloaded file for extraction
-	file, err := os.Open(tmpFile.Name())
-	if err != nil {
-		return fmt.Errorf("failed to open downloaded file: %w", err)
-	}
-	defer file.Close()
-
-	// Extract based on file format
-	switch fileExt {
-	case ".tar.gz":
-		return j.extractTarGz(tmpFile.Name(), destDir)
-	case ".zip":
-		return j.extractZip(tmpFile.Name(), destDir)
-	case ".tar.xz":
-		return j.extractTarXz(tmpFile.Name(), destDir)
-	default:
-		return fmt.Errorf("unsupported archive format: %s", fileExt)
-	}
-}
-
-// extractTarGz extracts a tar.gz file from disk
-func (j *JavaTool) extractTarGz(archivePath, destDir string) error {
-	file, err := os.Open(archivePath)
-	if err != nil {
-		return fmt.Errorf("failed to open archive: %w", err)
-	}
-	defer file.Close()
-
-	// Create gzip reader
-	gzReader, err := gzip.NewReader(file)
-	if err != nil {
-		return fmt.Errorf("failed to create gzip reader: %w", err)
-	}
-	defer gzReader.Close()
-
-	// Create tar reader
-	tarReader := tar.NewReader(gzReader)
-
-	// Extract files
-	for {
-		header, err := tarReader.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return fmt.Errorf("failed to read tar entry: %w", err)
-		}
-
-		targetPath := filepath.Join(destDir, header.Name)
-
-		switch header.Typeflag {
-		case tar.TypeDir:
-			if err := os.MkdirAll(targetPath, os.FileMode(header.Mode)); err != nil {
-				return fmt.Errorf("failed to create directory %s: %w", targetPath, err)
-			}
-		case tar.TypeReg:
-			// Ensure we have write permissions for the file
-			mode := os.FileMode(header.Mode)
-			if mode&0200 == 0 {
-				mode |= 0200 // Add write permission for owner
-			}
-			if err := j.extractFile(tarReader, targetPath, mode); err != nil {
-				return fmt.Errorf("failed to extract file %s: %w", targetPath, err)
-			}
-		}
-	}
-
-	return nil
-}
-
-// extractFile extracts a single file from tar reader
-func (j *JavaTool) extractFile(tarReader *tar.Reader, targetPath string, mode os.FileMode) error {
-	// Create parent directory
-	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
-		return err
-	}
-
-	// Create file
-	file, err := os.OpenFile(targetPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	// Copy content
-	_, err = io.Copy(file, tarReader)
-	return err
-}
-
-// extractZip extracts a ZIP file from disk
-func (j *JavaTool) extractZip(archivePath, destDir string) error {
-	reader, err := zip.OpenReader(archivePath)
-	if err != nil {
-		return fmt.Errorf("failed to open ZIP archive: %w", err)
-	}
-	defer reader.Close()
-
-	// Extract files
-	for _, file := range reader.File {
-		targetPath := filepath.Join(destDir, file.Name)
-
-		// Security check: ensure the file path is within destDir
-		if !strings.HasPrefix(targetPath, filepath.Clean(destDir)+string(os.PathSeparator)) {
-			return fmt.Errorf("invalid file path in ZIP: %s", file.Name)
-		}
-
-		if file.FileInfo().IsDir() {
-			// Create directory
-			if err := os.MkdirAll(targetPath, file.FileInfo().Mode()); err != nil {
-				return fmt.Errorf("failed to create directory %s: %w", targetPath, err)
-			}
-		} else {
-			// Extract file
-			if err := j.extractZipFile(file, targetPath); err != nil {
-				return fmt.Errorf("failed to extract file %s: %w", targetPath, err)
-			}
-		}
-	}
-
-	return nil
-}
-
-// extractZipFile extracts a single file from ZIP archive
-func (j *JavaTool) extractZipFile(file *zip.File, targetPath string) error {
-	// Create parent directory
-	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
-		return err
-	}
-
-	// Open file in ZIP
-	reader, err := file.Open()
-	if err != nil {
-		return err
-	}
-	defer reader.Close()
-
-	// Ensure we have write permissions for the file
-	mode := file.FileInfo().Mode()
-	if mode&0200 == 0 {
-		mode |= 0200 // Add write permission for owner
-	}
-
-	// Create target file
-	targetFile, err := os.OpenFile(targetPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
-	if err != nil {
-		return err
-	}
-	defer targetFile.Close()
-
-	// Copy content
-	_, err = io.Copy(targetFile, reader)
-	return err
-}
-
-// extractTarXz extracts a tar.xz file using system tar command
-func (j *JavaTool) extractTarXz(archivePath, destDir string) error {
-	// Use system tar command for tar.xz files
-	cmd := fmt.Sprintf("tar -xf %s -C %s", archivePath, destDir)
-	logVerbose("Extracting tar.xz using system command: %s", cmd)
-
-	// This is a simplified implementation - in practice you'd want to use exec.Command
-	return fmt.Errorf("tar.xz extraction not yet implemented - please use tar.gz or ZIP format")
 }

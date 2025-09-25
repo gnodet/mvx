@@ -234,6 +234,24 @@ type AdoptiumAsset struct {
 	} `json:"binary"`
 }
 
+// GoRelease represents a Go release from go.dev API
+type GoRelease struct {
+	Version string   `json:"version"`
+	Stable  bool     `json:"stable"`
+	Files   []GoFile `json:"files"`
+}
+
+// GoFile represents a Go file from go.dev API
+type GoFile struct {
+	Filename string `json:"filename"`
+	OS       string `json:"os"`
+	Arch     string `json:"arch"`
+	Version  string `json:"version"`
+	SHA256   string `json:"sha256"`
+	Size     int64  `json:"size"`
+	Kind     string `json:"kind"`
+}
+
 // GetJavaChecksumFromAPI fetches Java checksum from Adoptium API
 func (cr *ChecksumRegistry) GetJavaChecksumFromAPI(version, arch, osName string) (ChecksumInfo, error) {
 	// Convert mvx architecture names to Adoptium API names
@@ -281,6 +299,43 @@ func (cr *ChecksumRegistry) GetJavaChecksumFromAPI(version, arch, osName string)
 	}
 
 	return ChecksumInfo{}, fmt.Errorf("no matching JDK found for %s %s %s", version, arch, osName)
+}
+
+// GetGoChecksumFromAPI fetches Go checksum from go.dev API
+func (cr *ChecksumRegistry) GetGoChecksumFromAPI(version, filename string) (ChecksumInfo, error) {
+	url := "https://go.dev/dl/?mode=json&include=all"
+
+	resp, err := cr.client.Get(url)
+	if err != nil {
+		return ChecksumInfo{}, fmt.Errorf("failed to fetch Go checksums: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return ChecksumInfo{}, fmt.Errorf("Go checksums returned status %d", resp.StatusCode)
+	}
+
+	// Parse the JSON response
+	var releases []GoRelease
+	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+		return ChecksumInfo{}, fmt.Errorf("failed to decode Go API response: %w", err)
+	}
+
+	// Find the matching version and file
+	for _, release := range releases {
+		if release.Version == "go"+version {
+			for _, file := range release.Files {
+				if file.Filename == filename && file.Kind == "archive" {
+					return ChecksumInfo{
+						Type:  SHA256,
+						Value: file.SHA256,
+					}, nil
+				}
+			}
+		}
+	}
+
+	return ChecksumInfo{}, fmt.Errorf("no matching Go file found for version %s, filename %s", version, filename)
 }
 
 // GetNodeChecksumFromSHASUMS fetches Node.js checksum from SHASUMS256.txt

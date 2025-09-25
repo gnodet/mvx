@@ -233,8 +233,12 @@ func parseTokens(tokens []Token) ([]CommandChain, error) {
 
 // parseCommand parses a command string into Command struct
 // Supports environment variable assignments like: VAR=value command args
+// Properly handles quoted arguments by removing quotes
 func parseCommand(cmdStr string) (Command, error) {
-	fields := strings.Fields(cmdStr)
+	fields, err := parseShellArgs(cmdStr)
+	if err != nil {
+		return Command{}, err
+	}
 	if len(fields) == 0 {
 		return Command{}, fmt.Errorf("empty command")
 	}
@@ -267,6 +271,56 @@ func parseCommand(cmdStr string) (Command, error) {
 		Args: fields[cmdStart+1:],
 		Env:  env,
 	}, nil
+}
+
+// parseShellArgs parses a command string into arguments, properly handling quotes
+func parseShellArgs(cmdStr string) ([]string, error) {
+	var args []string
+	var current strings.Builder
+	inQuotes := false
+	quoteChar := byte(0)
+
+	for i := 0; i < len(cmdStr); i++ {
+		char := cmdStr[i]
+
+		// Handle quotes
+		if (char == '"' || char == '\'') && !inQuotes {
+			inQuotes = true
+			quoteChar = char
+			// Don't include the opening quote in the argument
+			continue
+		} else if char == quoteChar && inQuotes {
+			inQuotes = false
+			quoteChar = 0
+			// Don't include the closing quote in the argument
+			continue
+		}
+
+		if inQuotes {
+			// Inside quotes, include everything literally
+			current.WriteByte(char)
+		} else {
+			// Outside quotes, handle whitespace as separators
+			if char == ' ' || char == '\t' || char == '\n' || char == '\r' {
+				if current.Len() > 0 {
+					args = append(args, current.String())
+					current.Reset()
+				}
+			} else {
+				current.WriteByte(char)
+			}
+		}
+	}
+
+	if inQuotes {
+		return nil, fmt.Errorf("unterminated quote in command")
+	}
+
+	if current.Len() > 0 {
+		args = append(args, current.String())
+	}
+
+	return args, nil
 }
 
 // isValidEnvVarName checks if a string is a valid environment variable name

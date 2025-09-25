@@ -32,13 +32,11 @@ func TestUseSystemMaven(t *testing.T) {
 }
 
 func TestMavenSystemDetector(t *testing.T) {
-	detector := &MavenSystemDetector{}
-
-	// Test GetSystemHome when no Maven environment variables are set
+	// Test getSystemMavenHome when no Maven environment variables are set
 	os.Unsetenv("MAVEN_HOME")
 	os.Unsetenv("M2_HOME")
 
-	_, err := detector.GetSystemHome()
+	_, err := getSystemMavenHome()
 	// This might succeed if mvn is in PATH, so we don't assert failure
 	if err != nil {
 		t.Logf("Maven not found in system (expected): %v", err)
@@ -77,7 +75,7 @@ func TestMavenToolWithSystemMaven(t *testing.T) {
 		t.Fatalf("Failed to create manager: %v", err)
 	}
 
-	mavenTool := &MavenTool{manager: manager}
+	mavenTool := NewMavenTool(manager)
 
 	// Test with MVX_USE_SYSTEM_MAVEN=false (default behavior)
 	os.Unsetenv("MVX_USE_SYSTEM_MAVEN")
