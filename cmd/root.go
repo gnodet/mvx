@@ -55,8 +55,9 @@ For more information, visit: https://github.com/gnodet/mvx`,
 func Execute() error {
 	// Auto-setup tools and environment before executing any command
 	if err := autoSetupEnvironment(); err != nil {
-		// Don't fail completely if auto-setup fails, but warn the user
-		printVerbose("Auto-setup failed: %v", err)
+		// If auto-setup fails, we should fail the command execution
+		// This prevents commands from running with missing tools
+		return fmt.Errorf("auto-setup failed: %w", err)
 	}
 
 	// Add dynamic custom commands before execution

@@ -2,6 +2,7 @@ package tools
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +11,49 @@ import (
 
 	"github.com/gnodet/mvx/pkg/config"
 )
+
+// getUserFriendlyURL converts long redirect URLs to user-friendly display URLs
+func getUserFriendlyURL(inputURL string) string {
+	// Handle GitHub release asset URLs
+	if strings.Contains(inputURL, "release-assets.githubusercontent.com") {
+		// Extract filename from response-content-disposition parameter
+		if strings.Contains(inputURL, "response-content-disposition=attachment") {
+			if start := strings.Index(inputURL, "filename%3D"); start != -1 {
+				start += len("filename%3D")
+				if end := strings.Index(inputURL[start:], "&"); end != -1 {
+					filename := inputURL[start : start+end]
+					// URL decode the filename
+					if decoded, err := url.QueryUnescape(filename); err == nil {
+						return fmt.Sprintf("github.com/.../releases/%s", decoded)
+					}
+				}
+			}
+		}
+		return "github.com/.../releases/[asset]"
+	}
+
+	// Handle other long URLs with query parameters
+	if len(inputURL) > 80 && strings.Contains(inputURL, "?") {
+		baseURL := strings.Split(inputURL, "?")[0]
+		if len(baseURL) > 50 {
+			// Extract domain and path
+			if parsed, err := url.Parse(baseURL); err == nil {
+				if len(parsed.Path) > 30 {
+					// Show domain + shortened path
+					pathParts := strings.Split(parsed.Path, "/")
+					if len(pathParts) > 3 {
+						return fmt.Sprintf("%s/.../%s", parsed.Host, pathParts[len(pathParts)-1])
+					}
+				}
+				return fmt.Sprintf("%s%s", parsed.Host, parsed.Path)
+			}
+		}
+		return baseURL
+	}
+
+	// For normal URLs, return as-is
+	return inputURL
+}
 
 // BaseTool provides common functionality for all tools
 type BaseTool struct {
@@ -35,23 +79,71 @@ func (b *BaseTool) GetToolName() string {
 	return b.toolName
 }
 
-// CreateInstallDir creates the installation directory for a tool version
-func (b *BaseTool) CreateInstallDir(version, distribution string) (string, error) {
-	installDir := b.manager.GetToolVersionDir(b.toolName, version, distribution)
-	if err := os.MkdirAll(installDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create installation directory: %w", err)
-	}
-	return installDir, nil
+// getPlatformBinaryPath returns the platform-specific binary path
+func (b *BaseTool) getPlatformBinaryPath(binPath, binaryName string) string {
+	return b.getPlatformBinaryPathWithExtension(binPath, binaryName, ".exe")
 }
 
-// DownloadAndExtract performs a robust download with checksum verification
-func (b *BaseTool) DownloadAndExtract(url, destDir, version string, cfg config.ToolConfig, options DownloadOptions) error {
+// getPlatformBinaryPathWithExtension returns the platform-specific binary path with custom extension
+func (b *BaseTool) getPlatformBinaryPathWithExtension(binPath, binaryName, windowsExt string) string {
+	platformMapper := NewPlatformMapper()
+
+	// Add platform-specific extension if needed
+	if platformMapper.IsWindows() && binaryName != "" {
+		if !strings.HasSuffix(binaryName, ".exe") && !strings.HasSuffix(binaryName, ".cmd") {
+			binaryName = binaryName + windowsExt
+		}
+	}
+
+	return filepath.Join(binPath, binaryName)
+}
+
+// checkSystemBinaryExists checks if a system binary exists with platform-specific extensions
+func (b *BaseTool) checkSystemBinaryExists(basePath, binaryName string) (bool, string) {
+	return b.checkSystemBinaryExistsWithExtensions(basePath, binaryName, []string{".exe", ".cmd"})
+}
+
+// checkSystemBinaryExistsWithExtensions checks if a system binary exists with custom extensions
+func (b *BaseTool) checkSystemBinaryExistsWithExtensions(basePath, binaryName string, windowsExtensions []string) (bool, string) {
+	platformMapper := NewPlatformMapper()
+
+	// Try the exact binary name first
+	fullPath := filepath.Join(basePath, binaryName)
+	if _, err := os.Stat(fullPath); err == nil {
+		return true, fullPath
+	}
+
+	// On Windows, try specified extensions
+	if platformMapper.IsWindows() && !strings.HasSuffix(binaryName, ".exe") && !strings.HasSuffix(binaryName, ".cmd") {
+		for _, ext := range windowsExtensions {
+			extPath := fullPath + ext
+			if _, err := os.Stat(extPath); err == nil {
+				return true, extPath
+			}
+		}
+	}
+
+	return false, ""
+}
+
+// wrapError wraps an error with tool context using standardized error types
+func (b *BaseTool) wrapError(operation, version string, err error) error {
+	return WrapError(b.toolName, version, operation, err)
+}
+
+// CreateInstallDir creates the installation directory for a tool version
+func (b *BaseTool) CreateInstallDir(version, distribution string) (string, error) {
+	pathManager := NewInstallationPathManager(b.manager.GetToolsDir())
+	return pathManager.CreateToolInstallDir(b.toolName, version, distribution)
+}
+
+// Download performs a robust download with checksum verification
+func (b *BaseTool) Download(url, version string, cfg config.ToolConfig, options DownloadOptions) (string, error) {
 	// Create temporary file for download
 	tmpFile, err := os.CreateTemp("", fmt.Sprintf("%s-*%s", b.toolName, options.FileExtension))
 	if err != nil {
-		return fmt.Errorf("failed to create temporary file: %w", err)
+		return "", fmt.Errorf("failed to create temporary file: %w", err)
 	}
-	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
 
 	// Configure robust download with checksum verification
@@ -64,19 +156,103 @@ func (b *BaseTool) DownloadAndExtract(url, destDir, version string, cfg config.T
 	downloadConfig.Config = cfg
 	downloadConfig.ChecksumRegistry = b.manager.GetChecksumRegistry()
 
+	// Get the tool instance for checksum verification
+	if tool, err := b.manager.GetTool(b.toolName); err == nil {
+		downloadConfig.Tool = tool
+	}
+
 	// Perform robust download with checksum verification
 	result, err := RobustDownload(downloadConfig)
 	if err != nil {
-		return fmt.Errorf("%s download failed: %s", strings.Title(b.toolName), DiagnoseDownloadError(url, err))
+		os.Remove(tmpFile.Name()) // Clean up on failure
+		return "", fmt.Errorf("%s download failed: %s", strings.Title(b.toolName), DiagnoseDownloadError(url, err))
 	}
 
-	fmt.Printf("  📦 Downloaded %d bytes from %s\n", result.Size, result.FinalURL)
+	// Show user-friendly URL instead of long redirect URLs
+	displayURL := getUserFriendlyURL(result.FinalURL)
+	fmt.Printf("  📦 Downloaded %d bytes from %s\n", result.Size, displayURL)
 
-	// Close temp file before extraction
-	tmpFile.Close()
+	// Return the path to the downloaded file
+	return tmpFile.Name(), nil
+}
 
-	// Extract based on file type
-	return b.extractFile(tmpFile.Name(), destDir, options.ArchiveType)
+// Extract extracts an archive file to the destination directory
+func (b *BaseTool) Extract(archivePath, destDir string, options DownloadOptions) error {
+	return b.extractFile(archivePath, destDir, options.ArchiveType)
+}
+
+// VerificationConfig contains configuration for tool verification
+type VerificationConfig struct {
+	BinaryName      string   // Primary binary name to verify
+	VersionArgs     []string // Arguments to get version (e.g., ["--version"])
+	ExpectedVersion string   // Expected version string in output
+	DebugInfo       bool     // Whether to show debug information on failure
+}
+
+// Verify performs post-installation verification of a tool
+func (b *BaseTool) Verify(installDir, version string, cfg config.ToolConfig) error {
+	// Default verification: check if installation directory exists and is not empty
+	if _, err := os.Stat(installDir); os.IsNotExist(err) {
+		return fmt.Errorf("installation directory does not exist: %s", installDir)
+	}
+
+	// Check if directory is not empty
+	entries, err := os.ReadDir(installDir)
+	if err != nil {
+		return fmt.Errorf("failed to read installation directory: %w", err)
+	}
+
+	if len(entries) == 0 {
+		return fmt.Errorf("installation directory is empty: %s", installDir)
+	}
+
+	return nil
+}
+
+// VerifyWithConfig performs comprehensive verification using configuration
+func (b *BaseTool) VerifyWithConfig(version string, cfg config.ToolConfig, verifyConfig VerificationConfig) error {
+	// Get tool path
+	tool, err := b.manager.GetTool(b.toolName)
+	if err != nil {
+		return VerifyError(b.toolName, version, fmt.Errorf("failed to get tool: %w", err))
+	}
+
+	// Get path using tool's GetPath method
+	var binPath string
+	if pathProvider, hasGetPath := tool.(interface {
+		GetPath(string, config.ToolConfig) (string, error)
+	}); hasGetPath {
+		binPath, err = pathProvider.GetPath(version, cfg)
+		if err != nil {
+			if verifyConfig.DebugInfo {
+				b.printVerificationDebugInfo(version, cfg, err)
+			}
+			return VerifyError(b.toolName, version, fmt.Errorf("failed to get binary path: %w", err))
+		}
+	} else {
+		return VerifyError(b.toolName, version, fmt.Errorf("tool does not implement GetPath method"))
+	}
+
+	// Verify binary exists and works
+	if err := b.VerifyBinaryWithConfig(binPath, verifyConfig); err != nil {
+		return VerifyError(b.toolName, version, err)
+	}
+
+	return nil
+}
+
+// DownloadAndExtract performs a robust download with checksum verification and extraction
+// This is a convenience method that combines Download and Extract
+func (b *BaseTool) DownloadAndExtract(url, destDir, version string, cfg config.ToolConfig, options DownloadOptions) error {
+	// Download the file
+	archivePath, err := b.Download(url, version, cfg, options)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(archivePath) // Clean up downloaded file after extraction
+
+	// Extract the file
+	return b.Extract(archivePath, destDir, options)
 }
 
 // DownloadOptions contains options for downloading and extracting files
@@ -119,10 +295,7 @@ func (b *BaseTool) extractTarXz(src, dest string) error {
 
 // VerifyBinary runs a binary with version flag and checks the output
 func (b *BaseTool) VerifyBinary(binPath, binaryName, version string, versionArgs []string) error {
-	exe := filepath.Join(binPath, binaryName)
-	if runtime.GOOS == "windows" && !strings.HasSuffix(exe, ".exe") {
-		exe += ".exe"
-	}
+	exe := b.getPlatformBinaryPath(binPath, binaryName)
 
 	// Run version command
 	cmd := exec.Command(exe, versionArgs...)
@@ -131,24 +304,63 @@ func (b *BaseTool) VerifyBinary(binPath, binaryName, version string, versionArgs
 		return fmt.Errorf("%s verification failed: %w\nOutput: %s", b.toolName, err, output)
 	}
 
-	// Check if output contains expected version
-	outputStr := string(output)
-	if !strings.Contains(outputStr, version) {
-		// Allow 'v' prefix in output for some tools
-		if !strings.Contains(outputStr, "v"+version) {
-			return fmt.Errorf("%s version mismatch: expected %s, got %s", b.toolName, version, outputStr)
+	return nil
+}
+
+// VerifyBinaryWithConfig runs a binary with configuration and checks the output
+func (b *BaseTool) VerifyBinaryWithConfig(binPath string, verifyConfig VerificationConfig) error {
+	exe := b.getPlatformBinaryPath(binPath, verifyConfig.BinaryName)
+
+	// Check if binary exists
+	if _, err := os.Stat(exe); err != nil {
+		return fmt.Errorf("%s executable not found at %s: %w", verifyConfig.BinaryName, exe, err)
+	}
+
+	// Run version command
+	cmd := exec.Command(exe, verifyConfig.VersionArgs...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s verification failed: %w\nOutput: %s", b.toolName, err, output)
+	}
+
+	// Check version if expected version is provided
+	if verifyConfig.ExpectedVersion != "" {
+		outputStr := string(output)
+		if !strings.Contains(outputStr, verifyConfig.ExpectedVersion) {
+			return fmt.Errorf("%s version mismatch: expected %s, got %s", b.toolName, verifyConfig.ExpectedVersion, outputStr)
 		}
 	}
 
 	return nil
 }
 
+// printVerificationDebugInfo prints detailed debug information for verification failures
+func (b *BaseTool) printVerificationDebugInfo(version string, cfg config.ToolConfig, pathErr error) {
+	fmt.Printf("  🔍 Debug: %s installation verification failed\n", b.toolName)
+
+	// Try to determine install directory
+	installDir := ""
+	if cfg.Distribution != "" {
+		installDir = b.manager.GetToolVersionDir(b.toolName, version, cfg.Distribution)
+	} else {
+		installDir = b.manager.GetToolVersionDir(b.toolName, version, "")
+	}
+
+	fmt.Printf("     Install directory: %s\n", installDir)
+	fmt.Printf("     Error getting bin path: %v\n", pathErr)
+
+	// List contents of install directory for debugging
+	if entries, readErr := os.ReadDir(installDir); readErr == nil {
+		fmt.Printf("     Install directory contents:\n")
+		for _, entry := range entries {
+			fmt.Printf("       - %s (dir: %t)\n", entry.Name(), entry.IsDir())
+		}
+	}
+}
+
 // IsInstalled checks if a binary exists at the expected path
 func (b *BaseTool) IsInstalled(binPath, binaryName string) bool {
-	exe := filepath.Join(binPath, binaryName)
-	if runtime.GOOS == "windows" && !strings.HasSuffix(exe, ".exe") {
-		exe += ".exe"
-	}
+	exe := b.getPlatformBinaryPath(binPath, binaryName)
 	_, err := os.Stat(exe)
 	return err == nil
 }
@@ -211,20 +423,8 @@ func (b *BaseTool) StandardInstallWithOptions(version string, cfg config.ToolCon
 		for _, envVar := range envVars {
 			if envValue := os.Getenv(envVar); envValue != "" {
 				// Verify the tool exists in this environment path
-				toolPath := filepath.Join(envValue, "bin", b.toolName)
-				if runtime.GOOS == "windows" && !strings.HasSuffix(b.toolName, ".exe") && !strings.HasSuffix(b.toolName, ".cmd") {
-					if _, err := os.Stat(toolPath + ".cmd"); err == nil {
-						fmt.Printf("  🔗 Using system %s from %s: %s\n", b.toolName, envVar, envValue)
-						fmt.Printf("  ✅ System %s configured (mvx will use system PATH)\n", b.toolName)
-						return nil
-					}
-					if _, err := os.Stat(toolPath + ".exe"); err == nil {
-						fmt.Printf("  🔗 Using system %s from %s: %s\n", b.toolName, envVar, envValue)
-						fmt.Printf("  ✅ System %s configured (mvx will use system PATH)\n", b.toolName)
-						return nil
-					}
-				}
-				if _, err := os.Stat(toolPath); err == nil {
+				binPath := filepath.Join(envValue, "bin")
+				if exists, _ := b.checkSystemBinaryExists(binPath, b.toolName); exists {
 					fmt.Printf("  🔗 Using system %s from %s: %s\n", b.toolName, envVar, envValue)
 					fmt.Printf("  ✅ System %s configured (mvx will use system PATH)\n", b.toolName)
 					return nil
@@ -263,33 +463,39 @@ func (b *BaseTool) StandardInstallWithOptions(version string, cfg config.ToolCon
 	// Print download message
 	b.PrintDownloadMessage(version)
 
-	// Download and extract with tool-specific options
+	// Get tool-specific download options
 	options := b.getDownloadOptions()
-	if err := b.DownloadAndExtract(downloadURL, installDir, version, cfg, options); err != nil {
+
+	// Download the file
+	archivePath, err := b.Download(downloadURL, version, cfg, options)
+	if err != nil {
+		return InstallError(b.toolName, version, err)
+	}
+	defer os.Remove(archivePath) // Clean up downloaded file
+
+	// Extract the file
+	if err := b.Extract(archivePath, installDir, options); err != nil {
 		return InstallError(b.toolName, version, err)
 	}
 
-	// Verify installation was successful (if verification function is available)
-	if verifyFunc := b.getVerificationFunction(); verifyFunc != nil {
-		if err := verifyFunc(version, cfg); err != nil {
-			// Installation verification failed, clean up the installation directory
-			fmt.Printf("  ❌ %s installation verification failed: %v\n", b.toolName, err)
-			fmt.Printf("  🧹 Cleaning up failed installation directory...\n")
-			if removeErr := os.RemoveAll(installDir); removeErr != nil {
-				fmt.Printf("  ⚠️  Warning: failed to clean up installation directory: %v\n", removeErr)
+	// Verify installation was successful using tool's Verify method
+	if tool, err := b.manager.GetTool(b.toolName); err == nil {
+		if verifier, hasVerify := tool.(interface {
+			Verify(string, config.ToolConfig) error
+		}); hasVerify {
+			if err := verifier.Verify(version, cfg); err != nil {
+				// Installation verification failed, clean up the installation directory
+				fmt.Printf("  ❌ %s installation verification failed: %v\n", b.toolName, err)
+				fmt.Printf("  🧹 Cleaning up failed installation directory...\n")
+				if removeErr := os.RemoveAll(installDir); removeErr != nil {
+					fmt.Printf("  ⚠️  Warning: failed to clean up installation directory: %v\n", removeErr)
+				}
+				return InstallError(b.toolName, version, fmt.Errorf("installation verification failed: %w", err))
 			}
-			return InstallError(b.toolName, version, fmt.Errorf("installation verification failed: %w", err))
+			fmt.Printf("  ✅ %s %s installation verification successful\n", b.toolName, version)
 		}
-		fmt.Printf("  ✅ %s %s installation verification successful\n", b.toolName, version)
 	}
 
-	return nil
-}
-
-// getVerificationFunction returns a tool-specific verification function if available
-func (b *BaseTool) getVerificationFunction() func(string, config.ToolConfig) error {
-	// This is a placeholder - individual tools can override this by implementing their own verification
-	// For now, we return nil to indicate no verification is available at the base level
 	return nil
 }
 
@@ -303,6 +509,11 @@ func (b *BaseTool) StandardVerify(version string, cfg config.ToolConfig, getPath
 		return VerifyError(b.toolName, version, err)
 	}
 	return nil
+}
+
+// StandardVerifyWithConfig provides standard verification using VerificationConfig
+func (b *BaseTool) StandardVerifyWithConfig(version string, cfg config.ToolConfig, verifyConfig VerificationConfig) error {
+	return b.VerifyWithConfig(version, cfg, verifyConfig)
 }
 
 // StandardIsInstalled provides standard installation check for tools
@@ -411,7 +622,7 @@ func (b *BaseTool) StandardGetPathWithOptions(version string, cfg config.ToolCon
 			}
 		}
 
-		return "", fmt.Errorf("MVX_USE_SYSTEM_%s=true but system %s not available", strings.ToUpper(b.toolName), b.toolName)
+		return "", SystemToolError(b.toolName, fmt.Errorf("MVX_USE_SYSTEM_%s=true but system %s not available", strings.ToUpper(b.toolName), b.toolName))
 	}
 
 	// Use mvx-managed tool path

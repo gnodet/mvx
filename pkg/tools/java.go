@@ -17,17 +17,13 @@ import (
 
 // Compile-time interface validation
 var _ Tool = (*JavaTool)(nil)
-
-// useSystemJava checks if system Java should be used instead of downloading
-func useSystemJava() bool {
-	return UseSystemTool("java")
-}
+var _ ChecksumProvider = (*JavaTool)(nil)
 
 // getSystemJavaHome returns the system JAVA_HOME if available and valid
 func getSystemJavaHome() (string, error) {
 	javaHome := os.Getenv("JAVA_HOME")
 	if javaHome == "" {
-		return "", fmt.Errorf("JAVA_HOME environment variable not set")
+		return "", SystemToolError("java", fmt.Errorf("JAVA_HOME environment variable not set"))
 	}
 
 	// Check if JAVA_HOME points to a valid Java installation
@@ -37,7 +33,7 @@ func getSystemJavaHome() (string, error) {
 	}
 
 	if _, err := os.Stat(javaExe); err != nil {
-		return "", fmt.Errorf("Java executable not found at %s", javaExe)
+		return "", SystemToolError("java", fmt.Errorf("Java executable not found at %s: %w", javaExe, err))
 	}
 
 	return javaHome, nil
@@ -124,79 +120,140 @@ func (j *JavaTool) Install(version string, cfg config.ToolConfig) error {
 		distribution = "temurin" // Default to Eclipse Temurin
 	}
 
-	installDir := j.manager.GetToolVersionDir("java", version, distribution)
-
-	// Check if we should use system Java instead of downloading
-	if useSystemJava() {
-		logVerbose("%s=true, forcing use of system Java", getSystemToolEnvVar("java"))
-
-		systemJavaHome, err := getSystemJavaHome()
+	// Create a wrapper function that matches the expected signature
+	getDownloadURLWrapper := func(v string) string {
+		url, err := j.getDownloadURL(v, distribution)
 		if err != nil {
-			return fmt.Errorf("MVX_USE_SYSTEM_JAVA=true but system Java not available: %v", err)
+			logVerbose("Failed to get download URL for Java %s (%s): %v", v, distribution, err)
+			return ""
 		}
+		return url
+	}
 
-		systemVersion, err := getSystemJavaVersion(systemJavaHome)
-		if err != nil {
-			logVerbose("Could not determine system Java version: %v", err)
-			fmt.Printf("  🔗 Using system Java from JAVA_HOME: %s (version detection failed)\n", systemJavaHome)
-		} else {
-			fmt.Printf("  🔗 Using system Java %s from JAVA_HOME: %s\n", systemVersion, systemJavaHome)
-		}
+	// Use custom installation flow to handle distribution parameter
+	return j.installWithDistribution(version, cfg, distribution, getDownloadURLWrapper)
+}
 
-		fmt.Printf("  ✅ System Java configured (mvx will use system PATH)\n")
+// installWithDistribution provides Java-specific installation flow with distribution support
+func (j *JavaTool) installWithDistribution(version string, cfg config.ToolConfig, distribution string, getDownloadURL func(string) string) error {
+	// Check if we should use system tool instead of downloading
+	if UseSystemTool(j.toolName) {
+		logVerbose("%s=true, forcing use of system %s", getSystemToolEnvVar(j.toolName), j.toolName)
 		return nil
 	}
 
-	// Create installation directory
-	if err := os.MkdirAll(installDir, 0755); err != nil {
-		return fmt.Errorf("failed to create installation directory: %w", err)
-	}
-
-	// Get download URL
-	downloadURL, err := j.getDownloadURL(version, distribution)
+	// Create installation directory with distribution parameter
+	installDir, err := j.CreateInstallDir(version, distribution)
 	if err != nil {
-		return fmt.Errorf("failed to get download URL: %w", err)
+		return InstallError(j.toolName, version, fmt.Errorf("failed to create install directory: %w", err))
 	}
 
-	// Download and extract
-	fmt.Printf("  ⏳ Downloading Java %s (%s)...\n", version, distribution)
-	options := j.GetDownloadOptions()
-	if err := j.DownloadAndExtract(downloadURL, installDir, version, cfg, options); err != nil {
-		return fmt.Errorf("failed to download and extract: %w", err)
+	// Get download URL and package ID for checksum
+	downloadURL, packageID, err := j.getDownloadURLWithChecksum(version, distribution)
+	if err != nil {
+		return InstallError(j.toolName, version, fmt.Errorf("failed to get download URL: %w", err))
 	}
 
+	// Print download message
+	j.PrintDownloadMessage(version)
+
+	// Get checksum information if package ID is available
+	var configWithChecksum config.ToolConfig = cfg
+	if packageID != "" {
+		if checksumInfo, err := j.getChecksumFromDiscoAPI(packageID); err == nil {
+			// Add checksum to configuration for download verification
+			configWithChecksum.Checksum = &config.ChecksumConfig{
+				Type:  string(checksumInfo.Type),
+				Value: checksumInfo.Value,
+				URL:   checksumInfo.URL,
+			}
+			logVerbose("Added checksum to configuration: %s", checksumInfo.Value)
+		} else {
+			logVerbose("Failed to get checksum from Disco API: %v", err)
+		}
+	}
+
+	// Get tool-specific download options
+	options := j.getDownloadOptions()
+
+	// Download the file with checksum verification
+	archivePath, err := j.Download(downloadURL, version, configWithChecksum, options)
+	if err != nil {
+		return InstallError(j.toolName, version, err)
+	}
+	defer os.Remove(archivePath) // Clean up downloaded file
+
+	// Extract the file
+	if err := j.Extract(archivePath, installDir, options); err != nil {
+		return InstallError(j.toolName, version, err)
+	}
+
+	// Verify installation
+	if err := j.Verify(version, cfg); err != nil {
+		// Clean up failed installation
+		if removeErr := os.RemoveAll(installDir); removeErr != nil {
+			logVerbose("Failed to clean up installation directory %s: %v", installDir, removeErr)
+		}
+		fmt.Printf("  🧹 Cleaning up failed installation directory...\n")
+		return InstallError(j.toolName, version, fmt.Errorf("installation verification failed: %w", err))
+	}
+
+	fmt.Printf("  ✅ %s %s installation verification successful\n", j.toolName, version)
 	return nil
+}
+
+// getDownloadURLWithChecksum returns download URL and package ID for checksum verification
+func (j *JavaTool) getDownloadURLWithChecksum(version, distribution string) (string, string, error) {
+	platformMapper := NewPlatformMapper()
+
+	// Map Go arch to Disco API arch
+	archMapping := map[string]string{
+		"amd64": "x64",
+		"arm64": "aarch64",
+	}
+	arch := platformMapper.MapArchitecture(archMapping)
+
+	// Map OS names to Disco API format
+	osMapping := map[string]string{
+		"darwin": "macos",
+	}
+	osName := platformMapper.MapOS(osMapping)
+
+	// Handle early access versions
+	releaseStatus := "ga" // General Availability
+	if strings.HasSuffix(version, "-ea") {
+		releaseStatus = "ea" // Early Access
+		version = strings.TrimSuffix(version, "-ea")
+	}
+
+	// Try primary distribution first
+	result, err := j.tryDiscoDistributionWithChecksum(version, distribution, osName, arch, releaseStatus)
+	if err == nil && result.DownloadURL != "" {
+		return result.DownloadURL, result.PackageID, nil
+	}
+
+	// If primary distribution fails, try fallback distributions
+	fallbackDistributions := []string{"temurin", "zulu", "microsoft", "corretto"}
+	for _, fallback := range fallbackDistributions {
+		if fallback == distribution {
+			continue // Already tried this one
+		}
+
+		fmt.Printf("  🔄 Trying fallback distribution: %s\n", fallback)
+		result, err := j.tryDiscoDistributionWithChecksum(version, fallback, osName, arch, releaseStatus)
+		if err == nil && result.DownloadURL != "" {
+			fmt.Printf("  ✅ Found Java %s in %s distribution\n", version, fallback)
+			return result.DownloadURL, result.PackageID, nil
+		}
+	}
+
+	return "", "", URLGenerationError("java", version, fmt.Errorf("Java %s not available in any supported distribution for %s/%s", version, osName, arch))
 }
 
 // IsInstalled checks if the specified version is installed
 func (j *JavaTool) IsInstalled(version string, cfg config.ToolConfig) bool {
-	// Check if we should use system Java instead of mvx-managed Java
-	if useSystemJava() {
-		systemJavaHome, err := getSystemJavaHome()
-		if err != nil {
-			logVerbose("System Java not available: %v", err)
-			return false
-		}
-
-		// For system Java, we need to check if the version matches
-		systemVersion, err := getSystemJavaVersion(systemJavaHome)
-		if err != nil {
-			logVerbose("Could not determine system Java version: %v", err)
-			return false
-		}
-
-		// Check if system Java version is compatible with requested version
-		if !isJavaVersionCompatible(systemVersion, version) {
-			logVerbose("System Java version %s is not compatible with requested version %s", systemVersion, version)
-			return false
-		}
-
-		logVerbose("System Java version %s is compatible with requested version %s", systemVersion, version)
-		return true
-	}
-
-	// Use standard mvx-managed installation check
-	return j.StandardIsInstalled(version, cfg, j.GetPath, "java")
+	// Use standardized installation check with Java-specific environment variables
+	return j.StandardIsInstalledWithOptions(version, cfg, j.GetPath, "java", nil, []string{"JAVA_HOME"})
 }
 
 // isVersionCompatible checks if the system Java version is compatible with the requested version
@@ -245,12 +302,12 @@ func (j *JavaTool) GetJavaHome(version string, cfg config.ToolConfig) (string, e
 	}
 
 	// If using system Java, return system JAVA_HOME if available (no version compatibility check)
-	if useSystemJava() {
+	if UseSystemTool("java") {
 		if systemJavaHome, err := getSystemJavaHome(); err == nil {
 			logVerbose("Using system Java from JAVA_HOME: %s (MVX_USE_SYSTEM_JAVA=true)", systemJavaHome)
 			return systemJavaHome, nil
 		} else {
-			return "", fmt.Errorf("MVX_USE_SYSTEM_JAVA=true but system Java not available: %v", err)
+			return "", EnvironmentError("java", version, fmt.Errorf("MVX_USE_SYSTEM_JAVA=true but system Java not available: %w", err))
 		}
 	}
 
@@ -316,6 +373,12 @@ func (j *JavaTool) findJavaExecutable(dir string) (string, error) {
 
 // GetPath returns the binary path for the specified version (for PATH management)
 func (j *JavaTool) GetPath(version string, cfg config.ToolConfig) (string, error) {
+	// Use standardized path resolution with Java-specific environment variables
+	return j.StandardGetPathWithOptions(version, cfg, j.getInstalledPath, "java", nil, []string{"JAVA_HOME"})
+}
+
+// getInstalledPath returns the bin directory path for an installed Java version
+func (j *JavaTool) getInstalledPath(version string, cfg config.ToolConfig) (string, error) {
 	javaHome, err := j.GetJavaHome(version, cfg)
 	if err != nil {
 		return "", err
@@ -325,54 +388,13 @@ func (j *JavaTool) GetPath(version string, cfg config.ToolConfig) (string, error
 
 // Verify checks if the installation is working correctly
 func (j *JavaTool) Verify(version string, cfg config.ToolConfig) error {
-	distribution := cfg.Distribution
-	if distribution == "" {
-		distribution = "temurin"
+	verifyConfig := VerificationConfig{
+		BinaryName:      "java",
+		VersionArgs:     []string{"-version"},
+		ExpectedVersion: version,
+		DebugInfo:       true, // Java needs detailed debug info
 	}
-
-	binPath, err := j.GetPath(version, cfg)
-	if err != nil {
-		// Provide detailed debugging information
-		installDir := j.manager.GetToolVersionDir("java", version, distribution)
-		fmt.Printf("  🔍 Debug: Java installation verification failed\n")
-		fmt.Printf("     Install directory: %s\n", installDir)
-		fmt.Printf("     Error getting bin path: %v\n", err)
-
-		// List contents of install directory for debugging
-		if entries, readErr := os.ReadDir(installDir); readErr == nil {
-			fmt.Printf("     Install directory contents:\n")
-			for _, entry := range entries {
-				fmt.Printf("       - %s (dir: %t)\n", entry.Name(), entry.IsDir())
-			}
-		}
-
-		return fmt.Errorf("installation verification failed for java %s: %w", version, err)
-	}
-
-	javaExe := filepath.Join(binPath, "java")
-	if runtime.GOOS == "windows" {
-		javaExe += ".exe"
-	}
-
-	// Check if java executable exists
-	if _, err := os.Stat(javaExe); err != nil {
-		return fmt.Errorf("java verification failed: java executable not found at %s: %w", javaExe, err)
-	}
-
-	// Run java -version to verify installation
-	cmd := exec.Command(javaExe, "-version")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("java verification failed: %w\nOutput: %s", err, output)
-	}
-
-	// Check if output contains expected version
-	outputStr := string(output)
-	if !strings.Contains(outputStr, version) {
-		return fmt.Errorf("java version mismatch: expected %s, got %s", version, outputStr)
-	}
-
-	return nil
+	return j.StandardVerifyWithConfig(version, cfg, verifyConfig)
 }
 
 // ListVersions returns available versions for installation using Disco API
@@ -409,26 +431,20 @@ func (j *JavaTool) getDiscoURL(version, distribution string) (string, error) {
 		distribution = "temurin" // Default to Temurin
 	}
 
-	osName := runtime.GOOS
-	arch := runtime.GOARCH
+	platformMapper := NewPlatformMapper()
 
 	// Map Go arch to Disco API arch
-	switch arch {
-	case "amd64":
-		arch = "x64"
-	case "arm64":
-		arch = "aarch64"
+	archMapping := map[string]string{
+		"amd64": "x64",
+		"arm64": "aarch64",
 	}
+	arch := platformMapper.MapArchitecture(archMapping)
 
 	// Map OS names to Disco API format
-	switch osName {
-	case "darwin":
-		osName = "macos"
-	case "windows":
-		osName = "windows"
-	case "linux":
-		osName = "linux"
+	osMapping := map[string]string{
+		"darwin": "macos",
 	}
+	osName := platformMapper.MapOS(osMapping)
 
 	// Handle early access versions
 	releaseStatus := "ga" // General Availability
@@ -458,11 +474,26 @@ func (j *JavaTool) getDiscoURL(version, distribution string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("Java %s not available in any supported distribution for %s/%s", version, osName, arch)
+	return "", URLGenerationError("java", version, fmt.Errorf("Java %s not available in any supported distribution for %s/%s", version, osName, arch))
+}
+
+// DiscoveryResult contains both download URL and package ID for checksum fetching
+type DiscoveryResult struct {
+	DownloadURL string
+	PackageID   string
 }
 
 // tryDiscoDistribution attempts to get download URL from a specific distribution
 func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, releaseStatus string) (string, error) {
+	result, err := j.tryDiscoDistributionWithChecksum(version, distribution, osName, arch, releaseStatus)
+	if err != nil {
+		return "", err
+	}
+	return result.DownloadURL, nil
+}
+
+// tryDiscoDistributionWithChecksum attempts to get download URL and package ID from a specific distribution
+func (j *JavaTool) tryDiscoDistributionWithChecksum(version, distribution, osName, arch, releaseStatus string) (DiscoveryResult, error) {
 	// Build Disco API URL for package search
 	url := fmt.Sprintf("https://api.foojay.io/disco/v3.0/packages?version=%s&distribution=%s&operating_system=%s&architecture=%s&package_type=jdk&release_status=%s&latest=available",
 		version, distribution, osName, arch, releaseStatus)
@@ -479,18 +510,19 @@ func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, rel
 	resp, err := client.Get(url)
 	if err != nil {
 		logVerbose("HTTP request failed: %v", err)
-		return "", fmt.Errorf("failed to query Disco API: %w", err)
+		return DiscoveryResult{}, fmt.Errorf("failed to query Disco API: %w", err)
 	}
 	defer resp.Body.Close()
 
 	logVerbose("HTTP response status: %s", resp.Status)
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("Disco API request failed with status: %s", resp.Status)
+		return DiscoveryResult{}, fmt.Errorf("Disco API request failed with status: %s", resp.Status)
 	}
 
 	var packages struct {
 		Result []struct {
+			ID                string `json:"id"`
 			DirectDownloadURI string `json:"direct_download_uri"`
 			Filename          string `json:"filename"`
 			VersionNumber     string `json:"version_number"`
@@ -499,6 +531,7 @@ func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, rel
 			OperatingSystem   string `json:"operating_system"`
 			ArchiveType       string `json:"archive_type"`
 			Links             struct {
+				PkgInfoURI          string `json:"pkg_info_uri"`
 				PkgDownloadRedirect string `json:"pkg_download_redirect"`
 			} `json:"links"`
 		} `json:"result"`
@@ -507,14 +540,14 @@ func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, rel
 	// Read response body for debugging
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %w", err)
+		return DiscoveryResult{}, fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	logVerbose("Raw API response: %s", string(body))
 
 	if err := json.Unmarshal(body, &packages); err != nil {
 		logVerbose("JSON parsing failed: %v", err)
-		return "", fmt.Errorf("failed to parse Disco API response: %w", err)
+		return DiscoveryResult{}, fmt.Errorf("failed to parse Disco API response: %w", err)
 	}
 
 	logVerbose("Found %d packages in response", len(packages.Result))
@@ -528,11 +561,12 @@ func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, rel
 	}
 
 	if len(packages.Result) == 0 {
-		return "", fmt.Errorf("no packages found for Java %s (%s)", version, distribution)
+		return DiscoveryResult{}, fmt.Errorf("no packages found for Java %s (%s)", version, distribution)
 	}
 
 	// Define the package type for consistency
 	type packageType struct {
+		ID                string `json:"id"`
 		DirectDownloadURI string `json:"direct_download_uri"`
 		Filename          string `json:"filename"`
 		VersionNumber     string `json:"version_number"`
@@ -541,6 +575,7 @@ func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, rel
 		OperatingSystem   string `json:"operating_system"`
 		ArchiveType       string `json:"archive_type"`
 		Links             struct {
+			PkgInfoURI          string `json:"pkg_info_uri"`
 			PkgDownloadRedirect string `json:"pkg_download_redirect"`
 		} `json:"links"`
 	}
@@ -552,6 +587,7 @@ func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, rel
 
 	for _, pkg := range packages.Result {
 		pkgCopy := packageType{
+			ID:                pkg.ID,
 			DirectDownloadURI: pkg.DirectDownloadURI,
 			Filename:          pkg.Filename,
 			VersionNumber:     pkg.VersionNumber,
@@ -626,7 +662,7 @@ func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, rel
 		selectedPkg = otherPkg
 		logVerbose("Selected fallback package: %s", selectedPkg.Filename)
 	} else {
-		return "", fmt.Errorf("no suitable packages found for Java %s (%s)", version, distribution)
+		return DiscoveryResult{}, fmt.Errorf("no suitable packages found for Java %s (%s)", version, distribution)
 	}
 
 	logVerbose("Selected package: %s", selectedPkg.Filename)
@@ -636,9 +672,118 @@ func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, rel
 	}
 
 	if downloadURL == "" {
-		return "", fmt.Errorf("no download URL found for Java %s (%s)", version, distribution)
+		return DiscoveryResult{}, fmt.Errorf("no download URL found for Java %s (%s)", version, distribution)
 	}
 
 	logVerbose("Selected download URL: %s", downloadURL)
-	return downloadURL, nil
+	logVerbose("Package ID for checksum: %s", selectedPkg.ID)
+
+	return DiscoveryResult{
+		DownloadURL: downloadURL,
+		PackageID:   selectedPkg.ID,
+	}, nil
+}
+
+// getChecksumFromDiscoAPI fetches checksum information from Foojay Disco API
+func (j *JavaTool) getChecksumFromDiscoAPI(packageID string) (ChecksumInfo, error) {
+	if packageID == "" {
+		return ChecksumInfo{}, fmt.Errorf("package ID is required")
+	}
+
+	// Build package info URL
+	url := fmt.Sprintf("https://api.foojay.io/disco/v3.0/ids/%s", packageID)
+
+	logVerbose("Fetching checksum from Disco API: %s", url)
+
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	resp, err := client.Get(url)
+	if err != nil {
+		return ChecksumInfo{}, fmt.Errorf("failed to fetch package info: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return ChecksumInfo{}, fmt.Errorf("Disco API returned status %d", resp.StatusCode)
+	}
+
+	var packageInfo struct {
+		Result []struct {
+			Filename          string `json:"filename"`
+			Checksum          string `json:"checksum"`
+			ChecksumType      string `json:"checksum_type"`
+			ChecksumURI       string `json:"checksum_uri"`
+			DirectDownloadURI string `json:"direct_download_uri"`
+		} `json:"result"`
+		Message string `json:"message"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&packageInfo); err != nil {
+		return ChecksumInfo{}, fmt.Errorf("failed to decode package info: %w", err)
+	}
+
+	if len(packageInfo.Result) == 0 {
+		return ChecksumInfo{}, fmt.Errorf("no package info found")
+	}
+
+	pkg := packageInfo.Result[0]
+	if pkg.Checksum == "" {
+		return ChecksumInfo{}, fmt.Errorf("no checksum available for package")
+	}
+
+	// Convert checksum type to our enum
+	var checksumType ChecksumType
+	switch strings.ToLower(pkg.ChecksumType) {
+	case "sha256":
+		checksumType = SHA256
+	case "sha512":
+		checksumType = SHA512
+	default:
+		checksumType = SHA256 // Default fallback
+	}
+
+	logVerbose("Found checksum: %s (%s)", pkg.Checksum, pkg.ChecksumType)
+
+	return ChecksumInfo{
+		Type:  checksumType,
+		Value: pkg.Checksum,
+		URL:   pkg.ChecksumURI,
+	}, nil
+}
+
+// GetChecksum implements ChecksumProvider interface for Java
+func (j *JavaTool) GetChecksum(version, filename string) (ChecksumInfo, error) {
+	// Java checksums are provided via configuration from the Java tool
+	// which extracts them from the Foojay Disco API during URL resolution
+	fmt.Printf("  🔍 Checking for Java checksum from Disco API...\n")
+	return ChecksumInfo{}, fmt.Errorf("Java checksums should be provided via configuration")
+}
+
+// ResolveVersion resolves a Java version specification to a concrete version
+func (j *JavaTool) ResolveVersion(version, distribution string) (string, error) {
+	registry := j.manager.GetRegistry()
+	return registry.ResolveJavaVersion(version, distribution)
+}
+
+// GetDownloadURL implements Tool interface for Java
+func (j *JavaTool) GetDownloadURL(version string) string {
+	// Use default distribution (temurin) for URL generation
+	url, err := j.getDownloadURL(version, "temurin")
+	if err != nil {
+		logVerbose("Failed to get download URL for Java %s: %v", version, err)
+		return ""
+	}
+	return url
+}
+
+// GetChecksumURL implements Tool interface for Java
+func (j *JavaTool) GetChecksumURL(version, filename string) string {
+	// Java checksums are provided via Disco API package info
+	return ""
+}
+
+// GetVersionsURL implements Tool interface for Java
+func (j *JavaTool) GetVersionsURL() string {
+	return FoojayDiscoAPIBase + "/major_versions?distribution=temurin&maintained=true"
 }

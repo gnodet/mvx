@@ -11,20 +11,20 @@ import (
 func TestUseSystemMaven(t *testing.T) {
 	// Test when MVX_USE_SYSTEM_MAVEN is not set
 	os.Unsetenv("MVX_USE_SYSTEM_MAVEN")
-	if useSystemMaven() {
-		t.Error("useSystemMaven() should return false when MVX_USE_SYSTEM_MAVEN is not set")
+	if UseSystemTool("maven") {
+		t.Error("UseSystemTool('maven') should return false when MVX_USE_SYSTEM_MAVEN is not set")
 	}
 
 	// Test when MVX_USE_SYSTEM_MAVEN is set to false
 	os.Setenv("MVX_USE_SYSTEM_MAVEN", "false")
-	if useSystemMaven() {
-		t.Error("useSystemMaven() should return false when MVX_USE_SYSTEM_MAVEN=false")
+	if UseSystemTool("maven") {
+		t.Error("UseSystemTool('maven') should return false when MVX_USE_SYSTEM_MAVEN=false")
 	}
 
 	// Test when MVX_USE_SYSTEM_MAVEN is set to true
 	os.Setenv("MVX_USE_SYSTEM_MAVEN", "true")
-	if !useSystemMaven() {
-		t.Error("useSystemMaven() should return true when MVX_USE_SYSTEM_MAVEN=true")
+	if !UseSystemTool("maven") {
+		t.Error("UseSystemTool('maven') should return true when MVX_USE_SYSTEM_MAVEN=true")
 	}
 
 	// Clean up

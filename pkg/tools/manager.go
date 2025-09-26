@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -55,6 +56,32 @@ type Tool interface {
 
 	// ListVersions returns available versions for installation
 	ListVersions() ([]string, error)
+
+	// URL generation methods
+	GetDownloadURL(version string) string
+	GetChecksumURL(version, filename string) string
+	GetVersionsURL() string
+
+	// Checksum generation method
+	GetChecksum(version, filename string) (ChecksumInfo, error)
+}
+
+// ToolInfoProvider is an optional interface for tools that can provide detailed information
+type ToolInfoProvider interface {
+	// GetToolInfo returns detailed information about the tool
+	GetToolInfo() (map[string]interface{}, error)
+}
+
+// VersionValidator is an optional interface for tools that can validate versions
+type VersionValidator interface {
+	// ValidateVersion checks if a version specification is valid for this tool
+	ValidateVersion(version, distribution string) error
+}
+
+// VersionResolver is an optional interface for tools that can resolve version specifications
+type VersionResolver interface {
+	// ResolveVersion resolves a version specification (e.g., "21", "lts") to a concrete version
+	ResolveVersion(version, distribution string) (string, error)
 }
 
 // NewManager creates a new tool manager
@@ -82,12 +109,10 @@ func NewManager() (*Manager, error) {
 	// Load version cache from disk
 	manager.loadVersionCache()
 
-	// Register built-in tools
-	manager.RegisterTool(NewJavaTool(manager))
-	manager.RegisterTool(NewMavenTool(manager))
-	manager.RegisterTool(NewMvndTool(manager))
-	manager.RegisterTool(NewNodeTool(manager))
-	manager.RegisterTool(NewGoTool(manager))
+	// Auto-discover and register tools
+	if err := manager.discoverAndRegisterTools(); err != nil {
+		return nil, fmt.Errorf("failed to register tools: %w", err)
+	}
 
 	return manager, nil
 }
@@ -104,6 +129,159 @@ func (m *Manager) GetTool(name string) (Tool, error) {
 		return nil, fmt.Errorf("unknown tool: %s", name)
 	}
 	return tool, nil
+}
+
+// GetAllTools returns all registered tools
+func (m *Manager) GetAllTools() map[string]Tool {
+	result := make(map[string]Tool)
+	for name, tool := range m.tools {
+		result[name] = tool
+	}
+	return result
+}
+
+// GetToolNames returns the names of all registered tools
+func (m *Manager) GetToolNames() []string {
+	names := make([]string, 0, len(m.tools))
+	for name := range m.tools {
+		names = append(names, name)
+	}
+	return names
+}
+
+// ToolFactory represents a function that creates a tool instance
+// This enables dynamic tool registration without modifying the manager code
+type ToolFactory func(*Manager) Tool
+
+// toolFactories contains all available tool factories for auto-discovery
+// This registry allows tools to be registered dynamically, following the Open/Closed Principle
+var toolFactories = map[string]ToolFactory{
+	"java":  func(m *Manager) Tool { return NewJavaTool(m) },
+	"maven": func(m *Manager) Tool { return NewMavenTool(m) },
+	"mvnd":  func(m *Manager) Tool { return NewMvndTool(m) },
+	"node":  func(m *Manager) Tool { return NewNodeTool(m) },
+	"go":    func(m *Manager) Tool { return NewGoTool(m) },
+}
+
+// discoverAndRegisterTools automatically discovers and registers all available tools
+func (m *Manager) discoverAndRegisterTools() error {
+	// Register tools from the factory registry
+	for toolName, factory := range toolFactories {
+		tool := factory(m)
+		m.RegisterTool(tool)
+		logVerbose("Registered tool: %s", toolName)
+	}
+
+	// Future enhancement: could also load tools from configuration files
+	// This would allow users to register custom tools without code changes
+
+	return nil
+}
+
+// RegisterToolFactory registers a new tool factory for auto-discovery
+// This allows external packages to register their own tools
+func RegisterToolFactory(name string, factory ToolFactory) {
+	toolFactories[name] = factory
+}
+
+// GetRegisteredToolFactories returns the names of all registered tool factories
+// This is useful for debugging and introspection
+func GetRegisteredToolFactories() []string {
+	names := make([]string, 0, len(toolFactories))
+	for name := range toolFactories {
+		names = append(names, name)
+	}
+	return names
+}
+
+// SearchToolVersions searches for versions of a specific tool with optional filters
+func (m *Manager) SearchToolVersions(toolName string, filters []string) ([]string, error) {
+	tool, err := m.GetTool(toolName)
+	if err != nil {
+		return nil, err
+	}
+
+	versions, err := tool.ListVersions()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get versions for %s: %w", toolName, err)
+	}
+
+	// Apply filters if provided
+	if len(filters) > 0 {
+		filtered := make([]string, 0)
+		for _, version := range versions {
+			for _, filter := range filters {
+				if strings.Contains(strings.ToLower(version), strings.ToLower(filter)) {
+					filtered = append(filtered, version)
+					break
+				}
+			}
+		}
+		return filtered, nil
+	}
+
+	return versions, nil
+}
+
+// GetToolInfo returns detailed information about a tool
+func (m *Manager) GetToolInfo(toolName string) (map[string]interface{}, error) {
+	tool, err := m.GetTool(toolName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if tool implements ToolInfoProvider interface
+	if infoProvider, ok := tool.(ToolInfoProvider); ok {
+		return infoProvider.GetToolInfo()
+	}
+
+	// Fallback to basic information
+	versions, err := tool.ListVersions()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get versions for %s: %w", toolName, err)
+	}
+
+	return map[string]interface{}{
+		"name":     toolName,
+		"versions": versions,
+	}, nil
+}
+
+// ValidateToolVersion validates that a version exists for the given tool
+func (m *Manager) ValidateToolVersion(toolName, version, distribution string) error {
+	tool, err := m.GetTool(toolName)
+	if err != nil {
+		return err
+	}
+
+	// Check if tool implements VersionValidator interface
+	if validator, ok := tool.(VersionValidator); ok {
+		return validator.ValidateVersion(version, distribution)
+	}
+
+	// Fallback to checking if version exists in available versions
+	versions, err := tool.ListVersions()
+	if err != nil {
+		return fmt.Errorf("failed to get versions for %s: %w", toolName, err)
+	}
+
+	// For version specs like "lts", "latest", etc., we need to resolve them
+	resolvedVersion, err := m.resolveVersion(toolName, config.ToolConfig{
+		Version:      version,
+		Distribution: distribution,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to resolve version %s for %s: %w", version, toolName, err)
+	}
+
+	// Check if resolved version exists
+	for _, v := range versions {
+		if v == resolvedVersion {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("version %s (resolved to %s) not found for tool %s", version, resolvedVersion, toolName)
 }
 
 // InstallTool installs a specific tool version with version resolution
@@ -437,29 +615,22 @@ func (m *Manager) resolveVersionInternal(toolName string, toolConfig config.Tool
 		return cached, nil
 	}
 
-	// Resolve version using registry
-	var resolved string
-	var err error
-
-	switch toolName {
-	case "java":
-		resolved, err = m.registry.ResolveJavaVersion(toolConfig.Version, distribution)
-	case "maven":
-		resolved, err = m.registry.ResolveMavenVersion(toolConfig.Version)
-	case "mvnd":
-		resolved, err = m.registry.ResolveMvndVersion(toolConfig.Version)
-	case "node":
-		resolved, err = m.registry.ResolveNodeVersion(toolConfig.Version)
-	case "go":
-		resolved, err = m.registry.ResolveGoVersion(toolConfig.Version)
-
-	default:
-		// For unknown tools, return version as-is
-		resolved = toolConfig.Version
+	// Get the tool instance
+	tool, err := m.GetTool(toolName)
+	if err != nil {
+		return "", fmt.Errorf("unknown tool: %s", toolName)
 	}
 
-	if err != nil {
-		return "", err
+	// Check if tool implements VersionResolver interface
+	var resolved string
+	if resolver, ok := tool.(VersionResolver); ok {
+		resolved, err = resolver.ResolveVersion(toolConfig.Version, distribution)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		// Fallback: return version as-is for tools that don't implement VersionResolver
+		resolved = toolConfig.Version
 	}
 
 	// Cache the resolved version

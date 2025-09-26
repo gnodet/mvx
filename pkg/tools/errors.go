@@ -59,3 +59,64 @@ func ListVersionsError(tool string, err error) *ToolError {
 func PathError(tool, version string, err error) *ToolError {
 	return NewToolError(tool, version, "path resolution", err)
 }
+
+// ConfigurationError creates a standardized configuration error
+func ConfigurationError(tool, version string, err error) *ToolError {
+	return NewToolError(tool, version, "configuration", err)
+}
+
+// SystemToolError creates a standardized system tool error
+func SystemToolError(tool string, err error) *ToolError {
+	return NewToolError(tool, "", "system tool detection", err)
+}
+
+// URLGenerationError creates a standardized URL generation error
+func URLGenerationError(tool, version string, err error) *ToolError {
+	return NewToolError(tool, version, "URL generation", err)
+}
+
+// RegistryError creates a standardized registry operation error
+func RegistryError(tool string, err error) *ToolError {
+	return NewToolError(tool, "", "registry operation", err)
+}
+
+// EnvironmentError creates a standardized environment setup error
+func EnvironmentError(tool, version string, err error) *ToolError {
+	return NewToolError(tool, version, "environment setup", err)
+}
+
+// WrapError wraps an error with tool context if it's not already a ToolError
+func WrapError(tool, version, operation string, err error) error {
+	if err == nil {
+		return nil
+	}
+
+	// If it's already a ToolError, return as-is
+	if _, ok := err.(*ToolError); ok {
+		return err
+	}
+
+	return NewToolError(tool, version, operation, err)
+}
+
+// IsToolError checks if an error is a ToolError
+func IsToolError(err error) bool {
+	_, ok := err.(*ToolError)
+	return ok
+}
+
+// GetToolFromError extracts the tool name from a ToolError
+func GetToolFromError(err error) string {
+	if toolErr, ok := err.(*ToolError); ok {
+		return toolErr.Tool
+	}
+	return ""
+}
+
+// GetOperationFromError extracts the operation from a ToolError
+func GetOperationFromError(err error) string {
+	if toolErr, ok := err.(*ToolError); ok {
+		return toolErr.Op
+	}
+	return ""
+}

@@ -1,21 +1,17 @@
 package tools
 
 import (
+	"encoding/json"
 	"fmt"
-	"os"
+	"net/http"
 	"path/filepath"
-	"runtime"
+	"time"
 
 	"github.com/gnodet/mvx/pkg/config"
 )
 
 // Compile-time interface validation
 var _ Tool = (*GoTool)(nil)
-
-// useSystemGo checks if system Go should be used instead of downloading
-func useSystemGo() bool {
-	return UseSystemTool("go")
-}
 
 // GoTool implements Tool interface for Go toolchain management
 type GoTool struct {
@@ -52,19 +48,34 @@ func (g *GoTool) GetPath(version string, cfg config.ToolConfig) (string, error) 
 // getInstalledPath returns the path for an installed Go version
 func (g *GoTool) getInstalledPath(version string, cfg config.ToolConfig) (string, error) {
 	installDir := g.manager.GetToolVersionDir("go", version, "")
+	pathResolver := NewPathResolver(g.manager.GetToolsDir())
 
-	// Go archives extract to a "go" subdirectory
-	goPath := filepath.Join(installDir, "go")
-	if _, err := os.Stat(goPath); err == nil {
-		return filepath.Join(goPath, "bin"), nil
+	options := DirectorySearchOptions{
+		DirectoryPrefix:           "go",
+		BinSubdirectory:           "bin",
+		BinaryName:                "go",
+		UsePlatformExtensions:     true,
+		PreferredWindowsExtension: ".exe", // Go uses .exe on Windows
+		FallbackToParent:          false,  // Go always has bin subdirectory
 	}
 
-	return filepath.Join(installDir, "bin"), nil
+	binPath, err := pathResolver.FindToolBinaryPath(installDir, options)
+	if err != nil {
+		// Fallback to default bin directory if search fails
+		return filepath.Join(installDir, "bin"), nil
+	}
+
+	return binPath, nil
 }
 
 // Verify checks if the installation is working correctly
 func (g *GoTool) Verify(version string, cfg config.ToolConfig) error {
-	return g.StandardVerify(version, cfg, g.GetPath, "go", []string{"version"})
+	verifyConfig := VerificationConfig{
+		BinaryName:  "go",
+		VersionArgs: []string{"version"},
+		DebugInfo:   false,
+	}
+	return g.StandardVerifyWithConfig(version, cfg, verifyConfig)
 }
 
 // ListVersions returns available versions for installation
@@ -91,27 +102,114 @@ func (g *GoTool) GetDisplayName() string {
 
 // getDownloadURL returns the download URL for the specified version
 func (g *GoTool) getDownloadURL(version string) string {
-	// Determine platform string
-	osName := runtime.GOOS
-	arch := runtime.GOARCH
+	platformMapper := NewPlatformMapper()
+	osName := platformMapper.GetOS()
+	arch := platformMapper.GetArch()
 
-	// Map architecture names to Go's naming convention
-	switch arch {
-	case "amd64":
-		arch = "amd64"
-	case "arm64":
-		arch = "arm64"
-	case "386":
-		arch = "386"
+	// Determine file extension
+	var fileExt string
+	if platformMapper.IsWindows() {
+		fileExt = ".zip"
+	} else {
+		fileExt = ".tar.gz"
 	}
 
 	// Construct filename
-	var filename string
-	if osName == "windows" {
-		filename = fmt.Sprintf("go%s.%s-%s.zip", version, osName, arch)
-	} else {
-		filename = fmt.Sprintf("go%s.%s-%s.tar.gz", version, osName, arch)
-	}
+	filename := fmt.Sprintf("go%s.%s-%s%s", version, osName, arch, fileExt)
 
 	return fmt.Sprintf("https://go.dev/dl/%s", filename)
+}
+
+// ResolveVersion resolves a Go version specification to a concrete version
+func (g *GoTool) ResolveVersion(version, distribution string) (string, error) {
+	registry := g.manager.GetRegistry()
+	return registry.ResolveGoVersion(version)
+}
+
+// GetChecksum implements ChecksumProvider interface for Go
+func (g *GoTool) GetChecksum(version, filename string) (ChecksumInfo, error) {
+	fmt.Printf("  🔍 Fetching Go checksum from go.dev API...\n")
+
+	checksum, err := g.fetchGoChecksum(version, filename)
+	if err != nil {
+		fmt.Printf("  ⚠️  Failed to get Go checksum from go.dev API: %v\n", err)
+		return ChecksumInfo{}, err
+	}
+
+	fmt.Printf("  ✅ Found Go checksum from go.dev API\n")
+	return ChecksumInfo{
+		Type:  SHA256,
+		Value: checksum,
+	}, nil
+}
+
+// GoRelease represents a Go release from go.dev API
+type GoRelease struct {
+	Version string   `json:"version"`
+	Stable  bool     `json:"stable"`
+	Files   []GoFile `json:"files"`
+}
+
+// GoFile represents a Go file from go.dev API
+type GoFile struct {
+	Filename string `json:"filename"`
+	OS       string `json:"os"`
+	Arch     string `json:"arch"`
+	Version  string `json:"version"`
+	SHA256   string `json:"sha256"`
+	Size     int64  `json:"size"`
+	Kind     string `json:"kind"`
+}
+
+// fetchGoChecksum fetches Go checksum from go.dev API
+func (g *GoTool) fetchGoChecksum(version, filename string) (string, error) {
+	url := "https://go.dev/dl/?mode=json&include=all"
+
+	client := &http.Client{
+		Timeout: 120 * time.Second, // 2 minutes for slow servers
+	}
+
+	resp, err := client.Get(url)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch Go checksums: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("Go checksums returned status %d", resp.StatusCode)
+	}
+
+	// Parse the JSON response
+	var releases []GoRelease
+	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+		return "", fmt.Errorf("failed to decode Go API response: %w", err)
+	}
+
+	// Find the matching version and file
+	for _, release := range releases {
+		if release.Version == "go"+version {
+			for _, file := range release.Files {
+				if file.Filename == filename && file.Kind == "archive" {
+					return file.SHA256, nil
+				}
+			}
+		}
+	}
+
+	return "", fmt.Errorf("no matching Go file found for version %s, filename %s", version, filename)
+}
+
+// GetDownloadURL implements URLProvider interface for Go
+func (g *GoTool) GetDownloadURL(version string) string {
+	return g.getDownloadURL(version)
+}
+
+// GetChecksumURL implements URLProvider interface for Go
+func (g *GoTool) GetChecksumURL(version, filename string) string {
+	return GoDevAPIBase + "/?mode=json&include=all"
+}
+
+// GetVersionsURL implements URLProvider interface for Go
+func (g *GoTool) GetVersionsURL() string {
+	return GitHubAPIBase + "/repos/golang/go/tags?per_page=100"
 }

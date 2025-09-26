@@ -203,30 +203,38 @@ func TestChecksumRegistry_SupportsChecksumVerification(t *testing.T) {
 	}
 }
 
-func TestChecksumRegistry_GetJavaChecksumFromAPI(t *testing.T) {
-	registry := NewChecksumRegistry()
-
-	// Test with a known Java version (this is a real API call)
-	checksum, err := registry.GetJavaChecksumFromAPI("21", "x64", "linux")
+func TestJavaChecksumProvider(t *testing.T) {
+	manager, err := NewManager()
 	if err != nil {
-		t.Logf("Java checksum API call failed (expected in CI): %v", err)
-		return // Skip test if API is not accessible
+		t.Fatalf("Failed to create manager: %v", err)
 	}
 
-	if checksum.Type != SHA256 {
-		t.Errorf("Expected SHA256 checksum type, got %s", checksum.Type)
+	javaTool := NewJavaTool(manager)
+
+	// Test that Java tool implements ChecksumProvider
+	var provider ChecksumProvider = javaTool
+
+	// Test the GetChecksum method (should return error since Java checksums come from config)
+	_, err = provider.GetChecksum("21", "test-file.tar.gz")
+	if err == nil {
+		t.Errorf("Expected error for Java checksum without configuration")
 	}
-	if checksum.Value == "" {
-		t.Errorf("Expected non-empty checksum value")
-	}
-	t.Logf("Java 21 checksum: %s", checksum.Value)
+	t.Logf("Java checksum provider correctly returns error: %v", err)
 }
 
-func TestChecksumRegistry_GetNodeChecksumFromSHASUMS(t *testing.T) {
-	registry := NewChecksumRegistry()
+func TestNodeChecksumProvider(t *testing.T) {
+	manager, err := NewManager()
+	if err != nil {
+		t.Fatalf("Failed to create manager: %v", err)
+	}
+
+	nodeTool := NewNodeTool(manager)
+
+	// Test that Node tool implements ChecksumProvider
+	var provider ChecksumProvider = nodeTool
 
 	// Test with a known Node.js version (this is a real API call)
-	checksum, err := registry.GetNodeChecksumFromSHASUMS("22.14.0", "node-v22.14.0-linux-x64.tar.xz")
+	checksum, err := provider.GetChecksum("22.14.0", "node-v22.14.0-linux-x64.tar.xz")
 	if err != nil {
 		t.Logf("Node.js checksum fetch failed (expected in CI): %v", err)
 		return // Skip test if API is not accessible

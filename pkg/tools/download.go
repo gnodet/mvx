@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -30,6 +31,7 @@ type DownloadConfig struct {
 	Version          string // Tool version for checksum verification
 	Config           config.ToolConfig
 	ChecksumRegistry *ChecksumRegistry
+	Tool             Tool // Tool instance for checksum verification
 }
 
 // getTimeoutFromEnv returns a timeout from environment variable or default value
@@ -59,14 +61,16 @@ func getRetryDelay() time.Duration {
 
 // DefaultDownloadConfig returns a default download configuration
 func DefaultDownloadConfig(url, destPath string) *DownloadConfig {
+	configProvider := NewDownloadConfigProvider(NewEnvironmentConfigProvider())
+
 	return &DownloadConfig{
 		URL:           url,
 		DestPath:      destPath,
-		MaxRetries:    getMaxRetries(),
-		RetryDelay:    getRetryDelay(),
-		Timeout:       getTimeoutFromEnv("MVX_DOWNLOAD_TIMEOUT", 600*time.Second), // Default: 10 minutes for slow servers
-		MinSize:       1024,                                                       // At least 1KB
-		MaxSize:       2147483648,                                                 // Max 2GB
+		MaxRetries:    configProvider.GetMaxRetries(),
+		RetryDelay:    configProvider.GetRetryDelay(),
+		Timeout:       configProvider.GetDownloadTimeout(),
+		MinSize:       configProvider.GetMinFileSize(),
+		MaxSize:       configProvider.GetMaxFileSize(),
 		ValidateMagic: true,
 	}
 }
@@ -120,15 +124,17 @@ func attemptDownload(config *DownloadConfig) (*DownloadResult, error) {
 	defer tempFile.Close()
 
 	// Create HTTP client with granular timeouts for better handling of slow servers
+	configProvider := NewDownloadConfigProvider(NewEnvironmentConfigProvider())
+
 	client := &http.Client{
 		Transport: &http.Transport{
-			TLSHandshakeTimeout:   getTimeoutFromEnv("MVX_TLS_TIMEOUT", 120*time.Second),      // TLS handshake timeout (configurable for slow Apache servers)
-			ResponseHeaderTimeout: getTimeoutFromEnv("MVX_RESPONSE_TIMEOUT", 120*time.Second), // Time to receive response headers (configurable for slow servers)
-			IdleConnTimeout:       getTimeoutFromEnv("MVX_IDLE_TIMEOUT", 90*time.Second),      // Keep-alive timeout (configurable)
+			TLSHandshakeTimeout:   configProvider.GetTLSTimeout(),
+			ResponseHeaderTimeout: configProvider.GetResponseTimeout(),
+			IdleConnTimeout:       configProvider.GetIdleTimeout(),
 		},
 		// Use context timeout instead of global client timeout for better control
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 10 {
+			if len(via) >= MaxRedirects {
 				return fmt.Errorf("too many redirects")
 			}
 			return nil
@@ -211,7 +217,10 @@ func attemptDownload(config *DownloadConfig) (*DownloadResult, error) {
 
 	// Verify checksum if checksum registry is available
 	if config.ChecksumRegistry != nil {
-		if err := verifyChecksum(tempFile.Name(), config); err != nil {
+		// Update config with final URL for better filename detection
+		finalConfig := *config
+		finalConfig.URL = resp.Request.URL.String()
+		if err := verifyChecksum(tempFile.Name(), &finalConfig); err != nil {
 			return nil, err
 		}
 	}
@@ -411,51 +420,24 @@ func verifyChecksum(filePath string, config *DownloadConfig) error {
 		config.ToolName, config.Version, config.Config)
 
 	if !hasChecksum {
-		// Try to get checksum from known patterns or APIs
-		// Use the URL basename as the expected filename
-		filename := filepath.Base(config.URL)
+		// Try to get checksum from registry using dynamic lookup
+		// Extract filename from URL, handling redirects and query parameters
+		filename := extractFilenameFromURL(config.URL)
 		fmt.Printf("  🔍 Attempting to find checksum for file: %s\n", filename)
 
-		// Special handling for Java (Adoptium API)
-		if config.ToolName == "java" {
-			fmt.Printf("  🔍 Fetching Java checksum from Adoptium API...\n")
-			if javaChecksum, err := config.ChecksumRegistry.GetJavaChecksumFromAPI(config.Version, "amd64", "linux"); err == nil {
-				checksumInfo = javaChecksum
+		// Use tool's GetChecksum method for dynamic checksum resolution
+		if config.Tool != nil {
+			if dynamicChecksum, err := config.Tool.GetChecksum(config.Version, filename); err == nil {
+				checksumInfo = dynamicChecksum
 				hasChecksum = true
-				fmt.Printf("  ✅ Found Java checksum from Adoptium API\n")
 			} else {
-				fmt.Printf("  ⚠️  Failed to get Java checksum from Adoptium API: %v\n", err)
+				fmt.Printf("  ⚠️  Tool checksum lookup failed: %v\n", err)
 			}
 		}
 
-		// Special handling for Node.js (SHASUMS256.txt)
-		if config.ToolName == "node" && !hasChecksum {
-			fmt.Printf("  🔍 Fetching Node.js checksum from SHASUMS256.txt...\n")
-			// The GetNodeChecksumFromSHASUMS method already handles platform detection
-			if nodeChecksum, err := config.ChecksumRegistry.GetNodeChecksumFromSHASUMS(config.Version, filename); err == nil {
-				checksumInfo = nodeChecksum
-				hasChecksum = true
-				fmt.Printf("  ✅ Found Node.js checksum from SHASUMS256.txt\n")
-			} else {
-				fmt.Printf("  ⚠️  Failed to get Node.js checksum from SHASUMS256.txt: %v\n", err)
-			}
-		}
-
-		// Special handling for Go (go.dev API)
-		if config.ToolName == "go" && !hasChecksum {
-			fmt.Printf("  🔍 Fetching Go checksum from go.dev API...\n")
-			if goChecksum, err := config.ChecksumRegistry.GetGoChecksumFromAPI(config.Version, filename); err == nil {
-				checksumInfo = goChecksum
-				hasChecksum = true
-				fmt.Printf("  ✅ Found Go checksum from go.dev API\n")
-			} else {
-				fmt.Printf("  ⚠️  Failed to get Go checksum from go.dev API: %v\n", err)
-			}
-		}
-
-		// Fallback to URL patterns for other tools
-		if !hasChecksum {
-			checksumURL := config.ChecksumRegistry.GetChecksumURL(config.ToolName, config.Version, filename)
+		if !hasChecksum && config.Tool != nil {
+			// Fallback to URL patterns for tools with static checksum URLs
+			checksumURL := config.Tool.GetChecksumURL(config.Version, filename)
 			if checksumURL != "" {
 				fmt.Printf("  🔍 Using checksum URL pattern: %s\n", checksumURL)
 				checksumInfo = ChecksumInfo{
@@ -497,6 +479,69 @@ func verifyChecksum(filePath string, config *DownloadConfig) error {
 	}
 
 	return nil
+}
+
+// extractFilenameFromURL extracts the filename from a URL, handling redirects and query parameters
+func extractFilenameFromURL(urlStr string) string {
+	// Parse the URL
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		// Fallback to simple basename if URL parsing fails
+		return filepath.Base(urlStr)
+	}
+
+	// Get the path component
+	path := parsedURL.Path
+
+	// Handle GitHub release asset URLs and other redirect URLs
+	if strings.Contains(path, "/") {
+		// Check for Content-Disposition filename in query parameters
+		if query := parsedURL.Query(); query.Has("response-content-disposition") {
+			disposition := query.Get("response-content-disposition")
+			if strings.Contains(disposition, "filename=") {
+				// Extract filename from Content-Disposition header
+				parts := strings.Split(disposition, "filename=")
+				if len(parts) > 1 {
+					filename := strings.TrimSpace(parts[1])
+					// Remove quotes if present
+					filename = strings.Trim(filename, `"'`)
+					// Remove any additional parameters after semicolon
+					if idx := strings.Index(filename, ";"); idx != -1 {
+						filename = filename[:idx]
+					}
+					if filename != "" {
+						return filename
+					}
+				}
+			}
+		}
+	}
+
+	// Fallback to basename of path
+	filename := filepath.Base(path)
+
+	// If filename is empty or looks like a redirect artifact, try to extract from URL patterns
+	if filename == "" || filename == "." || filename == "redirect" || len(filename) < 3 {
+		// For GitHub release assets, try to extract from the URL pattern
+		if strings.Contains(urlStr, "github.com") || strings.Contains(urlStr, "githubusercontent.com") {
+			// Look for common archive extensions in the URL
+			extensions := []string{ExtTarGz, ExtTarXz, ExtZip, ExtTgz}
+			for _, ext := range extensions {
+				if idx := strings.LastIndex(urlStr, ext); idx != -1 {
+					// Find the start of the filename by looking backwards for a path separator
+					start := strings.LastIndex(urlStr[:idx], "/")
+					if start != -1 {
+						return urlStr[start+1 : idx+len(ext)]
+					}
+				}
+			}
+		}
+
+		// Final fallback - return a generic name based on the tool
+		return "download"
+	}
+
+	return filename
 }
 
 // moveFileWithRetry moves a file with retry logic for Windows compatibility

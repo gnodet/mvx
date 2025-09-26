@@ -1,16 +1,18 @@
 package tools
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"runtime"
-	"strings"
 	"time"
 
 	"github.com/gnodet/mvx/pkg/config"
 )
+
+// ChecksumProvider interface is deprecated - tools should implement GetChecksum in Tool interface
+// This is kept for backward compatibility only
+type ChecksumProvider interface {
+	GetChecksum(version, filename string) (ChecksumInfo, error)
+}
 
 // ChecksumRegistry provides checksum information for known tools and versions
 type ChecksumRegistry struct {
@@ -18,6 +20,8 @@ type ChecksumRegistry struct {
 	knownChecksums map[string]map[string]ChecksumInfo
 	// HTTP client for fetching checksums from APIs
 	client *http.Client
+	// Deprecated: providers map is no longer used - tools implement GetChecksum directly
+	providers map[string]ChecksumProvider
 }
 
 // NewChecksumRegistry creates a new checksum registry
@@ -27,12 +31,19 @@ func NewChecksumRegistry() *ChecksumRegistry {
 		client: &http.Client{
 			Timeout: getTimeoutFromEnv("MVX_REGISTRY_TIMEOUT", 120*time.Second), // Default: 2 minutes for slow Apache servers
 		},
+		providers: make(map[string]ChecksumProvider),
 	}
 
 	// Initialize with known checksums
 	registry.initializeKnownChecksums()
 
 	return registry
+}
+
+// RegisterChecksumProvider is deprecated - tools implement GetChecksum directly
+func (cr *ChecksumRegistry) RegisterChecksumProvider(toolName string, provider ChecksumProvider) {
+	// This method is kept for backward compatibility but is no longer used
+	cr.providers[toolName] = provider
 }
 
 // GetChecksum returns checksum information for a tool, version, and platform
@@ -78,29 +89,13 @@ func (cr *ChecksumRegistry) IsChecksumRequired(cfg config.ToolConfig) bool {
 }
 
 // getPlatformString returns the platform string for checksum lookup
+// This method should be deprecated in favor of tool-specific platform handling
 func (cr *ChecksumRegistry) getPlatformString(toolName string) string {
-	osName := runtime.GOOS
-	arch := runtime.GOARCH
+	platformMapper := NewPlatformMapper()
 
-	switch toolName {
-	case "maven", "mvnd":
-		// Maven and mvnd use platform-independent archives
-		return "bin"
-	case "java":
-		// Java uses specific platform naming
-		return fmt.Sprintf("%s-%s", osName, arch)
-	case "go":
-		// Go uses its own platform naming
-		return fmt.Sprintf("%s-%s", osName, arch)
-	case "node":
-		// Node.js platform naming
-		if osName == "windows" {
-			return fmt.Sprintf("win-%s", arch)
-		}
-		return fmt.Sprintf("%s-%s", osName, arch)
-	default:
-		return fmt.Sprintf("%s-%s", osName, arch)
-	}
+	// Default to generic platform for all tools
+	// Individual tools should handle their own platform-specific logic
+	return platformMapper.GetGenericPlatform()
 }
 
 // initializeKnownChecksums initializes the registry with known checksums
@@ -184,28 +179,11 @@ func (cr *ChecksumRegistry) addChecksumURLPatterns() {
 }
 
 // GetChecksumURL generates a checksum URL for a tool based on patterns
+// This method is deprecated - tools should use their own GetChecksumURL method
 func (cr *ChecksumRegistry) GetChecksumURL(toolName, version, filename string) string {
-	switch toolName {
-	case "maven":
-		if strings.HasPrefix(version, "4.") {
-			return fmt.Sprintf("https://archive.apache.org/dist/maven/maven-4/%s/binaries/%s.sha512", version, filename)
-		}
-		return fmt.Sprintf("https://archive.apache.org/dist/maven/maven-3/%s/binaries/%s.sha512", version, filename)
-	case "mvnd":
-		return fmt.Sprintf("https://archive.apache.org/dist/maven/mvnd/%s/%s.sha512", version, filename)
-	case "go":
-		// Go provides checksums at https://go.dev/dl/
-		return fmt.Sprintf("https://go.dev/dl/?mode=json&include=all")
-	case "java":
-		// Java checksums are provided via Adoptium API
-		// We'll use the API to get the checksum URL dynamically
-		return ""
-	case "node":
-		// Node.js provides SHASUMS256.txt files for each version
-		return fmt.Sprintf("https://nodejs.org/dist/v%s/SHASUMS256.txt", version)
-	default:
-		return ""
-	}
+	// This method is kept for backward compatibility but should not be used
+	// Tools should call their own GetChecksumURL method directly
+	return ""
 }
 
 // SupportsChecksumVerification returns whether a tool supports checksum verification
@@ -219,229 +197,15 @@ func (cr *ChecksumRegistry) SupportsChecksumVerification(toolName string) bool {
 	return false
 }
 
-// AdoptiumAsset represents a binary asset from the Adoptium API
-type AdoptiumAsset struct {
-	Binary struct {
-		Architecture string `json:"architecture"`
-		ImageType    string `json:"image_type"`
-		OS           string `json:"os"`
-		Package      struct {
-			Checksum     string `json:"checksum"`
-			ChecksumLink string `json:"checksum_link"`
-			Name         string `json:"name"`
-			Link         string `json:"link"`
-		} `json:"package"`
-	} `json:"binary"`
+// GetDynamicChecksum attempts to get checksum using the tool's GetChecksum method
+func (cr *ChecksumRegistry) GetDynamicChecksum(tool Tool, version, filename string) (ChecksumInfo, error) {
+	return tool.GetChecksum(version, filename)
 }
 
-// GoRelease represents a Go release from go.dev API
-type GoRelease struct {
-	Version string   `json:"version"`
-	Stable  bool     `json:"stable"`
-	Files   []GoFile `json:"files"`
-}
-
-// GoFile represents a Go file from go.dev API
-type GoFile struct {
-	Filename string `json:"filename"`
-	OS       string `json:"os"`
-	Arch     string `json:"arch"`
-	Version  string `json:"version"`
-	SHA256   string `json:"sha256"`
-	Size     int64  `json:"size"`
-	Kind     string `json:"kind"`
-}
-
-// GetJavaChecksumFromAPI fetches Java checksum from Adoptium API
-func (cr *ChecksumRegistry) GetJavaChecksumFromAPI(version, arch, osName string) (ChecksumInfo, error) {
-	// Convert mvx architecture names to Adoptium API names
-	adoptiumArch := arch
-	if arch == "amd64" {
-		adoptiumArch = "x64"
+// GetDynamicChecksumByName is deprecated - use GetDynamicChecksum with Tool parameter
+func (cr *ChecksumRegistry) GetDynamicChecksumByName(toolName, version, filename string) (ChecksumInfo, error) {
+	if provider, exists := cr.providers[toolName]; exists {
+		return provider.GetChecksum(version, filename)
 	}
-
-	// Convert mvx OS names to Adoptium API names
-	adoptiumOS := osName
-	if osName == "darwin" {
-		adoptiumOS = "mac"
-	}
-
-	// Construct API URL
-	url := fmt.Sprintf("https://api.adoptium.net/v3/assets/latest/%s/hotspot?architecture=%s&os=%s&image_type=jdk",
-		version, adoptiumArch, adoptiumOS)
-
-	resp, err := cr.client.Get(url)
-	if err != nil {
-		return ChecksumInfo{}, fmt.Errorf("failed to fetch from Adoptium API: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return ChecksumInfo{}, fmt.Errorf("Adoptium API returned status %d", resp.StatusCode)
-	}
-
-	var assets []AdoptiumAsset
-	if err := json.NewDecoder(resp.Body).Decode(&assets); err != nil {
-		return ChecksumInfo{}, fmt.Errorf("failed to decode Adoptium API response: %w", err)
-	}
-
-	// Find the JDK package
-	for _, asset := range assets {
-		if asset.Binary.ImageType == "jdk" &&
-			asset.Binary.Architecture == adoptiumArch &&
-			asset.Binary.OS == adoptiumOS {
-			return ChecksumInfo{
-				Type:  SHA256,
-				Value: asset.Binary.Package.Checksum,
-				URL:   asset.Binary.Package.ChecksumLink,
-			}, nil
-		}
-	}
-
-	return ChecksumInfo{}, fmt.Errorf("no matching JDK found for %s %s %s", version, arch, osName)
-}
-
-// GetGoChecksumFromAPI fetches Go checksum from go.dev API
-func (cr *ChecksumRegistry) GetGoChecksumFromAPI(version, filename string) (ChecksumInfo, error) {
-	url := "https://go.dev/dl/?mode=json&include=all"
-
-	resp, err := cr.client.Get(url)
-	if err != nil {
-		return ChecksumInfo{}, fmt.Errorf("failed to fetch Go checksums: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return ChecksumInfo{}, fmt.Errorf("Go checksums returned status %d", resp.StatusCode)
-	}
-
-	// Parse the JSON response
-	var releases []GoRelease
-	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
-		return ChecksumInfo{}, fmt.Errorf("failed to decode Go API response: %w", err)
-	}
-
-	// Find the matching version and file
-	for _, release := range releases {
-		if release.Version == "go"+version {
-			for _, file := range release.Files {
-				if file.Filename == filename && file.Kind == "archive" {
-					return ChecksumInfo{
-						Type:  SHA256,
-						Value: file.SHA256,
-					}, nil
-				}
-			}
-		}
-	}
-
-	return ChecksumInfo{}, fmt.Errorf("no matching Go file found for version %s, filename %s", version, filename)
-}
-
-// GetNodeChecksumFromSHASUMS fetches Node.js checksum from SHASUMS256.txt
-func (cr *ChecksumRegistry) GetNodeChecksumFromSHASUMS(version, filename string) (ChecksumInfo, error) {
-	url := fmt.Sprintf("https://nodejs.org/dist/v%s/SHASUMS256.txt", version)
-
-	resp, err := cr.client.Get(url)
-	if err != nil {
-		return ChecksumInfo{}, fmt.Errorf("failed to fetch Node.js checksums: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return ChecksumInfo{}, fmt.Errorf("Node.js checksums returned status %d", resp.StatusCode)
-	}
-
-	// Read and parse the checksum file content immediately
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return ChecksumInfo{}, fmt.Errorf("failed to read Node.js checksums: %w", err)
-	}
-
-	content := string(body)
-
-	// Parse the checksum file to find the checksum for our filename
-	// We need to determine the actual Node.js filename from the version and platform
-	nodeFilename := cr.getNodeFilename(version)
-
-	checksum, err := cr.parseNodeChecksumFile(content, nodeFilename)
-	if err != nil {
-		return ChecksumInfo{}, fmt.Errorf("failed to parse Node.js checksum: %w", err)
-	}
-
-	return ChecksumInfo{
-		Type:  SHA256,
-		Value: checksum,
-	}, nil
-}
-
-// parseNodeChecksumFile parses Node.js SHASUMS256.txt content to find checksum for specific filename
-func (cr *ChecksumRegistry) parseNodeChecksumFile(content, filename string) (string, error) {
-	lines := strings.Split(content, "\n")
-	var candidateFiles []string
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		// Split on whitespace - Node.js format is: checksum  filename
-		parts := strings.Fields(line)
-		if len(parts) < 2 {
-			continue
-		}
-
-		checksum := parts[0]
-		fileInLine := parts[1]
-
-		// Store candidate files for debugging
-		candidateFiles = append(candidateFiles, fileInLine)
-
-		// Check if this line matches our filename (exact match)
-		if fileInLine == filename {
-			return checksum, nil
-		}
-
-		// Also try matching just the basename
-		if strings.Contains(fileInLine, "/") {
-			parts := strings.Split(fileInLine, "/")
-			basename := parts[len(parts)-1]
-			if basename == filename {
-				return checksum, nil
-			}
-		}
-	}
-
-	// If we get here, no match was found - provide helpful debug info
-	fmt.Printf("⚠️  Debug: Available Node.js files in SHASUMS256.txt: %v\n", candidateFiles)
-	fmt.Printf("   Looking for: %s\n", filename)
-	return "", fmt.Errorf("checksum not found for Node.js file %s", filename)
-}
-
-// getNodeFilename determines the correct Node.js filename based on version and platform
-func (cr *ChecksumRegistry) getNodeFilename(version string) string {
-	platform := ""
-	switch runtime.GOOS {
-	case "linux":
-		if runtime.GOARCH == "arm64" {
-			platform = "linux-arm64"
-		} else {
-			platform = "linux-x64"
-		}
-	case "darwin":
-		if runtime.GOARCH == "arm64" {
-			platform = "darwin-arm64"
-		} else {
-			platform = "darwin-x64"
-		}
-	case "windows":
-		platform = "win-x64"
-	}
-
-	// Windows uses zip, others tar.xz
-	if runtime.GOOS == "windows" {
-		return fmt.Sprintf("node-v%s-%s.zip", version, platform)
-	}
-	return fmt.Sprintf("node-v%s-%s.tar.xz", version, platform)
+	return ChecksumInfo{}, fmt.Errorf("no checksum provider registered for tool: %s", toolName)
 }

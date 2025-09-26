@@ -2,9 +2,9 @@ package tools
 
 import (
 	"fmt"
-	"os"
+	"io"
+	"net/http"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"github.com/gnodet/mvx/pkg/config"
@@ -12,11 +12,6 @@ import (
 
 // Compile-time interface validation
 var _ Tool = (*MvndTool)(nil)
-
-// useSystemMvnd checks if system Mvnd should be used instead of downloading
-func useSystemMvnd() bool {
-	return UseSystemTool("mvnd")
-}
 
 // MvndTool implements Tool interface for Maven Daemon management
 type MvndTool struct {
@@ -53,33 +48,34 @@ func (m *MvndTool) GetPath(version string, cfg config.ToolConfig) (string, error
 // getInstalledPath returns the path for an installed Mvnd version
 func (m *MvndTool) getInstalledPath(version string, cfg config.ToolConfig) (string, error) {
 	installDir := m.manager.GetToolVersionDir("mvnd", version, "")
+	pathResolver := NewPathResolver(m.manager.GetToolsDir())
 
-	// mvnd archives typically extract to maven-mvnd-{version}-{platform}/
-	entries, err := os.ReadDir(installDir)
+	options := DirectorySearchOptions{
+		DirectoryPrefix:           "maven-mvnd-",
+		BinSubdirectory:           "bin",
+		BinaryName:                "mvnd",
+		UsePlatformExtensions:     true,
+		PreferredWindowsExtension: ".cmd", // Mvnd uses .cmd on Windows
+		FallbackToParent:          false,  // Mvnd always has bin subdirectory
+	}
+
+	binPath, err := pathResolver.FindToolBinaryPath(installDir, options)
 	if err != nil {
-		return "", fmt.Errorf("failed to read installation directory: %w", err)
+		// Fallback to default bin directory if search fails
+		return filepath.Join(installDir, "bin"), nil
 	}
 
-	// Look for maven-mvnd-* directory
-	for _, entry := range entries {
-		if entry.IsDir() && strings.HasPrefix(entry.Name(), "maven-mvnd-") {
-			subPath := filepath.Join(installDir, entry.Name())
-			mvndExe := filepath.Join(subPath, "bin", "mvnd")
-			if runtime.GOOS == "windows" {
-				mvndExe += ".cmd"
-			}
-			if _, err := os.Stat(mvndExe); err == nil {
-				return filepath.Join(subPath, "bin"), nil
-			}
-		}
-	}
-
-	return filepath.Join(installDir, "bin"), nil
+	return binPath, nil
 }
 
 // Verify checks if the installation is working correctly
 func (m *MvndTool) Verify(version string, cfg config.ToolConfig) error {
-	return m.StandardVerify(version, cfg, m.GetPath, "mvnd", []string{"--version"})
+	verifyConfig := VerificationConfig{
+		BinaryName:  "mvnd",
+		VersionArgs: []string{"--version"},
+		DebugInfo:   false,
+	}
+	return m.StandardVerifyWithConfig(version, cfg, verifyConfig)
 }
 
 // ListVersions returns available mvnd versions
@@ -124,14 +120,16 @@ func (m *MvndTool) getArchiveDownloadURL(version string) string {
 
 // getPlatformString returns the platform string for mvnd downloads
 func (m *MvndTool) getPlatformString() string {
-	switch runtime.GOOS {
+	platformMapper := NewPlatformMapper()
+
+	switch platformMapper.GetOS() {
 	case "linux":
-		if runtime.GOARCH == "arm64" {
+		if platformMapper.GetArch() == "arm64" {
 			return "linux-aarch64"
 		}
 		return "linux-amd64"
 	case "darwin":
-		if runtime.GOARCH == "arm64" {
+		if platformMapper.GetArch() == "arm64" {
 			return "darwin-aarch64"
 		}
 		return "darwin-amd64"
@@ -140,4 +138,75 @@ func (m *MvndTool) getPlatformString() string {
 	default:
 		return "linux-amd64" // fallback
 	}
+}
+
+// ResolveVersion resolves a Mvnd version specification to a concrete version
+func (m *MvndTool) ResolveVersion(version, distribution string) (string, error) {
+	registry := m.manager.GetRegistry()
+	return registry.ResolveMvndVersion(version)
+}
+
+// GetDownloadURL implements Tool interface for Maven Daemon
+func (m *MvndTool) GetDownloadURL(version string) string {
+	return m.getDownloadURL(version)
+}
+
+// GetChecksumURL implements Tool interface for Maven Daemon
+func (m *MvndTool) GetChecksumURL(version, filename string) string {
+	return fmt.Sprintf("%s/mvnd/%s/%s.sha512",
+		ApacheMavenBase, version, filename)
+}
+
+// GetVersionsURL implements Tool interface for Maven Daemon
+func (m *MvndTool) GetVersionsURL() string {
+	return ApacheMavenBase + "/mvnd/"
+}
+
+// GetChecksum implements Tool interface for Maven Daemon
+func (m *MvndTool) GetChecksum(version, filename string) (ChecksumInfo, error) {
+	fmt.Printf("  🔍 Fetching Maven Daemon checksum from Apache archive...\n")
+
+	checksumURL := m.GetChecksumURL(version, filename)
+	if checksumURL == "" {
+		return ChecksumInfo{}, fmt.Errorf("no checksum URL available for Maven Daemon %s", version)
+	}
+
+	// Fetch checksum from Apache archive (reuse Maven's implementation)
+	checksum, err := m.fetchChecksumFromURL(checksumURL)
+	if err != nil {
+		fmt.Printf("  ⚠️  Failed to get Maven Daemon checksum: %v\n", err)
+		return ChecksumInfo{}, err
+	}
+
+	fmt.Printf("  ✅ Found Maven Daemon checksum from Apache archive\n")
+	return ChecksumInfo{
+		Type:  SHA512,
+		Value: checksum,
+	}, nil
+}
+
+// fetchChecksumFromURL fetches checksum from a URL (same as Maven)
+func (m *MvndTool) fetchChecksumFromURL(url string) (string, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch checksum: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("checksum request returned status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read checksum response: %w", err)
+	}
+
+	// Apache checksum files contain just the checksum value
+	checksum := strings.TrimSpace(string(body))
+	if len(checksum) == 0 {
+		return "", fmt.Errorf("empty checksum response")
+	}
+
+	return checksum, nil
 }
