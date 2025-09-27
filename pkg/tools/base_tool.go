@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/gnodet/mvx/pkg/config"
 )
@@ -55,17 +56,26 @@ func getUserFriendlyURL(inputURL string) string {
 	return inputURL
 }
 
+// pathCacheEntry represents a cached path result
+type pathCacheEntry struct {
+	path string
+	err  error
+}
+
 // BaseTool provides common functionality for all tools
 type BaseTool struct {
-	manager  *Manager
-	toolName string
+	manager   *Manager
+	toolName  string
+	pathCache map[string]pathCacheEntry
+	cacheMux  sync.RWMutex
 }
 
 // NewBaseTool creates a new base tool instance
 func NewBaseTool(manager *Manager, toolName string) *BaseTool {
 	return &BaseTool{
-		manager:  manager,
-		toolName: toolName,
+		manager:   manager,
+		toolName:  toolName,
+		pathCache: make(map[string]pathCacheEntry),
 	}
 }
 
@@ -77,6 +87,46 @@ func (b *BaseTool) GetManager() *Manager {
 // GetToolName returns the tool name
 func (b *BaseTool) GetToolName() string {
 	return b.toolName
+}
+
+// getCacheKey generates a cache key for path operations
+func (b *BaseTool) getCacheKey(version string, cfg config.ToolConfig, operation string) string {
+	return fmt.Sprintf("%s:%s:%s:%s", operation, version, cfg.Distribution, b.toolName)
+}
+
+// getCachedPath retrieves a cached path result
+func (b *BaseTool) getCachedPath(cacheKey string) (string, error, bool) {
+	b.cacheMux.RLock()
+	defer b.cacheMux.RUnlock()
+
+	if entry, exists := b.pathCache[cacheKey]; exists {
+		return entry.path, entry.err, true
+	}
+	return "", nil, false
+}
+
+// setCachedPath stores a path result in cache
+func (b *BaseTool) setCachedPath(cacheKey string, path string, err error) {
+	b.cacheMux.Lock()
+	defer b.cacheMux.Unlock()
+
+	b.pathCache[cacheKey] = pathCacheEntry{
+		path: path,
+		err:  err,
+	}
+}
+
+// clearPathCache clears the path cache (useful for testing)
+func (b *BaseTool) clearPathCache() {
+	b.cacheMux.Lock()
+	defer b.cacheMux.Unlock()
+
+	b.pathCache = make(map[string]pathCacheEntry)
+}
+
+// ClearPathCache clears the path cache (public method for CacheManager interface)
+func (b *BaseTool) ClearPathCache() {
+	b.clearPathCache()
 }
 
 // getPlatformBinaryPath returns the platform-specific binary path
@@ -584,6 +634,11 @@ func (b *BaseTool) StandardGetPath(version string, cfg config.ToolConfig, getIns
 
 // StandardGetPathWithOptions provides standard path resolution with system tool support and options
 func (b *BaseTool) StandardGetPathWithOptions(version string, cfg config.ToolConfig, getInstalledPath func(string, config.ToolConfig) (string, error), binaryName string, alternativeNames []string, envVars []string) (string, error) {
+	// Check cache first
+	cacheKey := b.getCacheKey(version, cfg, "getPath")
+	if cachedPath, cachedErr, found := b.getCachedPath(cacheKey); found {
+		return cachedPath, cachedErr
+	}
 	// Check if we should use system tool instead of mvx-managed tool
 	if UseSystemTool(b.toolName) {
 		// Try environment variables first (for tools like Maven that need MAVEN_HOME)
@@ -594,15 +649,18 @@ func (b *BaseTool) StandardGetPathWithOptions(version string, cfg config.ToolCon
 				if runtime.GOOS == "windows" && !strings.HasSuffix(binaryName, ".exe") && !strings.HasSuffix(binaryName, ".cmd") {
 					if _, err := os.Stat(toolPath + ".cmd"); err == nil {
 						logVerbose("Using system %s from %s (MVX_USE_SYSTEM_%s=true)", b.toolName, envVar, strings.ToUpper(b.toolName))
+						b.setCachedPath(cacheKey, "", nil)
 						return "", nil
 					}
 					if _, err := os.Stat(toolPath + ".exe"); err == nil {
 						logVerbose("Using system %s from %s (MVX_USE_SYSTEM_%s=true)", b.toolName, envVar, strings.ToUpper(b.toolName))
+						b.setCachedPath(cacheKey, "", nil)
 						return "", nil
 					}
 				}
 				if _, err := os.Stat(toolPath); err == nil {
 					logVerbose("Using system %s from %s (MVX_USE_SYSTEM_%s=true)", b.toolName, envVar, strings.ToUpper(b.toolName))
+					b.setCachedPath(cacheKey, "", nil)
 					return "", nil
 				}
 			}
@@ -611,6 +669,7 @@ func (b *BaseTool) StandardGetPathWithOptions(version string, cfg config.ToolCon
 		// Try primary binary name in PATH
 		if _, err := exec.LookPath(binaryName); err == nil {
 			logVerbose("Using system %s from PATH (MVX_USE_SYSTEM_%s=true)", b.toolName, strings.ToUpper(b.toolName))
+			b.setCachedPath(cacheKey, "", nil)
 			return "", nil
 		}
 
@@ -618,13 +677,18 @@ func (b *BaseTool) StandardGetPathWithOptions(version string, cfg config.ToolCon
 		for _, altName := range alternativeNames {
 			if _, err := exec.LookPath(altName); err == nil {
 				logVerbose("Using system %s from PATH as %s (MVX_USE_SYSTEM_%s=true)", b.toolName, altName, strings.ToUpper(b.toolName))
+				b.setCachedPath(cacheKey, "", nil)
 				return "", nil
 			}
 		}
 
-		return "", SystemToolError(b.toolName, fmt.Errorf("MVX_USE_SYSTEM_%s=true but system %s not available", strings.ToUpper(b.toolName), b.toolName))
+		systemErr := SystemToolError(b.toolName, fmt.Errorf("MVX_USE_SYSTEM_%s=true but system %s not available", strings.ToUpper(b.toolName), b.toolName))
+		b.setCachedPath(cacheKey, "", systemErr)
+		return "", systemErr
 	}
 
 	// Use mvx-managed tool path
-	return getInstalledPath(version, cfg)
+	path, err := getInstalledPath(version, cfg)
+	b.setCachedPath(cacheKey, path, err)
+	return path, err
 }

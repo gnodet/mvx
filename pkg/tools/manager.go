@@ -140,6 +140,20 @@ func ResetManager() {
 	globalManager = nil
 }
 
+// CacheManager interface for tools that support cache management
+type CacheManager interface {
+	ClearPathCache()
+}
+
+// ClearAllCaches clears all tool path caches (for testing purposes)
+func (m *Manager) ClearAllCaches() {
+	for _, tool := range m.tools {
+		if cacheManager, ok := tool.(CacheManager); ok {
+			cacheManager.ClearPathCache()
+		}
+	}
+}
+
 // RegisterTool registers a tool with the manager
 func (m *Manager) RegisterTool(tool Tool) {
 	m.tools[tool.Name()] = tool
