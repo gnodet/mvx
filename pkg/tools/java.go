@@ -296,6 +296,23 @@ func extractMajorVersion(version string) string {
 
 // GetJavaHome returns the JAVA_HOME path for the specified version
 func (j *JavaTool) GetJavaHome(version string, cfg config.ToolConfig) (string, error) {
+	// Check cache first
+	cacheKey := j.getCacheKey(version, cfg, "getJavaHome")
+	if cachedPath, cachedErr, found := j.getCachedPath(cacheKey); found {
+		return cachedPath, cachedErr
+	}
+
+	// Compute the result
+	javaHome, err := j.getJavaHomeUncached(version, cfg)
+
+	// Cache the result
+	j.setCachedPath(cacheKey, javaHome, err)
+
+	return javaHome, err
+}
+
+// getJavaHomeUncached performs the actual JAVA_HOME resolution without caching
+func (j *JavaTool) getJavaHomeUncached(version string, cfg config.ToolConfig) (string, error) {
 	distribution := cfg.Distribution
 	if distribution == "" {
 		distribution = "temurin"
