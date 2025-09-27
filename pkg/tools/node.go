@@ -47,7 +47,6 @@ func (n *NodeTool) getInstalledPath(version string, cfg config.ToolConfig) (stri
 	pathResolver := NewPathResolver(n.manager.GetToolsDir())
 
 	options := DirectorySearchOptions{
-		DirectoryPrefix:           "node-",
 		BinSubdirectory:           "bin",
 		BinaryName:                "node",
 		UsePlatformExtensions:     true,

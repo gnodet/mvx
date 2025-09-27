@@ -831,7 +831,12 @@ func verifyToolUsability(t *testing.T, toolName, version string) {
 
 	case "go":
 		// Find Go installation and test it
-		goPath := filepath.Join(homeDir, ".mvx", "tools", "go", version, "go", "bin", "go")
+		// Try new extraction format first (post-strip-components)
+		goPath := filepath.Join(homeDir, ".mvx", "tools", "go", version, "bin", "go")
+		if _, err := os.Stat(goPath); os.IsNotExist(err) {
+			// Fallback to legacy extraction format
+			goPath = filepath.Join(homeDir, ".mvx", "tools", "go", version, "go", "bin", "go")
+		}
 		cmd := exec.Command(goPath, "version")
 		output, err := cmd.CombinedOutput()
 		if err != nil {

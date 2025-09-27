@@ -51,8 +51,8 @@ func (m *MvndTool) getInstalledPath(version string, cfg config.ToolConfig) (stri
 	installDir := m.manager.GetToolVersionDir("mvnd", version, "")
 	pathResolver := NewPathResolver(m.manager.GetToolsDir())
 
+	// Use robust directory walking approach
 	options := DirectorySearchOptions{
-		DirectoryPrefix:           "maven-mvnd-",
 		BinSubdirectory:           "bin",
 		BinaryName:                "mvnd",
 		UsePlatformExtensions:     true,
@@ -62,7 +62,7 @@ func (m *MvndTool) getInstalledPath(version string, cfg config.ToolConfig) (stri
 
 	binPath, err := pathResolver.FindToolBinaryPath(installDir, options)
 	if err != nil {
-		// Fallback to default bin directory if search fails
+		// Final fallback to default bin directory
 		return filepath.Join(installDir, "bin"), nil
 	}
 

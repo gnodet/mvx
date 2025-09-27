@@ -12,6 +12,102 @@ import (
 	"strings"
 )
 
+// detectSingleTopLevelDirectory checks if all files in a ZIP archive are under a single top-level directory
+// Returns the directory prefix to strip, or empty string if no stripping should be done
+func detectSingleTopLevelDirectory(files []*zip.File) string {
+	if len(files) == 0 {
+		return ""
+	}
+
+	var topLevelDir string
+	for _, file := range files {
+		// Skip empty entries
+		if file.Name == "" {
+			continue
+		}
+
+		// Get the first path component
+		parts := strings.Split(file.Name, "/")
+		if len(parts) == 0 {
+			return "" // No directory structure
+		}
+
+		firstComponent := parts[0]
+		if firstComponent == "" {
+			return "" // Absolute path, don't strip
+		}
+
+		if topLevelDir == "" {
+			topLevelDir = firstComponent
+		} else if topLevelDir != firstComponent {
+			return "" // Multiple top-level directories, don't strip
+		}
+	}
+
+	// Ensure the top-level directory actually exists as a directory entry
+	topLevelDirPath := topLevelDir + "/"
+	for _, file := range files {
+		if file.Name == topLevelDirPath && file.FileInfo().IsDir() {
+			return topLevelDirPath
+		}
+	}
+
+	// If we don't find the directory entry, still strip if all files are under the same prefix
+	if topLevelDir != "" {
+		return topLevelDir + "/"
+	}
+
+	return ""
+}
+
+// detectSingleTopLevelDirectoryTar checks if all files in a tar archive are under a single top-level directory
+// Returns the directory prefix to strip, or empty string if no stripping should be done
+func detectSingleTopLevelDirectoryTar(headers []*tar.Header) string {
+	if len(headers) == 0 {
+		return ""
+	}
+
+	var topLevelDir string
+	for _, header := range headers {
+		// Skip empty entries
+		if header.Name == "" {
+			continue
+		}
+
+		// Get the first path component
+		parts := strings.Split(header.Name, "/")
+		if len(parts) == 0 {
+			return "" // No directory structure
+		}
+
+		firstComponent := parts[0]
+		if firstComponent == "" {
+			return "" // Absolute path, don't strip
+		}
+
+		if topLevelDir == "" {
+			topLevelDir = firstComponent
+		} else if topLevelDir != firstComponent {
+			return "" // Multiple top-level directories, don't strip
+		}
+	}
+
+	// Ensure the top-level directory actually exists as a directory entry
+	topLevelDirPath := topLevelDir + "/"
+	for _, header := range headers {
+		if header.Name == topLevelDirPath && header.Typeflag == tar.TypeDir {
+			return topLevelDirPath
+		}
+	}
+
+	// If we don't find the directory entry, still strip if all files are under the same prefix
+	if topLevelDir != "" {
+		return topLevelDir + "/"
+	}
+
+	return ""
+}
+
 // extractZipFile extracts a zip file to the destination directory
 func extractZipFile(src, dest string) error {
 	reader, err := zip.OpenReader(src)
@@ -25,9 +121,24 @@ func extractZipFile(src, dest string) error {
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
 
+	// Check if archive contains a single top-level directory
+	stripPrefix := detectSingleTopLevelDirectory(reader.File)
+
 	// Extract files
 	for _, file := range reader.File {
-		targetPath := filepath.Join(dest, file.Name)
+		// Skip the top-level directory if we're stripping it
+		relativePath := file.Name
+		if stripPrefix != "" {
+			if !strings.HasPrefix(file.Name, stripPrefix) {
+				continue
+			}
+			relativePath = strings.TrimPrefix(file.Name, stripPrefix)
+			if relativePath == "" {
+				continue // Skip the directory itself
+			}
+		}
+
+		targetPath := filepath.Join(dest, relativePath)
 
 		// Security check: ensure the file path is within destDir
 		if !strings.HasPrefix(targetPath, filepath.Clean(dest)+string(os.PathSeparator)) {
@@ -105,7 +216,39 @@ func extractTarGzFile(src, dest string) error {
 		return fmt.Errorf("failed to create destination directory: %w", err)
 	}
 
-	// Extract files
+	// First pass: collect all headers to detect single top-level directory
+	var headers []*tar.Header
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("failed to read tar header: %w", err)
+		}
+		headers = append(headers, header)
+	}
+
+	// Detect if we should strip a single top-level directory
+	stripPrefix := detectSingleTopLevelDirectoryTar(headers)
+
+	// Reopen the file for second pass
+	file.Close()
+	file, err = os.Open(src)
+	if err != nil {
+		return fmt.Errorf("failed to reopen archive: %w", err)
+	}
+	defer file.Close()
+
+	gzReader, err = gzip.NewReader(file)
+	if err != nil {
+		return fmt.Errorf("failed to create gzip reader: %w", err)
+	}
+	defer gzReader.Close()
+
+	tarReader = tar.NewReader(gzReader)
+
+	// Second pass: extract files
 	for {
 		header, err := tarReader.Next()
 		if err == io.EOF {
@@ -115,7 +258,19 @@ func extractTarGzFile(src, dest string) error {
 			return fmt.Errorf("failed to read tar header: %w", err)
 		}
 
-		targetPath := filepath.Join(dest, header.Name)
+		// Skip the top-level directory if we're stripping it
+		relativePath := header.Name
+		if stripPrefix != "" {
+			if !strings.HasPrefix(header.Name, stripPrefix) {
+				continue
+			}
+			relativePath = strings.TrimPrefix(header.Name, stripPrefix)
+			if relativePath == "" {
+				continue // Skip the directory itself
+			}
+		}
+
+		targetPath := filepath.Join(dest, relativePath)
 
 		// Security check: ensure the file path is within destDir
 		if !strings.HasPrefix(targetPath, filepath.Clean(dest)+string(os.PathSeparator)) {

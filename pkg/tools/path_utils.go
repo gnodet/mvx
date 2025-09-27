@@ -21,8 +21,6 @@ func NewPathResolver(toolsDir string) *PathResolver {
 
 // DirectorySearchOptions configures directory search behavior
 type DirectorySearchOptions struct {
-	// Prefix to match directory names (e.g., "apache-maven-", "node-")
-	DirectoryPrefix string
 	// Subdirectory to look for within matched directories (e.g., "bin")
 	BinSubdirectory string
 	// Binary name to verify exists (e.g., "mvn", "node")
@@ -42,9 +40,9 @@ func (pr *PathResolver) FindToolBinaryPath(installDir string, options DirectoryS
 		return "", fmt.Errorf("failed to read installation directory: %w", err)
 	}
 
-	// Search for directories matching the prefix
+	// Walk all subdirectories and look for the binary
 	for _, entry := range entries {
-		if entry.IsDir() && strings.HasPrefix(entry.Name(), options.DirectoryPrefix) {
+		if entry.IsDir() {
 			toolHome := filepath.Join(installDir, entry.Name())
 
 			// Check for bin subdirectory
@@ -64,7 +62,7 @@ func (pr *PathResolver) FindToolBinaryPath(installDir string, options DirectoryS
 		}
 	}
 
-	// If no prefixed directory found, check direct installation
+	// If no subdirectory worked, check direct installation
 	if options.BinSubdirectory != "" {
 		binPath := filepath.Join(installDir, options.BinSubdirectory)
 		if pr.verifyBinaryExists(binPath, options.BinaryName, options) {

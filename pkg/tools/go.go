@@ -50,8 +50,8 @@ func (g *GoTool) getInstalledPath(version string, cfg config.ToolConfig) (string
 	installDir := g.manager.GetToolVersionDir("go", version, "")
 	pathResolver := NewPathResolver(g.manager.GetToolsDir())
 
+	// Use robust directory walking approach
 	options := DirectorySearchOptions{
-		DirectoryPrefix:           "go",
 		BinSubdirectory:           "bin",
 		BinaryName:                "go",
 		UsePlatformExtensions:     true,
@@ -61,7 +61,7 @@ func (g *GoTool) getInstalledPath(version string, cfg config.ToolConfig) (string
 
 	binPath, err := pathResolver.FindToolBinaryPath(installDir, options)
 	if err != nil {
-		// Fallback to default bin directory if search fails
+		// Final fallback to default bin directory
 		return filepath.Join(installDir, "bin"), nil
 	}
 

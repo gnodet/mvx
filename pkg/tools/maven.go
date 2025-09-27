@@ -184,8 +184,8 @@ func (m *MavenTool) getInstalledPath(version string, cfg config.ToolConfig) (str
 	installDir := m.manager.GetToolVersionDir("maven", version, "")
 	pathResolver := NewPathResolver(m.manager.GetToolsDir())
 
+	// Use robust directory walking approach
 	options := DirectorySearchOptions{
-		DirectoryPrefix:           "apache-maven-",
 		BinSubdirectory:           "bin",
 		BinaryName:                "mvn",
 		UsePlatformExtensions:     true,
@@ -195,7 +195,7 @@ func (m *MavenTool) getInstalledPath(version string, cfg config.ToolConfig) (str
 
 	binPath, err := pathResolver.FindToolBinaryPath(installDir, options)
 	if err != nil {
-		// Fallback to default bin directory if search fails
+		// Final fallback to default bin directory
 		return filepath.Join(installDir, "bin"), nil
 	}
 
