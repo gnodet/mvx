@@ -127,7 +127,7 @@ Both interpreters support comprehensive variable expansion with multiple syntax 
 #### Supported Syntax
 
 - **Simple Variables**: `$VARIABLE_NAME`
-- **Braced Variables**: `${VARIABLE_NAME}` (useful when followed by other characters)
+- **Braced Variables**: `$\{VARIABLE_NAME\}` (useful when followed by other characters)
 
 #### MVX-Shell Variable Expansion
 
