@@ -30,6 +30,12 @@ type Manager struct {
 	cacheMutex       sync.RWMutex
 }
 
+var (
+	// Global singleton instance
+	globalManager *Manager
+	managerMutex  sync.Mutex
+)
+
 // InstallOptions contains options for tool installation
 type InstallOptions struct {
 	MaxConcurrent int  // Maximum number of concurrent downloads (default: 3)
@@ -84,8 +90,16 @@ type VersionResolver interface {
 	ResolveVersion(version, distribution string) (string, error)
 }
 
-// NewManager creates a new tool manager
+// NewManager creates a new tool manager (singleton pattern)
 func NewManager() (*Manager, error) {
+	managerMutex.Lock()
+	defer managerMutex.Unlock()
+
+	// Return existing instance if already created
+	if globalManager != nil {
+		return globalManager, nil
+	}
+
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user home directory: %w", err)
@@ -114,7 +128,16 @@ func NewManager() (*Manager, error) {
 		return nil, fmt.Errorf("failed to register tools: %w", err)
 	}
 
+	// Store as global singleton
+	globalManager = manager
 	return manager, nil
+}
+
+// ResetManager resets the global manager instance (for testing purposes)
+func ResetManager() {
+	managerMutex.Lock()
+	defer managerMutex.Unlock()
+	globalManager = nil
 }
 
 // RegisterTool registers a tool with the manager

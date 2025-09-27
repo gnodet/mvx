@@ -9,6 +9,9 @@ import (
 )
 
 func TestExecutor_SetupEnvironment(t *testing.T) {
+	// Reset manager for test isolation
+	tools.ResetManager()
+
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 
@@ -79,6 +82,9 @@ func TestExecutor_SetupEnvironment(t *testing.T) {
 }
 
 func TestExecutor_ProcessScriptString(t *testing.T) {
+	// Reset manager for test isolation
+	tools.ResetManager()
+
 	tempDir := t.TempDir()
 	cfg := &config.Config{}
 	manager, _ := tools.NewManager()
@@ -121,6 +127,9 @@ func TestExecutor_ProcessScriptString(t *testing.T) {
 }
 
 func TestExecutor_ListCommands(t *testing.T) {
+	// Reset manager for test isolation
+	tools.ResetManager()
+
 	tempDir := t.TempDir()
 	cfg := &config.Config{
 		Commands: map[string]config.CommandConfig{
@@ -161,6 +170,9 @@ func TestExecutor_ListCommands(t *testing.T) {
 }
 
 func TestExecutor_GetCommandInfo(t *testing.T) {
+	// Reset manager for test isolation
+	tools.ResetManager()
+
 	tempDir := t.TempDir()
 	cfg := &config.Config{
 		Commands: map[string]config.CommandConfig{
@@ -194,6 +206,9 @@ func TestExecutor_GetCommandInfo(t *testing.T) {
 }
 
 func TestExecutor_ValidateCommand(t *testing.T) {
+	// Reset manager for test isolation
+	tools.ResetManager()
+
 	tempDir := t.TempDir()
 	cfg := &config.Config{
 		Tools: map[string]config.ToolConfig{
@@ -241,6 +256,9 @@ func TestExecutor_ValidateCommand(t *testing.T) {
 }
 
 func TestExecutor_InterpreterSelection(t *testing.T) {
+	// Reset manager for test isolation
+	tools.ResetManager()
+
 	cfg := &config.Config{}
 	manager, _ := tools.NewManager()
 	_ = NewExecutor(cfg, manager, "")
