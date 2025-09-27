@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -32,7 +33,7 @@ func (m *MvndTool) Name() string {
 
 // Install downloads and installs the specified mvnd version
 func (m *MvndTool) Install(version string, cfg config.ToolConfig) error {
-	return m.StandardInstall(version, cfg, m.getDownloadURL)
+	return m.installWithFallback(version, cfg)
 }
 
 // IsInstalled checks if the specified version is installed
@@ -209,4 +210,106 @@ func (m *MvndTool) fetchChecksumFromURL(url string) (string, error) {
 	}
 
 	return checksum, nil
+}
+
+// installWithFallback tries primary URL first, then fallback archive URL with improved retry strategy
+func (m *MvndTool) installWithFallback(version string, cfg config.ToolConfig) error {
+	// Check if we should use system tool instead of downloading
+	if UseSystemTool("mvnd") {
+		return m.StandardInstallWithOptions(version, cfg, m.getDownloadURL, []string{"mvnd.cmd"}, []string{"MVND_HOME"})
+	}
+
+	// Create installation directory
+	installDir, err := m.CreateInstallDir(version, "")
+	if err != nil {
+		return InstallError("mvnd", version, fmt.Errorf("failed to create install directory: %w", err))
+	}
+
+	// Try both URLs with reduced retries instead of exhausting retries on first URL
+	primaryURL := m.getDownloadURL(version)
+	archiveURL := m.getArchiveDownloadURL(version)
+	m.PrintDownloadMessage(version)
+
+	options := m.GetDownloadOptions()
+
+	// Try to download with alternating URLs and reduced retries per URL
+	archivePath, err := m.downloadWithAlternatingURLs(primaryURL, archiveURL, version, cfg, options)
+	if err != nil {
+		return InstallError("mvnd", version, fmt.Errorf("download failed from both primary and archive URLs: %w", err))
+	}
+
+	// Extract archive
+	if err := m.Extract(archivePath, installDir, options); err != nil {
+		return InstallError("mvnd", version, fmt.Errorf("failed to extract archive: %w", err))
+	}
+
+	// Clean up downloaded archive
+	if err := os.Remove(archivePath); err != nil {
+		fmt.Printf("  ⚠️  Warning: failed to remove archive file: %v\n", err)
+	}
+
+	fmt.Printf("  ✅ Maven Daemon %s installed successfully\n", version)
+	return nil
+}
+
+// downloadWithAlternatingURLs tries downloading from both URLs with reduced retries per URL
+// instead of exhausting all retries on the first URL before trying the second
+func (m *MvndTool) downloadWithAlternatingURLs(primaryURL, archiveURL, version string, cfg config.ToolConfig, options DownloadOptions) (string, error) {
+	urls := []struct {
+		url  string
+		name string
+	}{
+		{primaryURL, "primary"},
+		{archiveURL, "archive"},
+	}
+
+	maxRetries := 3    // Total retries across both URLs
+	retriesPerURL := 1 // Reduced retries per URL to allow trying both
+
+	var lastErr error
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		urlIndex := attempt % len(urls)
+		currentURL := urls[urlIndex]
+
+		if attempt > 0 && urlIndex == 0 {
+			fmt.Printf("  🔄 Trying %s URL again (attempt %d)...\n", currentURL.name, (attempt/len(urls))+1)
+		} else if urlIndex == 1 {
+			fmt.Printf("  🔄 Switching to %s URL...\n", currentURL.name)
+		}
+
+		// Create download config with reduced retries per URL
+		downloadConfig := DefaultDownloadConfig(currentURL.url, "")
+		downloadConfig.MaxRetries = retriesPerURL
+		downloadConfig.ExpectedType = options.ExpectedType
+		downloadConfig.MinSize = options.MinSize
+		downloadConfig.MaxSize = options.MaxSize
+		downloadConfig.ToolName = "mvnd"
+		downloadConfig.Version = version
+		downloadConfig.Config = cfg
+		downloadConfig.ChecksumRegistry = m.manager.GetChecksumRegistry()
+		downloadConfig.Tool = m
+
+		// Create temporary file for download
+		tmpFile, err := os.CreateTemp("", fmt.Sprintf("mvnd-*%s", options.FileExtension))
+		if err != nil {
+			lastErr = fmt.Errorf("failed to create temporary file: %w", err)
+			continue
+		}
+		downloadConfig.DestPath = tmpFile.Name()
+		tmpFile.Close()
+
+		_, err = RobustDownload(downloadConfig)
+		if err == nil {
+			fmt.Printf("  ✅ Successfully downloaded from %s URL\n", currentURL.name)
+			return downloadConfig.DestPath, nil
+		}
+
+		lastErr = err
+		fmt.Printf("  ⚠️  Download from %s URL failed: %v\n", currentURL.name, err)
+		// Clean up failed download
+		os.Remove(downloadConfig.DestPath)
+	}
+
+	return "", fmt.Errorf("all download attempts failed, last error: %w", lastErr)
 }

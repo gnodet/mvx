@@ -60,10 +60,16 @@ func Execute() error {
 		return fmt.Errorf("auto-setup failed: %w", err)
 	}
 
-	// Add dynamic custom commands before execution
+	// Add dynamic custom commands and tool commands before execution
 	if err := addCustomCommands(); err != nil {
 		// If we can't load custom commands, continue with built-in commands only
 		printVerbose("Failed to load custom commands: %v", err)
+	}
+
+	// Add automatic tool commands
+	if err := addToolCommands(); err != nil {
+		// If we can't load tool commands, continue without them
+		printVerbose("Failed to load tool commands: %v", err)
 	}
 
 	return rootCmd.Execute()
@@ -382,6 +388,86 @@ func createCustomCommand(cmdName string, cmdConfig config.CommandConfig, exec *e
 	}
 
 	return cmd
+}
+
+// addToolCommands dynamically adds tool commands (mvn, go, node, etc.) as top-level commands
+func addToolCommands() error {
+	// Try to find project root and load configuration
+	projectRoot, err := findProjectRoot()
+	if err != nil {
+		return err // No project root found, skip tool commands
+	}
+
+	// Load configuration
+	cfg, err := config.LoadConfig(projectRoot)
+	if err != nil {
+		return err // No configuration found, skip tool commands
+	}
+
+	// Create tool manager
+	manager, err := tools.NewManager()
+	if err != nil {
+		return fmt.Errorf("failed to create tool manager: %w", err)
+	}
+
+	// Create executor
+	exec := executor.NewExecutor(cfg, manager, projectRoot)
+
+	// Get all registered tool names from the manager
+	registeredToolNames := manager.GetToolNames()
+
+	for _, toolName := range registeredToolNames {
+		// Check if this tool is configured in the project
+		if _, exists := cfg.Tools[toolName]; !exists {
+			continue // Skip tools not configured in this project
+		}
+
+		// Check if a command with this name already exists (avoid conflicts)
+		if hasCommand(rootCmd, toolName) {
+			continue // Skip if command already exists
+		}
+
+		// Create the tool command
+		toolCmd := createToolCommand(toolName, exec)
+		rootCmd.AddCommand(toolCmd)
+		printVerbose("Added automatic tool command: %s", toolName)
+	}
+
+	return nil
+}
+
+// hasCommand checks if a command with the given name already exists
+func hasCommand(cmd *cobra.Command, name string) bool {
+	for _, subCmd := range cmd.Commands() {
+		if subCmd.Name() == name {
+			return true
+		}
+	}
+	return false
+}
+
+// createToolCommand creates a cobra command for a specific tool
+func createToolCommand(toolName string, exec *executor.Executor) *cobra.Command {
+	return &cobra.Command{
+		Use:   toolName + " [tool-args...]",
+		Short: fmt.Sprintf("Run %s with mvx-managed environment", toolName),
+		Long: fmt.Sprintf(`Run %s with the mvx-managed %s installation and proper environment setup.
+
+This command automatically uses the %s version specified in your mvx configuration
+and sets up the appropriate environment variables.
+
+Examples:
+  mvx %s --version           # Show %s version
+  mvx %s [args...]           # Run %s with arguments`, toolName, toolName, toolName, toolName, toolName, toolName, toolName),
+
+		DisableFlagParsing: true, // Allow all flags to be passed through to the tool
+		Run: func(cmd *cobra.Command, args []string) {
+			if err := exec.ExecuteTool(toolName, args); err != nil {
+				printError("%v", err)
+				os.Exit(1)
+			}
+		},
+	}
 }
 
 // isBuiltinCommand checks if a command name is a built-in mvx command

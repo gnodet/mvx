@@ -74,6 +74,63 @@ func (e *Executor) ExecuteCommand(commandName string, args []string) error {
 	return e.executeScriptWithInterpreter(processedScript, workDir, env, interpreter)
 }
 
+// ExecuteTool executes a tool command with mvx-managed environment
+func (e *Executor) ExecuteTool(toolName string, args []string) error {
+	// Check if the tool is configured
+	toolConfig, exists := e.config.Tools[toolName]
+	if !exists {
+		return fmt.Errorf("tool %s is not configured in this project", toolName)
+	}
+
+	// Get the tool instance
+	tool, err := e.toolManager.GetTool(toolName)
+	if err != nil {
+		return fmt.Errorf("failed to get tool %s: %w", toolName, err)
+	}
+
+	// Resolve tool version using the manager
+	resolvedVersion, err := e.toolManager.ResolveVersion(toolName, toolConfig)
+	if err != nil {
+		return fmt.Errorf("failed to resolve %s version %s: %w", toolName, toolConfig.Version, err)
+	}
+
+	// Check if tool is installed, auto-install if needed
+	if !tool.IsInstalled(resolvedVersion, toolConfig) {
+		fmt.Printf("🔧 Auto-installing %s %s...\n", toolName, resolvedVersion)
+		if err := tool.Install(resolvedVersion, toolConfig); err != nil {
+			return fmt.Errorf("failed to install %s %s: %w", toolName, resolvedVersion, err)
+		}
+	}
+
+	// Get tool binary path
+	toolBinPath, err := tool.GetPath(resolvedVersion, toolConfig)
+	if err != nil {
+		return fmt.Errorf("failed to get %s binary path: %w", toolName, err)
+	}
+
+	// Setup environment with tool paths
+	env, err := e.setupToolEnvironment(toolName, toolBinPath)
+	if err != nil {
+		return fmt.Errorf("failed to setup environment for %s: %w", toolName, err)
+	}
+
+	// Execute the tool
+	toolExecutable := toolName
+	if len(args) == 0 {
+		args = []string{"--version"} // Default to showing version if no args
+	}
+
+	// Create and execute command
+	cmd := exec.Command(toolExecutable, args...)
+	cmd.Env = env
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	cmd.Dir = e.projectRoot
+
+	return cmd.Run()
+}
+
 // ExecuteBuiltinCommand executes a built-in command with optional hooks and overrides
 func (e *Executor) ExecuteBuiltinCommand(commandName string, args []string, builtinFunc func([]string) error) error {
 	// Check if command is overridden
@@ -387,4 +444,73 @@ func (e *Executor) ValidateCommand(commandName string) error {
 	}
 
 	return nil
+}
+
+// setupToolEnvironment prepares the environment for tool execution
+func (e *Executor) setupToolEnvironment(toolName, toolBinPath string) ([]string, error) {
+	// Create environment map starting with current environment
+	envVars := make(map[string]string)
+	for _, envVar := range os.Environ() {
+		parts := strings.SplitN(envVar, "=", 2)
+		if len(parts) == 2 {
+			envVars[parts[0]] = parts[1]
+		}
+	}
+
+	// Add global environment variables from config
+	globalEnv, err := e.toolManager.SetupEnvironment(e.config)
+	if err != nil {
+		return nil, err
+	}
+
+	for key, value := range globalEnv {
+		envVars[key] = value
+	}
+
+	// Add tool binary directory to PATH
+	pathDirs := []string{toolBinPath}
+
+	// Add existing PATH
+	if existingPath, exists := envVars["PATH"]; exists {
+		pathDirs = append(pathDirs, existingPath)
+	}
+
+	// Set PATH with tool directory first
+	envVars["PATH"] = strings.Join(pathDirs, string(os.PathListSeparator))
+
+	// Set tool-specific environment variables
+	switch toolName {
+	case "go":
+		// Set GOROOT if we can determine it from the binary path
+		if strings.HasSuffix(toolBinPath, "/bin") {
+			goRoot := strings.TrimSuffix(toolBinPath, "/bin")
+			envVars["GOROOT"] = goRoot
+		}
+	case "java":
+		// Set JAVA_HOME if we can determine it from the binary path
+		if strings.HasSuffix(toolBinPath, "/bin") {
+			javaHome := strings.TrimSuffix(toolBinPath, "/bin")
+			envVars["JAVA_HOME"] = javaHome
+		}
+	case "mvn", "maven":
+		// Set MAVEN_HOME if we can determine it from the binary path
+		if strings.HasSuffix(toolBinPath, "/bin") {
+			mavenHome := strings.TrimSuffix(toolBinPath, "/bin")
+			envVars["MAVEN_HOME"] = mavenHome
+		}
+	case "mvnd":
+		// Set MVND_HOME if we can determine it from the binary path
+		if strings.HasSuffix(toolBinPath, "/bin") {
+			mvndHome := strings.TrimSuffix(toolBinPath, "/bin")
+			envVars["MVND_HOME"] = mvndHome
+		}
+	}
+
+	// Convert map back to slice
+	env := make([]string, 0, len(envVars))
+	for key, value := range envVars {
+		env = append(env, fmt.Sprintf("%s=%s", key, value))
+	}
+
+	return env, nil
 }

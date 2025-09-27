@@ -135,22 +135,17 @@ func (m *MavenTool) installWithFallback(version string, cfg config.ToolConfig) e
 		return InstallError("maven", version, fmt.Errorf("failed to create install directory: %w", err))
 	}
 
-	// Try primary URL first
+	// Try both URLs with reduced retries instead of exhausting retries on first URL
 	primaryURL := m.getDownloadURL(version)
+	archiveURL := m.getArchiveDownloadURL(version)
 	m.PrintDownloadMessage(version)
 
 	options := m.GetDownloadOptions()
 
-	// Try to download from primary URL
-	archivePath, err := m.Download(primaryURL, version, cfg, options)
+	// Try to download with alternating URLs and reduced retries per URL
+	archivePath, err := m.downloadWithAlternatingURLs(primaryURL, archiveURL, version, cfg, options)
 	if err != nil {
-		// If primary URL fails, try archive URL
-		fmt.Printf("  🔄 Primary download failed, trying archive URL...\n")
-		archiveURL := m.getArchiveDownloadURL(version)
-		archivePath, err = m.Download(archiveURL, version, cfg, options)
-		if err != nil {
-			return InstallError("maven", version, fmt.Errorf("both primary and archive downloads failed: %w", err))
-		}
+		return InstallError("maven", version, fmt.Errorf("download failed from both primary and archive URLs: %w", err))
 	}
 	defer os.Remove(archivePath) // Clean up downloaded file
 
@@ -391,4 +386,66 @@ func (m *MavenTool) fetchChecksumFromURL(url string) (string, error) {
 	}
 
 	return checksum, nil
+}
+
+// downloadWithAlternatingURLs tries downloading from both URLs with reduced retries per URL
+// instead of exhausting all retries on the first URL before trying the second
+func (m *MavenTool) downloadWithAlternatingURLs(primaryURL, archiveURL, version string, cfg config.ToolConfig, options DownloadOptions) (string, error) {
+	urls := []struct {
+		url  string
+		name string
+	}{
+		{primaryURL, "primary"},
+		{archiveURL, "archive"},
+	}
+
+	maxRetries := 3    // Total retries across both URLs
+	retriesPerURL := 1 // Reduced retries per URL to allow trying both
+
+	var lastErr error
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		urlIndex := attempt % len(urls)
+		currentURL := urls[urlIndex]
+
+		if attempt > 0 && urlIndex == 0 {
+			fmt.Printf("  🔄 Trying %s URL again (attempt %d)...\n", currentURL.name, (attempt/len(urls))+1)
+		} else if urlIndex == 1 {
+			fmt.Printf("  🔄 Switching to %s URL...\n", currentURL.name)
+		}
+
+		// Create download config with reduced retries per URL
+		downloadConfig := DefaultDownloadConfig(currentURL.url, "")
+		downloadConfig.MaxRetries = retriesPerURL
+		downloadConfig.ExpectedType = options.ExpectedType
+		downloadConfig.MinSize = options.MinSize
+		downloadConfig.MaxSize = options.MaxSize
+		downloadConfig.ToolName = "maven"
+		downloadConfig.Version = version
+		downloadConfig.Config = cfg
+		downloadConfig.ChecksumRegistry = m.manager.GetChecksumRegistry()
+		downloadConfig.Tool = m
+
+		// Create temporary file for download
+		tmpFile, err := os.CreateTemp("", fmt.Sprintf("maven-*%s", options.FileExtension))
+		if err != nil {
+			lastErr = fmt.Errorf("failed to create temporary file: %w", err)
+			continue
+		}
+		downloadConfig.DestPath = tmpFile.Name()
+		tmpFile.Close()
+
+		_, err = RobustDownload(downloadConfig)
+		if err == nil {
+			fmt.Printf("  ✅ Successfully downloaded from %s URL\n", currentURL.name)
+			return downloadConfig.DestPath, nil
+		}
+
+		lastErr = err
+		fmt.Printf("  ⚠️  Download from %s URL failed: %v\n", currentURL.name, err)
+		// Clean up failed download
+		os.Remove(downloadConfig.DestPath)
+	}
+
+	return "", fmt.Errorf("all download attempts failed, last error: %w", lastErr)
 }
