@@ -71,13 +71,13 @@
 
     "website build": {
       description: "Build the website using ROQ",
-      script: "cd website && QUARKUS_ROQ_GENERATOR_BATCH=true mvn clean package quarkus\\:run --no-transfer-progress",
+      script: "cd website && QUARKUS_ROQ_GENERATOR_BATCH=true mvn clean package quarkus:run -DskipTests --no-transfer-progress",
       override: true
     },
 
     "website serve": {
       description: "Serve the website using ROQ dev mode",
-      script: "cd website && mvn quarkus\\:dev -Dquarkus.http.port=8081 --no-transfer-progress",
+      script: "cd website && mvn quarkus:dev -Dquarkus.http.port=8081 --no-transfer-progress",
       override: true
     },
 
