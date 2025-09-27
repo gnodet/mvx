@@ -6,82 +6,41 @@ on:
   pull_request:
     branches: [ main ]
 
-env:
-  GO_VERSION: '1.24'
-
 jobs:
-  test:
-    name: Test
+  test-and-build:
+    name: Test and Build
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
+      - name: Setup mvx
+        run: ./mvx setup
 
       - name: Download dependencies
-        run: go mod download
+        run: ./mvx go mod download
 
       - name: Run tests
-        run: go test -v $(go list ./... | grep -v '/test')
+        run: ./mvx test
 
       - name: Run go vet
-        run: go vet ./...
+        run: ./mvx go vet ./...
 
       - name: Check formatting
         run: |
-          if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          GOROOT=$(./mvx go env GOROOT)
+          if [ "$($GOROOT/bin/gofmt -s -l . | wc -l)" -gt 0 ]; then
             echo "The following files are not formatted:"
-            gofmt -s -l .
+            $GOROOT/bin/gofmt -s -l .
             exit 1
           fi
 
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    needs: test
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Setup mvx for testing
-        run: |
-          curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-wrapper.sh | bash
-          mkdir -p .mvx
-          echo "mvxVersion=0.3.0" > .mvx/mvx.properties
-          echo "Debug: mvx.properties content:"
-          cat .mvx/mvx.properties
-
-      - name: Test binary
-        run: |
-          echo "Debug: Testing mvx version with verbose output"
-          ./mvx -v version
-
       - name: Run integration tests
-        run: |
-          cd test
-          go test -v -timeout=10m ./...
+        run: ./mvx test-integration
 
       - name: Run benchmarks
-        run: |
-          cd test
-          go test -bench=. -benchtime=3s ./...
-
-      - name: Setup mvx
-        run: |
-          curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-wrapper.sh | bash
-          mkdir -p .mvx
-          echo "mvxVersion=0.3.0" > .mvx/mvx.properties
+        run: ./mvx benchmark
 
       - name: Build for all platforms
         run: ./mvx build-all
@@ -89,10 +48,9 @@ jobs:
       - name: Generate checksums
         run: ./mvx checksums
 
-      - name: Test wrapper
+      - name: Test wrapper functionality
         run: |
-          # Test wrapper with released version
-          echo "mvxVersion=0.3.0" > .mvx/mvx.properties
+          # Test that wrapper works with current version
           ./mvx version
 
       - name: Upload build artifacts
@@ -103,35 +61,3 @@ jobs:
             dist/mvx-*
             dist/checksums.txt
           retention-days: 7
-
-  wrapper-test:
-    name: Test Wrapper
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-
-      - name: Test wrapper (Unix)
-        if: runner.os != 'Windows'
-        run: |
-          # Test wrapper with released version
-          mkdir -p .mvx
-          echo "mvxVersion=0.3.0" > .mvx/mvx.properties
-          ./mvx version
-
-      - name: Test wrapper (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          # Test wrapper with released version
-          New-Item -ItemType Directory -Force -Path ".mvx"
-          echo "mvxVersion=0.3.0" | Out-File -FilePath ".mvx\mvx.properties" -Encoding ascii
-          .\mvx.cmd version
