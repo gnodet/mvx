@@ -4,8 +4,8 @@ import "time"
 
 // Download Configuration Constants
 const (
-	// File size limits
-	DefaultMinFileSize = 1024       // 1KB minimum file size
+	// File size limits - very permissive since we rely on checksums for validation
+	DefaultMinFileSize = 1024       // 1KB minimum file size (just to catch empty files)
 	DefaultMaxFileSize = 2147483648 // 2GB maximum file size
 
 	// Timeout defaults

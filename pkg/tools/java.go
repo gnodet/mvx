@@ -409,8 +409,8 @@ func (j *JavaTool) GetDownloadOptions() DownloadOptions {
 	return DownloadOptions{
 		FileExtension: ".tar.gz",
 		ExpectedType:  "application",
-		MinSize:       100 * 1024 * 1024, // 100MB
-		MaxSize:       500 * 1024 * 1024, // 500MB
+		MinSize:       10 * 1024 * 1024,  // 10MB (very permissive, rely on checksums)
+		MaxSize:       800 * 1024 * 1024, // 800MB (generous upper bound)
 		ArchiveType:   "tar.gz",
 	}
 }

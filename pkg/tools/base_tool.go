@@ -389,8 +389,8 @@ func (b *BaseTool) GetDefaultDownloadOptions() DownloadOptions {
 	return DownloadOptions{
 		FileExtension: ".tar.gz",
 		ExpectedType:  "application",
-		MinSize:       1 * 1024 * 1024,   // 1MB
-		MaxSize:       100 * 1024 * 1024, // 100MB
+		MinSize:       100 * 1024,        // 100KB (very permissive, rely on checksums)
+		MaxSize:       500 * 1024 * 1024, // 500MB (generous upper bound)
 		ArchiveType:   "tar.gz",
 	}
 }

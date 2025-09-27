@@ -77,8 +77,8 @@ func (n *NodeTool) GetDownloadOptions() DownloadOptions {
 	return DownloadOptions{
 		FileExtension: ".tar.xz",
 		ExpectedType:  "application",
-		MinSize:       15 * 1024 * 1024, // 15MB (Node.js 18.17.0 is ~19.5MB)
-		MaxSize:       80 * 1024 * 1024, // 80MB
+		MinSize:       1 * 1024 * 1024,   // 1MB (very permissive, rely on checksums)
+		MaxSize:       200 * 1024 * 1024, // 200MB (generous upper bound)
 		ArchiveType:   "tar.xz",
 	}
 }
