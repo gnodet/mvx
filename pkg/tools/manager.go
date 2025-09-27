@@ -787,12 +787,32 @@ func (m *Manager) InstallSpecificTools(cfg *config.Config, toolNames []string) e
 		return nil
 	}
 
+	// Create a subset config with only the specified tools
+	subsetCfg := &config.Config{
+		Tools: make(map[string]config.ToolConfig),
+	}
+
 	for _, toolName := range toolNames {
 		toolConfig, exists := cfg.Tools[toolName]
 		if !exists {
 			return fmt.Errorf("tool %s not configured", toolName)
 		}
+		subsetCfg.Tools[toolName] = toolConfig
+	}
 
+	// Get tools that actually need installation
+	toolsToInstall, err := m.GetToolsNeedingInstallation(subsetCfg)
+	if err != nil {
+		return err
+	}
+
+	// If no tools need installation
+	if len(toolsToInstall) == 0 {
+		return nil // All specified tools already installed
+	}
+
+	// Install only the tools that need installation
+	for toolName, toolConfig := range toolsToInstall {
 		if err := m.InstallTool(toolName, toolConfig); err != nil {
 			return err
 		}
