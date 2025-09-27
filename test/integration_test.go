@@ -33,6 +33,8 @@ func copyFile(src, dst string) error {
 
 // TestMvxBinary tests the mvx binary functionality
 func TestMvxBinary(t *testing.T) {
+	t.Logf("Starting mvx integration tests - this includes downloading real tools and may take 10+ minutes")
+
 	// Find the mvx binary
 	mvxBinary := findMvxBinary(t)
 
@@ -700,6 +702,8 @@ func testMavenArgumentParsingErrorCases(t *testing.T, mvxBinary string) {
 
 // testToolInstallation tests individual tool installation and verification
 func testToolInstallation(t *testing.T, mvxBinary string) {
+	t.Logf("Starting tool installation tests - this may take several minutes as tools are downloaded...")
+
 	// Test each tool individually in separate directories
 	tools := []struct {
 		name         string
@@ -712,8 +716,10 @@ func testToolInstallation(t *testing.T, mvxBinary string) {
 		{"node", "18.17.0", ""},
 	}
 
-	for _, tool := range tools {
+	for i, tool := range tools {
 		t.Run(fmt.Sprintf("Install_%s_%s", tool.name, tool.version), func(t *testing.T) {
+			t.Logf("Testing tool %d/%d: %s %s (this may take 1-3 minutes for download and installation)",
+				i+1, len(tools), tool.name, tool.version)
 			testSingleToolInstallation(t, mvxBinary, tool.name, tool.version, tool.distribution)
 		})
 	}
@@ -759,12 +765,14 @@ func testSingleToolInstallation(t *testing.T, mvxBinary, toolName, version, dist
 	}
 
 	// Run setup to install the tool
+	t.Logf("Installing %s %s - downloading and setting up (this is the slow part)...", toolName, version)
 	cmd = exec.Command(mvxBinary, "setup", "--tools-only", "--sequential")
 	cmd.Env = append(os.Environ(), "MVX_VERBOSE=true")
 	output, err = cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("mvx setup failed for %s %s: %v\nOutput: %s", toolName, version, err, output)
 	}
+	t.Logf("Installation of %s %s completed, now verifying...", toolName, version)
 
 	// Verify the tool was installed successfully
 	outputStr := string(output)
