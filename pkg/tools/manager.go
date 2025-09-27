@@ -30,6 +30,12 @@ type Manager struct {
 	cacheMutex       sync.RWMutex
 }
 
+var (
+	// Global singleton instance
+	globalManager *Manager
+	managerMutex  sync.Mutex
+)
+
 // InstallOptions contains options for tool installation
 type InstallOptions struct {
 	MaxConcurrent int  // Maximum number of concurrent downloads (default: 3)
@@ -84,8 +90,16 @@ type VersionResolver interface {
 	ResolveVersion(version, distribution string) (string, error)
 }
 
-// NewManager creates a new tool manager
+// NewManager creates a new tool manager (singleton pattern)
 func NewManager() (*Manager, error) {
+	managerMutex.Lock()
+	defer managerMutex.Unlock()
+
+	// Return existing instance if already created
+	if globalManager != nil {
+		return globalManager, nil
+	}
+
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user home directory: %w", err)
@@ -114,7 +128,30 @@ func NewManager() (*Manager, error) {
 		return nil, fmt.Errorf("failed to register tools: %w", err)
 	}
 
+	// Store as global singleton
+	globalManager = manager
 	return manager, nil
+}
+
+// ResetManager resets the global manager instance (for testing purposes)
+func ResetManager() {
+	managerMutex.Lock()
+	defer managerMutex.Unlock()
+	globalManager = nil
+}
+
+// CacheManager interface for tools that support cache management
+type CacheManager interface {
+	ClearPathCache()
+}
+
+// ClearAllCaches clears all tool path caches (for testing purposes)
+func (m *Manager) ClearAllCaches() {
+	for _, tool := range m.tools {
+		if cacheManager, ok := tool.(CacheManager); ok {
+			cacheManager.ClearPathCache()
+		}
+	}
 }
 
 // RegisterTool registers a tool with the manager
@@ -750,12 +787,32 @@ func (m *Manager) InstallSpecificTools(cfg *config.Config, toolNames []string) e
 		return nil
 	}
 
+	// Create a subset config with only the specified tools
+	subsetCfg := &config.Config{
+		Tools: make(map[string]config.ToolConfig),
+	}
+
 	for _, toolName := range toolNames {
 		toolConfig, exists := cfg.Tools[toolName]
 		if !exists {
 			return fmt.Errorf("tool %s not configured", toolName)
 		}
+		subsetCfg.Tools[toolName] = toolConfig
+	}
 
+	// Get tools that actually need installation
+	toolsToInstall, err := m.GetToolsNeedingInstallation(subsetCfg)
+	if err != nil {
+		return err
+	}
+
+	// If no tools need installation
+	if len(toolsToInstall) == 0 {
+		return nil // All specified tools already installed
+	}
+
+	// Install only the tools that need installation
+	for toolName, toolConfig := range toolsToInstall {
 		if err := m.InstallTool(toolName, toolConfig); err != nil {
 			return err
 		}

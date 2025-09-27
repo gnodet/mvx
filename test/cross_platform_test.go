@@ -13,6 +13,9 @@ import (
 )
 
 func TestCrossPlatformScripts(t *testing.T) {
+	// Reset manager for test isolation
+	tools.ResetManager()
+
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 
