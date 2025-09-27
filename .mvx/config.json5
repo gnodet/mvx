@@ -18,7 +18,7 @@
       version: "4.0.0-rc-4"
     },
     node: {
-      version: "lts"
+      version: "22.20.0"
     },
     go: {
       version: "1.24.2"
