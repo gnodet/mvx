@@ -90,6 +90,10 @@ func (b *BaseTool) GetToolName() string {
 	return b.toolName
 }
 
+func (b *BaseTool) GetBinaryName() string {
+	return b.binaryName
+}
+
 // getCacheKey generates a cache key for path operations
 func (b *BaseTool) getCacheKey(version string, cfg config.ToolConfig, operation string) string {
 	return fmt.Sprintf("%s:%s:%s:%s", operation, version, cfg.Distribution, b.toolName)
@@ -506,11 +510,11 @@ func (b *BaseTool) StandardVerifyWithConfig(version string, cfg config.ToolConfi
 }
 
 // StandardIsInstalled provides standard installation check for tools
-func (b *BaseTool) StandardIsInstalled(version string, cfg config.ToolConfig, getPath func(string, config.ToolConfig) (string, error), binaryName string) bool {
+func (b *BaseTool) StandardIsInstalled(version string, cfg config.ToolConfig, getPath func(string, config.ToolConfig) (string, error)) bool {
 	// Check if we should use system tool instead of mvx-managed tool
 	if UseSystemTool(b.toolName) {
 		// Try primary binary name in PATH
-		if _, err := exec.LookPath(binaryName); err == nil {
+		if _, err := exec.LookPath(b.GetBinaryName()); err == nil {
 			logVerbose("System %s is available in PATH (MVX_USE_SYSTEM_%s=true)", b.toolName, strings.ToUpper(b.toolName))
 			return true
 		}
@@ -521,18 +525,15 @@ func (b *BaseTool) StandardIsInstalled(version string, cfg config.ToolConfig, ge
 
 	binPath, err := getPath(version, cfg)
 	if err != nil {
+		logVerbose("Failed to get %s binary path: %v", b.toolName, err)
 		return false
 	}
-	return b.IsInstalled(binPath, binaryName)
+	logVerbose("Checking for %s binary at: %s", b.toolName, binPath)
+	return b.IsInstalled(binPath, b.GetBinaryName())
 }
 
 // StandardGetPath provides standard path resolution with system tool support
-func (b *BaseTool) StandardGetPath(version string, cfg config.ToolConfig, getInstalledPath func(string, config.ToolConfig) (string, error), binaryName string) (string, error) {
-	return b.StandardGetPathWithOptions(version, cfg, getInstalledPath, binaryName)
-}
-
-// StandardGetPathWithOptions provides standard path resolution with system tool support and options
-func (b *BaseTool) StandardGetPathWithOptions(version string, cfg config.ToolConfig, getInstalledPath func(string, config.ToolConfig) (string, error), binaryName string) (string, error) {
+func (b *BaseTool) StandardGetPath(version string, cfg config.ToolConfig, getInstalledPath func(string, config.ToolConfig) (string, error)) (string, error) {
 	// Check cache first
 	cacheKey := b.getCacheKey(version, cfg, "getPath")
 	if cachedPath, cachedErr, found := b.getCachedPath(cacheKey); found {
@@ -541,7 +542,7 @@ func (b *BaseTool) StandardGetPathWithOptions(version string, cfg config.ToolCon
 	// Check if we should use system tool instead of mvx-managed tool
 	if UseSystemTool(b.toolName) {
 		// Try primary binary name in PATH
-		if _, err := exec.LookPath(binaryName); err == nil {
+		if _, err := exec.LookPath(b.GetBinaryName()); err == nil {
 			logVerbose("Using system %s from PATH (MVX_USE_SYSTEM_%s=true)", b.toolName, strings.ToUpper(b.toolName))
 			b.setCachedPath(cacheKey, "", nil)
 			return "", nil

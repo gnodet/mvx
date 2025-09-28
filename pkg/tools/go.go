@@ -44,12 +44,12 @@ func (g *GoTool) Install(version string, cfg config.ToolConfig) error {
 
 // IsInstalled checks if the specified version is installed
 func (g *GoTool) IsInstalled(version string, cfg config.ToolConfig) bool {
-	return g.StandardIsInstalled(version, cfg, g.GetPath, g.GetBinaryName())
+	return g.StandardIsInstalled(version, cfg, g.GetPath)
 }
 
 // GetPath returns the binary path for the specified version (for PATH management)
 func (g *GoTool) GetPath(version string, cfg config.ToolConfig) (string, error) {
-	return g.StandardGetPath(version, cfg, g.getInstalledPath, g.GetBinaryName())
+	return g.StandardGetPath(version, cfg, g.getInstalledPath)
 }
 
 func (g *GoTool) GetBinaryName() string {

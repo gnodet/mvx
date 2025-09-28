@@ -87,7 +87,7 @@ func (r *ToolRegistry) GetJavaVersions(distribution string) ([]string, error) {
 
 // getDiscoDistributions fetches available distributions from Disco API
 func (r *ToolRegistry) getDiscoDistributions() ([]JavaDistribution, error) {
-	resp, err := r.httpClient.Get("https://api.foojay.io/disco/v3.0/distributions")
+	resp, err := r.httpClient.Get(FoojayDiscoAPIBase + "/distributions")
 	if err != nil {
 		return nil, err
 	}
@@ -169,13 +169,13 @@ func (r *ToolRegistry) fetchMavenVersionsFromApache() ([]string, error) {
 	var allVersions []string
 
 	// Fetch Maven 3.x versions from archive
-	maven3Versions, err := r.fetchVersionsFromApacheRepo("https://archive.apache.org/dist/maven/maven-3/")
+	maven3Versions, err := r.fetchVersionsFromApacheRepo(ApacheMavenBase + "/maven-3/")
 	if err == nil {
 		allVersions = append(allVersions, maven3Versions...)
 	}
 
 	// Fetch Maven 4.x versions from archive
-	maven4Versions, err := r.fetchVersionsFromApacheRepo("https://archive.apache.org/dist/maven/maven-4/")
+	maven4Versions, err := r.fetchVersionsFromApacheRepo(ApacheMavenBase + "/maven-4/")
 	if err == nil {
 		allVersions = append(allVersions, maven4Versions...)
 	}
@@ -301,7 +301,7 @@ func (r *ToolRegistry) GetGoVersions() ([]string, error) {
 
 // fetchGoVersions fetches Go versions from GitHub releases API
 func (r *ToolRegistry) fetchGoVersions() ([]string, error) {
-	resp, err := r.httpClient.Get("https://api.github.com/repos/golang/go/tags?per_page=100")
+	resp, err := r.httpClient.Get(GoGithubAPIBase + "/tags?per_page=100")
 	if err != nil {
 		return nil, err
 	}
@@ -370,7 +370,7 @@ func (r *ToolRegistry) ResolveGoVersion(versionSpec string) (string, error) {
 // fetchMvndVersionsFromApache fetches mvnd versions from Apache archive
 func (r *ToolRegistry) fetchMvndVersionsFromApache() ([]string, error) {
 	// Fetch mvnd versions from archive
-	mvndVersions, err := r.fetchVersionsFromApacheRepo("https://archive.apache.org/dist/maven/mvnd/")
+	mvndVersions, err := r.fetchVersionsFromApacheRepo(ApacheMavenBase + "/mvnd/")
 	if err != nil {
 		return nil, fmt.Errorf("no mvnd versions found from Apache archive: %w", err)
 	}
@@ -488,7 +488,7 @@ type nodeIndexEntry struct {
 }
 
 func (r *ToolRegistry) fetchNodeIndex() ([]nodeIndexEntry, error) {
-	resp, err := r.httpClient.Get("https://nodejs.org/dist/index.json")
+	resp, err := r.httpClient.Get(NodeJSDistBase + "/index.json")
 	if err != nil {
 		return nil, err
 	}

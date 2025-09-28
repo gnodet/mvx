@@ -31,7 +31,8 @@ const (
 	GitHubAPIBase      = "https://api.github.com"
 	NodeJSDistBase     = "https://nodejs.org/dist"
 	GoDevAPIBase       = "https://go.dev/dl"
-	ApacheMavenBase    = "https://archive.apache.org/dist/release/maven"
+	GoGithubAPIBase    = "https://api.github.com/repos/golang/go"
+	ApacheMavenBase    = "https://archive.apache.org/dist/maven"
 	ApacheDistBase     = "https://dist.apache.org/repos/dist/release/maven"
 )
 

@@ -45,11 +45,11 @@ func (n *NodeTool) Install(version string, cfg config.ToolConfig) error {
 }
 
 func (n *NodeTool) IsInstalled(version string, cfg config.ToolConfig) bool {
-	return n.StandardIsInstalled(version, cfg, n.GetPath, n.GetBinaryName())
+	return n.StandardIsInstalled(version, cfg, n.GetPath)
 }
 
 func (n *NodeTool) GetPath(version string, cfg config.ToolConfig) (string, error) {
-	return n.StandardGetPath(version, cfg, n.getInstalledPath, n.GetBinaryName())
+	return n.StandardGetPath(version, cfg, n.getInstalledPath)
 }
 
 func (n *NodeTool) GetBinaryName() string {

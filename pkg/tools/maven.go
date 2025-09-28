@@ -18,27 +18,15 @@ type MavenTool struct {
 	*BaseTool
 }
 
-func getMavenToolName() string {
-	return ToolMaven
-}
-
-func getMavenBinaryName() string {
-	if NewPlatformMapper().IsWindows() {
-		return BinaryMaven + ExtCmd
-	}
-	return BinaryMaven
-}
-
 // NewMavenTool creates a new Maven tool instance
-func NewMavenTool(manager *Manager) *MavenTool {
-	return &MavenTool{
-		BaseTool: NewBaseTool(manager, getMavenToolName(), getMavenBinaryName()),
+func NewMavenTool(manager *Manager) Tool {
+	var binaryName = BinaryMaven
+	if NewPlatformMapper().IsWindows() {
+		binaryName = BinaryMaven + ExtCmd
 	}
-}
-
-// Name returns the tool name
-func (m *MavenTool) Name() string {
-	return getMavenToolName()
+	return &MavenTool{
+		BaseTool: NewBaseTool(manager, ToolMaven, binaryName),
+	}
 }
 
 // Install downloads and installs the specified Maven version
@@ -49,7 +37,7 @@ func (m *MavenTool) Install(version string, cfg config.ToolConfig) error {
 // installWithFallback tries primary URL first, then fallback archive URL
 func (m *MavenTool) installWithFallback(version string, cfg config.ToolConfig) error {
 	// Check if we should use system tool instead of downloading (use standardized approach)
-	if UseSystemTool(m.Name()) {
+	if UseSystemTool(m.GetToolName()) {
 		// Use standardized system tool detection
 		return m.StandardInstall(version, cfg, m.getDownloadURL)
 	}
@@ -57,7 +45,7 @@ func (m *MavenTool) installWithFallback(version string, cfg config.ToolConfig) e
 	// Create installation directory
 	installDir, err := m.CreateInstallDir(version, "")
 	if err != nil {
-		return InstallError(m.Name(), version, fmt.Errorf("failed to create install directory: %w", err))
+		return InstallError(m.GetToolName(), version, fmt.Errorf("failed to create install directory: %w", err))
 	}
 
 	// Try both URLs with reduced retries instead of exhausting retries on first URL
@@ -70,7 +58,7 @@ func (m *MavenTool) installWithFallback(version string, cfg config.ToolConfig) e
 	// Try to download with alternating URLs and reduced retries per URL
 	archivePath, err := m.downloadWithAlternatingURLs(primaryURL, archiveURL, version, cfg, options)
 	if err != nil {
-		return InstallError(m.Name(), version, fmt.Errorf("download failed from both primary and archive URLs: %w", err))
+		return InstallError(m.GetToolName(), version, fmt.Errorf("download failed from both primary and archive URLs: %w", err))
 	}
 	defer os.Remove(archivePath) // Clean up downloaded file
 
@@ -96,21 +84,17 @@ func (m *MavenTool) installWithFallback(version string, cfg config.ToolConfig) e
 
 // IsInstalled checks if the specified version is installed
 func (m *MavenTool) IsInstalled(version string, cfg config.ToolConfig) bool {
-	return m.StandardIsInstalled(version, cfg, m.GetPath, m.GetBinaryName())
+	return m.StandardIsInstalled(version, cfg, m.GetPath)
 }
 
 // GetPath returns the binary path for the specified version (for PATH management)
 func (m *MavenTool) GetPath(version string, cfg config.ToolConfig) (string, error) {
-	return m.StandardGetPath(version, cfg, m.getInstalledPath, m.GetBinaryName())
-}
-
-func (m *MavenTool) GetBinaryName() string {
-	return getMavenBinaryName()
+	return m.StandardGetPath(version, cfg, m.getInstalledPath)
 }
 
 // getInstalledPath returns the path for an installed Maven version
 func (m *MavenTool) getInstalledPath(version string, cfg config.ToolConfig) (string, error) {
-	installDir := m.manager.GetToolVersionDir(m.Name(), version, "")
+	installDir := m.manager.GetToolVersionDir(m.GetToolName(), version, "")
 	pathResolver := NewPathResolver(m.manager.GetToolsDir())
 	binDir, err := pathResolver.FindBinaryParentDir(installDir, m.GetBinaryName())
 	if err != nil {

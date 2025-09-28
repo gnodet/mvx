@@ -46,7 +46,7 @@ type InstallOptions struct {
 // Tool represents a tool that can be installed and managed
 type Tool interface {
 	// Name returns the tool name (e.g., "java", "maven")
-	Name() string
+	GetToolName() string
 
 	// Install downloads and installs the specified version
 	Install(version string, config config.ToolConfig) error
@@ -159,7 +159,7 @@ func (m *Manager) ClearAllCaches() {
 
 // RegisterTool registers a tool with the manager
 func (m *Manager) RegisterTool(tool Tool) {
-	m.tools[tool.Name()] = tool
+	m.tools[tool.GetToolName()] = tool
 }
 
 // GetTool returns a tool by name

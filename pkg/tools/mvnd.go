@@ -44,12 +44,12 @@ func (m *MvndTool) Install(version string, cfg config.ToolConfig) error {
 
 // IsInstalled checks if the specified version is installed
 func (m *MvndTool) IsInstalled(version string, cfg config.ToolConfig) bool {
-	return m.StandardIsInstalled(version, cfg, m.GetPath, m.GetBinaryName())
+	return m.StandardIsInstalled(version, cfg, m.GetPath)
 }
 
 // GetPath returns the binary path for the specified version (for PATH management)
 func (m *MvndTool) GetPath(version string, cfg config.ToolConfig) (string, error) {
-	return m.StandardGetPath(version, cfg, m.getInstalledPath, m.GetBinaryName())
+	return m.StandardGetPath(version, cfg, m.getInstalledPath)
 }
 
 func (m *MvndTool) GetBinaryName() string {
