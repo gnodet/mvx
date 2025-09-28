@@ -22,19 +22,23 @@ type NodeTool struct {
 
 func getNodeBinaryName() string {
 	if NewPlatformMapper().IsWindows() {
-		return "node.exe"
+		return BinaryNode + ExtExe
 	}
-	return "node"
+	return BinaryNode
+}
+
+func getNodeToolName() string {
+	return ToolNode
 }
 
 // NewNodeTool creates a new Node tool instance
 func NewNodeTool(manager *Manager) *NodeTool {
 	return &NodeTool{
-		BaseTool: NewBaseTool(manager, "node", getNodeBinaryName()),
+		BaseTool: NewBaseTool(manager, getNodeToolName(), getNodeBinaryName()),
 	}
 }
 
-func (n *NodeTool) Name() string { return "node" }
+func (n *NodeTool) Name() string { return getNodeToolName() }
 
 func (n *NodeTool) Install(version string, cfg config.ToolConfig) error {
 	return n.StandardInstall(version, cfg, n.getDownloadURL)
@@ -54,7 +58,7 @@ func (n *NodeTool) GetBinaryName() string {
 
 // getInstalledPath returns the path for an installed Node version
 func (n *NodeTool) getInstalledPath(version string, cfg config.ToolConfig) (string, error) {
-	installDir := n.manager.GetToolVersionDir("node", version, "")
+	installDir := n.manager.GetToolVersionDir(n.Name(), version, "")
 	pathResolver := NewPathResolver(n.manager.GetToolsDir())
 	binDir, err := pathResolver.FindBinaryParentDir(installDir, n.GetBinaryName())
 	if err != nil {
@@ -80,11 +84,11 @@ func (n *NodeTool) ListVersions() ([]string, error) {
 // GetDownloadOptions returns download options specific to Node.js
 func (n *NodeTool) GetDownloadOptions() DownloadOptions {
 	return DownloadOptions{
-		FileExtension: ".tar.xz",
+		FileExtension: ExtTarXz,
 		ExpectedType:  "application",
 		MinSize:       1 * 1024 * 1024,   // 1MB (very permissive, rely on checksums)
 		MaxSize:       200 * 1024 * 1024, // 200MB (generous upper bound)
-		ArchiveType:   "tar.xz",
+		ArchiveType:   ArchiveTypeTarXz,
 	}
 }
 
@@ -120,12 +124,12 @@ func (n *NodeTool) getDownloadURL(version string) string {
 	// Determine file extension
 	var fileExt string
 	if platformMapper.IsWindows() {
-		fileExt = ".zip"
+		fileExt = ExtZip
 	} else {
-		fileExt = ".tar.xz"
+		fileExt = ExtTarGz
 	}
 
-	return fmt.Sprintf("https://nodejs.org/dist/v%[1]s/node-v%[1]s-%[2]s%[3]s", version, platform, fileExt)
+	return fmt.Sprintf(NodeJSDistBase+"/v%[1]s/node-v%[1]s-%[2]s%[3]s", version, platform, fileExt)
 }
 
 // ResolveVersion resolves a Node version specification to a concrete version
@@ -153,7 +157,7 @@ func (n *NodeTool) GetChecksum(version, filename string) (ChecksumInfo, error) {
 
 // fetchNodeChecksum fetches Node.js checksum from SHASUMS256.txt
 func (n *NodeTool) fetchNodeChecksum(version, filename string) (string, error) {
-	url := fmt.Sprintf("https://nodejs.org/dist/v%s/SHASUMS256.txt", version)
+	url := fmt.Sprintf("%s/v%s/SHASUMS256.txt", NodeJSDistBase, version)
 
 	client := &http.Client{
 		Timeout: 120 * time.Second, // 2 minutes for slow servers

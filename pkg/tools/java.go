@@ -22,14 +22,14 @@ var _ ChecksumProvider = (*JavaTool)(nil)
 func getSystemJavaHome() (string, error) {
 	javaHome := os.Getenv("JAVA_HOME")
 	if javaHome == "" {
-		return "", SystemToolError("java", fmt.Errorf("JAVA_HOME environment variable not set"))
+		return "", SystemToolError(ToolJava, fmt.Errorf("JAVA_HOME environment variable not set"))
 	}
 
 	// Check if JAVA_HOME points to a valid Java installation
 	javaExe := filepath.Join(javaHome, "bin", getJavaBinaryName())
 
 	if _, err := os.Stat(javaExe); err != nil {
-		return "", SystemToolError("java", fmt.Errorf("Java executable not found at %s: %w", javaExe, err))
+		return "", SystemToolError(ToolJava, fmt.Errorf("Java executable not found at %s: %w", javaExe, err))
 	}
 
 	return javaHome, nil
@@ -96,21 +96,21 @@ type JavaTool struct {
 
 func getJavaBinaryName() string {
 	if NewPlatformMapper().IsWindows() {
-		return "java.exe"
+		return BinaryJava + ExtExe
 	}
-	return "java"
+	return BinaryJava
 }
 
 // NewJavaTool creates a new Java tool instance
 func NewJavaTool(manager *Manager) *JavaTool {
 	return &JavaTool{
-		BaseTool: NewBaseTool(manager, "java", getJavaBinaryName()),
+		BaseTool: NewBaseTool(manager, ToolJava, getJavaBinaryName()),
 	}
 }
 
 // Name returns the tool name
 func (j *JavaTool) Name() string {
-	return "java"
+	return ToolJava
 }
 
 // Install downloads and installs the specified Java version
@@ -247,51 +247,24 @@ func (j *JavaTool) getDownloadURLWithChecksum(version, distribution string) (str
 		}
 	}
 
-	return "", "", URLGenerationError("java", version, fmt.Errorf("Java %s not available in any supported distribution for %s/%s", version, osName, arch))
+	return "", "", URLGenerationError(ToolJava, version, fmt.Errorf("Java %s not available in any supported distribution for %s/%s", version, osName, arch))
 }
 
 // IsInstalled checks if the specified version is installed
 func (j *JavaTool) IsInstalled(version string, cfg config.ToolConfig) bool {
+	// Resolve the full version string
+	distribution := cfg.Distribution
+	if distribution == "" {
+		distribution = "temurin"
+	}
+	fullVersion, err := j.ResolveVersion(version, distribution)
+	if err != nil {
+		logVerbose("Failed to resolve full Java version for check: %v", err)
+		return false
+	}
+
 	// Use standardized installation check with Java-specific environment variables
-	return j.StandardIsInstalledWithOptions(version, cfg, j.GetPath, "java", []string{"JAVA_HOME"})
-}
-
-// isVersionCompatible checks if the system Java version is compatible with the requested version
-func (j *JavaTool) isVersionCompatible(systemVersion, requestedVersion string) bool {
-	// Extract major version numbers for comparison
-	systemMajor := extractMajorVersion(systemVersion)
-	requestedMajor := extractMajorVersion(requestedVersion)
-
-	// For Java, we require exact major version match
-	return systemMajor == requestedMajor
-}
-
-// extractMajorVersion extracts the major version number from a Java version string
-func extractMajorVersion(version string) string {
-	// Handle different Java version formats:
-	// - "11.0.16" -> "11"
-	// - "17.0.2" -> "17"
-	// - "1.8.0_345" -> "8"
-	// - "21" -> "21"
-
-	// Remove any leading/trailing whitespace
-	version = strings.TrimSpace(version)
-
-	// Handle legacy format (1.x.y -> x)
-	if strings.HasPrefix(version, "1.") {
-		parts := strings.Split(version, ".")
-		if len(parts) >= 2 {
-			return parts[1]
-		}
-	}
-
-	// Handle modern format (x.y.z -> x)
-	parts := strings.Split(version, ".")
-	if len(parts) > 0 {
-		return parts[0]
-	}
-
-	return version
+	return j.StandardIsInstalled(fullVersion, cfg, j.GetPath, j.GetBinaryName())
 }
 
 // GetJavaHome returns the JAVA_HOME path for the specified version
@@ -319,16 +292,16 @@ func (j *JavaTool) getJavaHomeUncached(version string, cfg config.ToolConfig) (s
 	}
 
 	// If using system Java, return system JAVA_HOME if available (no version compatibility check)
-	if UseSystemTool("java") {
+	if UseSystemTool(ToolJava) {
 		if systemJavaHome, err := getSystemJavaHome(); err == nil {
 			logVerbose("Using system Java from JAVA_HOME: %s (MVX_USE_SYSTEM_JAVA=true)", systemJavaHome)
 			return systemJavaHome, nil
 		} else {
-			return "", EnvironmentError("java", version, fmt.Errorf("MVX_USE_SYSTEM_JAVA=true but system Java not available: %w", err))
+			return "", EnvironmentError(ToolJava, version, fmt.Errorf("MVX_USE_SYSTEM_JAVA=true but system Java not available: %w", err))
 		}
 	}
 
-	installDir := j.manager.GetToolVersionDir("java", version, distribution)
+	installDir := j.manager.GetToolVersionDir(ToolJava, version, distribution)
 
 	// Check if installation directory exists
 	if _, err := os.Stat(installDir); os.IsNotExist(err) {
@@ -392,12 +365,12 @@ func (j *JavaTool) GetBinaryName() string {
 // GetPath returns the binary path for the specified version (for PATH management)
 func (j *JavaTool) GetPath(version string, cfg config.ToolConfig) (string, error) {
 	// Use standardized path resolution with Java-specific environment variables
-	return j.StandardGetPathWithOptions(version, cfg, j.getInstalledPath, "java", []string{"JAVA_HOME"})
+	return j.StandardGetPath(version, cfg, j.getInstalledPath, j.GetBinaryName())
 }
 
 // getInstalledPath returns the bin directory path for an installed Java version
 func (j *JavaTool) getInstalledPath(version string, cfg config.ToolConfig) (string, error) {
-	installDir := j.manager.GetToolVersionDir("java", version, "")
+	installDir := j.manager.GetToolVersionDir(ToolJava, version, "")
 	pathResolver := NewPathResolver(j.manager.GetToolsDir())
 	binDir, err := pathResolver.FindBinaryParentDir(installDir, j.GetBinaryName())
 	if err != nil {
@@ -427,11 +400,11 @@ func (j *JavaTool) ListVersions() ([]string, error) {
 // GetDownloadOptions returns download options specific to Java
 func (j *JavaTool) GetDownloadOptions() DownloadOptions {
 	return DownloadOptions{
-		FileExtension: ".tar.gz",
+		FileExtension: ExtTarGz,
 		ExpectedType:  "application",
 		MinSize:       10 * 1024 * 1024,  // 10MB (very permissive, rely on checksums)
 		MaxSize:       800 * 1024 * 1024, // 800MB (generous upper bound)
-		ArchiveType:   "tar.gz",
+		ArchiveType:   ArchiveTypeTarGz,
 	}
 }
 
@@ -540,21 +513,23 @@ func (j *JavaTool) tryDiscoDistributionWithChecksum(version, distribution, osNam
 		return DiscoveryResult{}, fmt.Errorf("Disco API request failed with status: %s", resp.Status)
 	}
 
+	type DiscoPackage struct {
+		ID                  string `json:"id"`
+		DirectDownloadURI   string `json:"direct_download_uri"`
+		Filename            string `json:"filename"`
+		VersionNumber       string `json:"version_number"`
+		LibCType            string `json:"lib_c_type"`
+		Architecture        string `json:"architecture"`
+		OperatingSystem     string `json:"operating_system"`
+		ArchiveType         string `json:"archive_type"`
+		Links               struct {
+			PkgInfoURI          string `json:"pkg_info_uri"`
+			PkgDownloadRedirect string `json:"pkg_download_redirect"`
+		} `json:"links"`
+	}
+
 	var packages struct {
-		Result []struct {
-			ID                string `json:"id"`
-			DirectDownloadURI string `json:"direct_download_uri"`
-			Filename          string `json:"filename"`
-			VersionNumber     string `json:"version_number"`
-			LibCType          string `json:"lib_c_type"`
-			Architecture      string `json:"architecture"`
-			OperatingSystem   string `json:"operating_system"`
-			ArchiveType       string `json:"archive_type"`
-			Links             struct {
-				PkgInfoURI          string `json:"pkg_info_uri"`
-				PkgDownloadRedirect string `json:"pkg_download_redirect"`
-			} `json:"links"`
-		} `json:"result"`
+		Result []DiscoPackage `json:"result"`
 	}
 
 	// Read response body for debugging
@@ -584,40 +559,12 @@ func (j *JavaTool) tryDiscoDistributionWithChecksum(version, distribution, osNam
 		return DiscoveryResult{}, fmt.Errorf("no packages found for Java %s (%s)", version, distribution)
 	}
 
-	// Define the package type for consistency
-	type packageType struct {
-		ID                string `json:"id"`
-		DirectDownloadURI string `json:"direct_download_uri"`
-		Filename          string `json:"filename"`
-		VersionNumber     string `json:"version_number"`
-		LibCType          string `json:"lib_c_type"`
-		Architecture      string `json:"architecture"`
-		OperatingSystem   string `json:"operating_system"`
-		ArchiveType       string `json:"archive_type"`
-		Links             struct {
-			PkgInfoURI          string `json:"pkg_info_uri"`
-			PkgDownloadRedirect string `json:"pkg_download_redirect"`
-		} `json:"links"`
-	}
-
-	var selectedPkg *packageType
+	var selectedPkg *DiscoPackage
 
 	// Smart selection: prefer glibc over musl on glibc systems, and tar.gz over other formats
-	var glibcPkg, muslPkg, zipPkg, tarGzPkg, otherPkg *packageType
+	var glibcPkg, muslPkg, zipPkg, tarGzPkg, otherPkg *DiscoPackage
 
 	for _, pkg := range packages.Result {
-		pkgCopy := packageType{
-			ID:                pkg.ID,
-			DirectDownloadURI: pkg.DirectDownloadURI,
-			Filename:          pkg.Filename,
-			VersionNumber:     pkg.VersionNumber,
-			LibCType:          pkg.LibCType,
-			Architecture:      pkg.Architecture,
-			OperatingSystem:   pkg.OperatingSystem,
-			ArchiveType:       pkg.ArchiveType,
-			Links:             pkg.Links,
-		}
-
 		// Check architecture compatibility
 		archMatch := false
 		if pkg.Architecture == "x64" || pkg.Architecture == "amd64" {
@@ -634,12 +581,12 @@ func (j *JavaTool) tryDiscoDistributionWithChecksum(version, distribution, osNam
 		if pkg.OperatingSystem == "linux" && pkg.ArchiveType == "tar.gz" {
 			if pkg.LibCType == "musl" {
 				if muslPkg == nil {
-					muslPkg = &pkgCopy
+					muslPkg = &pkg
 					logVerbose("Found musl candidate: %s", pkg.Filename)
 				}
 			} else if pkg.LibCType == "glibc" {
 				if glibcPkg == nil {
-					glibcPkg = &pkgCopy
+					glibcPkg = &pkg
 					logVerbose("Found glibc candidate: %s", pkg.Filename)
 				}
 			}
@@ -647,16 +594,16 @@ func (j *JavaTool) tryDiscoDistributionWithChecksum(version, distribution, osNam
 
 		// For all platforms: prefer tar.gz over zip (tar.gz is smaller and more standard)
 		if pkg.ArchiveType == "tar.gz" && tarGzPkg == nil {
-			tarGzPkg = &pkgCopy
+			tarGzPkg = &pkg
 			logVerbose("Found TAR.GZ candidate: %s", pkg.Filename)
 		} else if pkg.ArchiveType == "zip" && zipPkg == nil {
-			zipPkg = &pkgCopy
+			zipPkg = &pkg
 			logVerbose("Found ZIP candidate: %s", pkg.Filename)
 		}
 
 		// Keep track of any package as fallback
 		if otherPkg == nil {
-			otherPkg = &pkgCopy
+			otherPkg = &pkg
 		}
 	}
 

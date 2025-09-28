@@ -28,13 +28,13 @@ func getGoBinaryName() string {
 // NewGoTool creates a new Go tool instance
 func NewGoTool(manager *Manager) *GoTool {
 	return &GoTool{
-		BaseTool: NewBaseTool(manager, "go", getGoBinaryName()),
+		BaseTool: NewBaseTool(manager, ToolGo, getGoBinaryName()),
 	}
 }
 
 // Name returns the tool name
 func (g *GoTool) Name() string {
-	return "go"
+	return ToolGo
 }
 
 // Install downloads and installs the specified Go version
@@ -58,7 +58,7 @@ func (g *GoTool) GetBinaryName() string {
 
 // getInstalledPath returns the path for an installed Go version
 func (g *GoTool) getInstalledPath(version string, cfg config.ToolConfig) (string, error) {
-	installDir := g.manager.GetToolVersionDir("go", version, "")
+	installDir := g.manager.GetToolVersionDir(g.Name(), version, "")
 	pathResolver := NewPathResolver(g.manager.GetToolsDir())
 	binDir, err := pathResolver.FindBinaryParentDir(installDir, g.GetBinaryName())
 	if err != nil {
@@ -86,11 +86,11 @@ func (g *GoTool) ListVersions() ([]string, error) {
 // GetDownloadOptions returns download options specific to Go
 func (g *GoTool) GetDownloadOptions() DownloadOptions {
 	return DownloadOptions{
-		FileExtension: ".tar.gz",
+		FileExtension: ExtTarGz,
 		ExpectedType:  "application",
 		MinSize:       50 * 1024 * 1024,  // 50MB
 		MaxSize:       200 * 1024 * 1024, // 200MB
-		ArchiveType:   "tar.gz",
+		ArchiveType:   ArchiveTypeTarGz,
 	}
 }
 
@@ -108,15 +108,15 @@ func (g *GoTool) getDownloadURL(version string) string {
 	// Determine file extension
 	var fileExt string
 	if platformMapper.IsWindows() {
-		fileExt = ".zip"
+		fileExt = ExtZip
 	} else {
-		fileExt = ".tar.gz"
+		fileExt = ExtTarGz
 	}
 
 	// Construct filename
 	filename := fmt.Sprintf("go%s.%s-%s%s", version, osName, arch, fileExt)
 
-	return fmt.Sprintf("https://go.dev/dl/%s", filename)
+	return fmt.Sprintf("%s/%s", GoDevAPIBase, filename)
 }
 
 // ResolveVersion resolves a Go version specification to a concrete version
@@ -162,7 +162,7 @@ type GoFile struct {
 
 // fetchGoChecksum fetches Go checksum from go.dev API
 func (g *GoTool) fetchGoChecksum(version, filename string) (string, error) {
-	url := "https://go.dev/dl/?mode=json&include=all"
+	url := GoDevAPIBase + "/?mode=json&include=all"
 
 	client := &http.Client{
 		Timeout: 120 * time.Second, // 2 minutes for slow servers

@@ -403,11 +403,11 @@ func (b *BaseTool) PrintDownloadMessage(version string) {
 // GetDefaultDownloadOptions returns default download options for tools that don't specify their own
 func (b *BaseTool) GetDefaultDownloadOptions() DownloadOptions {
 	return DownloadOptions{
-		FileExtension: ".tar.gz",
+		FileExtension: ExtTarGz,
 		ExpectedType:  "application",
 		MinSize:       100 * 1024,        // 100KB (very permissive, rely on checksums)
 		MaxSize:       500 * 1024 * 1024, // 500MB (generous upper bound)
-		ArchiveType:   "tar.gz",
+		ArchiveType:   ArchiveTypeTarGz,
 	}
 }
 
@@ -426,27 +426,9 @@ func (b *BaseTool) getDownloadOptions() DownloadOptions {
 
 // StandardInstall provides a standard installation flow for most tools
 func (b *BaseTool) StandardInstall(version string, cfg config.ToolConfig, getDownloadURL func(string) string) error {
-	return b.StandardInstallWithOptions(version, cfg, getDownloadURL, nil)
-}
-
-// StandardInstallWithOptions provides a standard installation flow with system tool support
-func (b *BaseTool) StandardInstallWithOptions(version string, cfg config.ToolConfig, getDownloadURL func(string) string, envVars []string) error {
 	// Check if we should use system tool instead of downloading
 	if UseSystemTool(b.toolName) {
 		logVerbose("%s=true, forcing use of system %s", getSystemToolEnvVar(b.toolName), b.toolName)
-
-		// Try environment variables first (for tools like Maven that need MAVEN_HOME)
-		for _, envVar := range envVars {
-			if envValue := os.Getenv(envVar); envValue != "" {
-				// Verify the tool exists in this environment path
-				binPath := filepath.Join(envValue, "bin")
-				if exists, _ := b.checkSystemBinaryExists(binPath, b.binaryName); exists {
-					fmt.Printf("  🔗 Using system %s from %s: %s\n", b.toolName, envVar, envValue)
-					fmt.Printf("  ✅ System %s configured (mvx will use system PATH)\n", b.toolName)
-					return nil
-				}
-			}
-		}
 
 		// Try primary binary name in PATH
 		if toolPath, err := exec.LookPath(b.binaryName); err == nil {
@@ -525,30 +507,8 @@ func (b *BaseTool) StandardVerifyWithConfig(version string, cfg config.ToolConfi
 
 // StandardIsInstalled provides standard installation check for tools
 func (b *BaseTool) StandardIsInstalled(version string, cfg config.ToolConfig, getPath func(string, config.ToolConfig) (string, error), binaryName string) bool {
-	return b.StandardIsInstalledWithAlternatives(version, cfg, getPath, binaryName)
-}
-
-// StandardIsInstalledWithAlternatives provides standard installation check for tools with alternative binary names
-func (b *BaseTool) StandardIsInstalledWithAlternatives(version string, cfg config.ToolConfig, getPath func(string, config.ToolConfig) (string, error), binaryName string) bool {
-	return b.StandardIsInstalledWithOptions(version, cfg, getPath, binaryName, nil)
-}
-
-// StandardIsInstalledWithOptions provides standard installation check for tools with full customization options
-func (b *BaseTool) StandardIsInstalledWithOptions(version string, cfg config.ToolConfig, getPath func(string, config.ToolConfig) (string, error), binaryName string, envVars []string) bool {
 	// Check if we should use system tool instead of mvx-managed tool
 	if UseSystemTool(b.toolName) {
-		// Try environment variables first (for tools like Maven that need MAVEN_HOME)
-		for _, envVar := range envVars {
-			if envValue := os.Getenv(envVar); envValue != "" {
-				// Verify the tool exists in this environment path
-				toolPath := filepath.Join(envValue, "bin", binaryName)
-				if _, err := os.Stat(toolPath); err == nil {
-					logVerbose("System %s found via %s=%s (MVX_USE_SYSTEM_%s=true)", b.toolName, envVar, envValue, strings.ToUpper(b.toolName))
-					return true
-				}
-			}
-		}
-
 		// Try primary binary name in PATH
 		if _, err := exec.LookPath(binaryName); err == nil {
 			logVerbose("System %s is available in PATH (MVX_USE_SYSTEM_%s=true)", b.toolName, strings.ToUpper(b.toolName))
@@ -568,11 +528,11 @@ func (b *BaseTool) StandardIsInstalledWithOptions(version string, cfg config.Too
 
 // StandardGetPath provides standard path resolution with system tool support
 func (b *BaseTool) StandardGetPath(version string, cfg config.ToolConfig, getInstalledPath func(string, config.ToolConfig) (string, error), binaryName string) (string, error) {
-	return b.StandardGetPathWithOptions(version, cfg, getInstalledPath, binaryName, nil)
+	return b.StandardGetPathWithOptions(version, cfg, getInstalledPath, binaryName)
 }
 
 // StandardGetPathWithOptions provides standard path resolution with system tool support and options
-func (b *BaseTool) StandardGetPathWithOptions(version string, cfg config.ToolConfig, getInstalledPath func(string, config.ToolConfig) (string, error), binaryName string, envVars []string) (string, error) {
+func (b *BaseTool) StandardGetPathWithOptions(version string, cfg config.ToolConfig, getInstalledPath func(string, config.ToolConfig) (string, error), binaryName string) (string, error) {
 	// Check cache first
 	cacheKey := b.getCacheKey(version, cfg, "getPath")
 	if cachedPath, cachedErr, found := b.getCachedPath(cacheKey); found {
@@ -580,19 +540,6 @@ func (b *BaseTool) StandardGetPathWithOptions(version string, cfg config.ToolCon
 	}
 	// Check if we should use system tool instead of mvx-managed tool
 	if UseSystemTool(b.toolName) {
-		// Try environment variables first (for tools like Maven that need MAVEN_HOME)
-		for _, envVar := range envVars {
-			if envValue := os.Getenv(envVar); envValue != "" {
-				// Verify the tool exists in this environment path
-				toolPath := filepath.Join(envValue, "bin", binaryName)
-				if _, err := os.Stat(toolPath); err == nil {
-					logVerbose("Using system %s from %s (MVX_USE_SYSTEM_%s=true)", b.toolName, envVar, strings.ToUpper(b.toolName))
-					b.setCachedPath(cacheKey, "", nil)
-					return "", nil
-				}
-			}
-		}
-
 		// Try primary binary name in PATH
 		if _, err := exec.LookPath(binaryName); err == nil {
 			logVerbose("Using system %s from PATH (MVX_USE_SYSTEM_%s=true)", b.toolName, strings.ToUpper(b.toolName))

@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/gnodet/mvx/pkg/config"
@@ -19,23 +18,27 @@ type MavenTool struct {
 	*BaseTool
 }
 
+func getMavenToolName() string {
+	return ToolMaven
+}
+
 func getMavenBinaryName() string {
 	if NewPlatformMapper().IsWindows() {
-		return "mvn.exe"
+		return BinaryMaven + ExtCmd
 	}
-	return "mvn"
+	return BinaryMaven
 }
 
 // NewMavenTool creates a new Maven tool instance
 func NewMavenTool(manager *Manager) *MavenTool {
 	return &MavenTool{
-		BaseTool: NewBaseTool(manager, "maven", getMavenBinaryName()),
+		BaseTool: NewBaseTool(manager, getMavenToolName(), getMavenBinaryName()),
 	}
 }
 
 // Name returns the tool name
 func (m *MavenTool) Name() string {
-	return "maven"
+	return getMavenToolName()
 }
 
 // Install downloads and installs the specified Maven version
@@ -46,15 +49,15 @@ func (m *MavenTool) Install(version string, cfg config.ToolConfig) error {
 // installWithFallback tries primary URL first, then fallback archive URL
 func (m *MavenTool) installWithFallback(version string, cfg config.ToolConfig) error {
 	// Check if we should use system tool instead of downloading (use standardized approach)
-	if UseSystemTool("maven") {
+	if UseSystemTool(m.Name()) {
 		// Use standardized system tool detection
-		return m.StandardInstallWithOptions(version, cfg, m.getDownloadURL, []string{"MAVEN_HOME"})
+		return m.StandardInstall(version, cfg, m.getDownloadURL)
 	}
 
 	// Create installation directory
 	installDir, err := m.CreateInstallDir(version, "")
 	if err != nil {
-		return InstallError("maven", version, fmt.Errorf("failed to create install directory: %w", err))
+		return InstallError(m.Name(), version, fmt.Errorf("failed to create install directory: %w", err))
 	}
 
 	// Try both URLs with reduced retries instead of exhausting retries on first URL
@@ -67,13 +70,13 @@ func (m *MavenTool) installWithFallback(version string, cfg config.ToolConfig) e
 	// Try to download with alternating URLs and reduced retries per URL
 	archivePath, err := m.downloadWithAlternatingURLs(primaryURL, archiveURL, version, cfg, options)
 	if err != nil {
-		return InstallError("maven", version, fmt.Errorf("download failed from both primary and archive URLs: %w", err))
+		return InstallError(m.Name(), version, fmt.Errorf("download failed from both primary and archive URLs: %w", err))
 	}
 	defer os.Remove(archivePath) // Clean up downloaded file
 
 	// Extract the downloaded file
 	if err := m.Extract(archivePath, installDir, options); err != nil {
-		return InstallError("maven", version, err)
+		return InstallError(m.toolName, version, err)
 	}
 
 	// Verify installation
@@ -93,12 +96,12 @@ func (m *MavenTool) installWithFallback(version string, cfg config.ToolConfig) e
 
 // IsInstalled checks if the specified version is installed
 func (m *MavenTool) IsInstalled(version string, cfg config.ToolConfig) bool {
-	return m.StandardIsInstalledWithOptions(version, cfg, m.GetPath, "mvn", []string{"MAVEN_HOME"})
+	return m.StandardIsInstalled(version, cfg, m.GetPath, m.GetBinaryName())
 }
 
 // GetPath returns the binary path for the specified version (for PATH management)
 func (m *MavenTool) GetPath(version string, cfg config.ToolConfig) (string, error) {
-	return m.StandardGetPathWithOptions(version, cfg, m.getInstalledPath, "mvn", []string{"MAVEN_HOME"})
+	return m.StandardGetPath(version, cfg, m.getInstalledPath, m.GetBinaryName())
 }
 
 func (m *MavenTool) GetBinaryName() string {
@@ -107,7 +110,7 @@ func (m *MavenTool) GetBinaryName() string {
 
 // getInstalledPath returns the path for an installed Maven version
 func (m *MavenTool) getInstalledPath(version string, cfg config.ToolConfig) (string, error) {
-	installDir := m.manager.GetToolVersionDir("maven", version, "")
+	installDir := m.manager.GetToolVersionDir(m.Name(), version, "")
 	pathResolver := NewPathResolver(m.manager.GetToolsDir())
 	binDir, err := pathResolver.FindBinaryParentDir(installDir, m.GetBinaryName())
 	if err != nil {
@@ -126,56 +129,6 @@ func (m *MavenTool) Verify(version string, cfg config.ToolConfig) error {
 	return m.StandardVerifyWithConfig(version, cfg, verifyConfig)
 }
 
-// findJavaHome attempts to find an installed Java home directory
-func (m *MavenTool) findJavaHome() (string, error) {
-	// Check if JAVA_HOME is already set
-	if javaHome := os.Getenv("JAVA_HOME"); javaHome != "" {
-		return javaHome, nil
-	}
-
-	// Try to find Java installations in the tools directory
-	javaToolsDir := filepath.Join(m.manager.GetToolsDir(), "java")
-	if entries, err := os.ReadDir(javaToolsDir); err == nil {
-		for _, entry := range entries {
-			if entry.IsDir() {
-				javaVersionDir := filepath.Join(javaToolsDir, entry.Name())
-
-				// Try to find Java executable in this version directory
-				if javaPath, err := m.findJavaInDirectory(javaVersionDir); err == nil {
-					logVerbose("Found Java installation at: %s", javaPath)
-					return javaPath, nil
-				}
-			}
-		}
-	}
-
-	return "", fmt.Errorf("no Java installation found")
-}
-
-// findJavaInDirectory searches for Java executable in a directory and returns JAVA_HOME
-func (m *MavenTool) findJavaInDirectory(dir string) (string, error) {
-	// Check if there are subdirectories (common with JDK archives)
-	if entries, err := os.ReadDir(dir); err == nil {
-		for _, entry := range entries {
-			if entry.IsDir() {
-				subPath := filepath.Join(dir, entry.Name())
-				javaExe := filepath.Join(subPath, "bin", getJavaBinaryName())
-				if _, err := os.Stat(javaExe); err == nil {
-					return subPath, nil
-				}
-			}
-		}
-	}
-
-	// Also check if java is directly in the directory
-	javaExe := filepath.Join(dir, "bin", getJavaBinaryName())
-	if _, err := os.Stat(javaExe); err == nil {
-		return dir, nil
-	}
-
-	return "", PathError("java", "", fmt.Errorf("java executable not found in %s", dir))
-}
-
 // ListVersions returns available versions for installation
 func (m *MavenTool) ListVersions() ([]string, error) {
 	registry := m.manager.GetRegistry()
@@ -185,11 +138,11 @@ func (m *MavenTool) ListVersions() ([]string, error) {
 // GetDownloadOptions returns download options specific to Maven
 func (m *MavenTool) GetDownloadOptions() DownloadOptions {
 	return DownloadOptions{
-		FileExtension: ".zip",
+		FileExtension: ExtZip,
 		ExpectedType:  "application",
 		MinSize:       5 * 1024 * 1024,   // 5MB
 		MaxSize:       100 * 1024 * 1024, // 100MB
-		ArchiveType:   "zip",
+		ArchiveType:   ArchiveTypeZip,
 	}
 }
 
@@ -203,22 +156,22 @@ func (m *MavenTool) getDownloadURL(version string) string {
 	// For recent releases, use dist.apache.org (CDN-backed)
 	if strings.HasPrefix(version, "4.") {
 		// Maven 4.x versions - try dist first for recent releases
-		return fmt.Sprintf("https://dist.apache.org/repos/dist/release/maven/maven-4/%s/binaries/apache-maven-%s-bin.zip", version, version)
+		return fmt.Sprintf(ApacheDistBase+"/maven-4/%s/binaries/apache-maven-%s-bin.zip", version, version)
 	}
 
 	// Maven 3.x versions - try dist first for recent releases
-	return fmt.Sprintf("https://dist.apache.org/repos/dist/release/maven/maven-3/%s/binaries/apache-maven-%s-bin.zip", version, version)
+	return fmt.Sprintf(ApacheDistBase+"/maven-3/%s/binaries/apache-maven-%s-bin.zip", version, version)
 }
 
 // getArchiveDownloadURL returns the fallback archive URL for the specified version
 func (m *MavenTool) getArchiveDownloadURL(version string) string {
 	if strings.HasPrefix(version, "4.") {
 		// Maven 4.x versions are in the Maven 4 archive
-		return fmt.Sprintf("https://archive.apache.org/dist/maven/maven-4/%s/binaries/apache-maven-%s-bin.zip", version, version)
+		return fmt.Sprintf(ApacheMavenBase+"/maven-4/%s/binaries/apache-maven-%s-bin.zip", version, version)
 	}
 
 	// Maven 3.x versions are in the Maven 3 archive
-	return fmt.Sprintf("https://archive.apache.org/dist/maven/maven-3/%s/binaries/apache-maven-%s-bin.zip", version, version)
+	return fmt.Sprintf(ApacheMavenBase+"/maven-3/%s/binaries/apache-maven-%s-bin.zip", version, version)
 }
 
 // ResolveVersion resolves a Maven version specification to a concrete version
@@ -328,7 +281,7 @@ func (m *MavenTool) downloadWithAlternatingURLs(primaryURL, archiveURL, version 
 		downloadConfig.ExpectedType = options.ExpectedType
 		downloadConfig.MinSize = options.MinSize
 		downloadConfig.MaxSize = options.MaxSize
-		downloadConfig.ToolName = "maven"
+		downloadConfig.ToolName = m.toolName
 		downloadConfig.Version = version
 		downloadConfig.Config = cfg
 		downloadConfig.ChecksumRegistry = m.manager.GetChecksumRegistry()

@@ -31,7 +31,7 @@ const (
 	GitHubAPIBase      = "https://api.github.com"
 	NodeJSDistBase     = "https://nodejs.org/dist"
 	GoDevAPIBase       = "https://go.dev/dl"
-	ApacheMavenBase    = "https://archive.apache.org/dist/maven"
+	ApacheMavenBase    = "https://archive.apache.org/dist/release/maven"
 	ApacheDistBase     = "https://dist.apache.org/repos/dist/release/maven"
 )
 
@@ -52,6 +52,8 @@ const (
 
 // File Extensions
 const (
+	ExtExe   = ".exe"
+	ExtCmd   = ".cmd"
 	ExtZip   = ".zip"
 	ExtTarGz = ".tar.gz"
 	ExtTarXz = ".tar.xz"

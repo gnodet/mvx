@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -42,21 +41,6 @@ func getTimeoutFromEnv(envVar string, defaultTimeout time.Duration) time.Duratio
 		}
 	}
 	return defaultTimeout
-}
-
-// getMaxRetries returns the maximum number of download retries from environment or default
-func getMaxRetries() int {
-	if retriesStr := os.Getenv("MVX_MAX_RETRIES"); retriesStr != "" {
-		if retries, err := strconv.Atoi(retriesStr); err == nil && retries >= 0 {
-			return retries
-		}
-	}
-	return 3 // Default: 3 retries
-}
-
-// getRetryDelay returns the delay between retries from environment or default
-func getRetryDelay() time.Duration {
-	return getTimeoutFromEnv("MVX_RETRY_DELAY", 2*time.Second) // Default: 2 seconds between retries
 }
 
 // DefaultDownloadConfig returns a default download configuration

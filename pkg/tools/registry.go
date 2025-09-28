@@ -30,7 +30,6 @@ func NewToolRegistry() *ToolRegistry {
 type JavaDistribution struct {
 	Name        string
 	DisplayName string
-	APIBase     string
 }
 
 // DiscoDistribution represents a Java distribution from Disco API
@@ -53,37 +52,30 @@ func (r *ToolRegistry) GetJavaDistributions() []JavaDistribution {
 		{
 			Name:        "temurin",
 			DisplayName: "Eclipse Temurin (OpenJDK)",
-			APIBase:     "https://api.foojay.io/disco/v3.0",
 		},
 		{
 			Name:        "graalvm_ce",
 			DisplayName: "GraalVM Community Edition",
-			APIBase:     "https://api.foojay.io/disco/v3.0",
 		},
 		{
 			Name:        "oracle",
 			DisplayName: "Oracle JDK",
-			APIBase:     "https://api.foojay.io/disco/v3.0",
 		},
 		{
 			Name:        "corretto",
 			DisplayName: "Amazon Corretto",
-			APIBase:     "https://api.foojay.io/disco/v3.0",
 		},
 		{
 			Name:        "liberica",
 			DisplayName: "BellSoft Liberica",
-			APIBase:     "https://api.foojay.io/disco/v3.0",
 		},
 		{
 			Name:        "zulu",
 			DisplayName: "Azul Zulu",
-			APIBase:     "https://api.foojay.io/disco/v3.0",
 		},
 		{
 			Name:        "microsoft",
 			DisplayName: "Microsoft Build of OpenJDK",
-			APIBase:     "https://api.foojay.io/disco/v3.0",
 		},
 	}
 }
@@ -112,7 +104,6 @@ func (r *ToolRegistry) getDiscoDistributions() ([]JavaDistribution, error) {
 			distributions = append(distributions, JavaDistribution{
 				Name:        dist.APIParameter,
 				DisplayName: dist.Name,
-				APIBase:     "https://api.foojay.io/disco/v3.0",
 			})
 		}
 	}

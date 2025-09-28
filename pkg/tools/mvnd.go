@@ -214,7 +214,7 @@ func (m *MvndTool) fetchChecksumFromURL(url string) (string, error) {
 func (m *MvndTool) installWithFallback(version string, cfg config.ToolConfig) error {
 	// Check if we should use system tool instead of downloading
 	if UseSystemTool("mvnd") {
-		return m.StandardInstallWithOptions(version, cfg, m.getDownloadURL, []string{"MVND_HOME"})
+		return m.StandardInstall(version, cfg, m.getDownloadURL)
 	}
 
 	// Create installation directory
