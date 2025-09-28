@@ -264,7 +264,7 @@ func (j *JavaTool) IsInstalled(version string, cfg config.ToolConfig) bool {
 	}
 
 	// Use standardized installation check with Java-specific environment variables
-	return j.StandardIsInstalled(fullVersion, cfg, j.GetPath, j.GetBinaryName())
+	return j.StandardIsInstalled(fullVersion, cfg, j.GetPath)
 }
 
 // GetJavaHome returns the JAVA_HOME path for the specified version
@@ -365,7 +365,7 @@ func (j *JavaTool) GetBinaryName() string {
 // GetPath returns the binary path for the specified version (for PATH management)
 func (j *JavaTool) GetPath(version string, cfg config.ToolConfig) (string, error) {
 	// Use standardized path resolution with Java-specific environment variables
-	return j.StandardGetPath(version, cfg, j.getInstalledPath, j.GetBinaryName())
+	return j.StandardGetPath(version, cfg, j.getInstalledPath)
 }
 
 // getInstalledPath returns the bin directory path for an installed Java version
@@ -514,15 +514,15 @@ func (j *JavaTool) tryDiscoDistributionWithChecksum(version, distribution, osNam
 	}
 
 	type DiscoPackage struct {
-		ID                  string `json:"id"`
-		DirectDownloadURI   string `json:"direct_download_uri"`
-		Filename            string `json:"filename"`
-		VersionNumber       string `json:"version_number"`
-		LibCType            string `json:"lib_c_type"`
-		Architecture        string `json:"architecture"`
-		OperatingSystem     string `json:"operating_system"`
-		ArchiveType         string `json:"archive_type"`
-		Links               struct {
+		ID                string `json:"id"`
+		DirectDownloadURI string `json:"direct_download_uri"`
+		Filename          string `json:"filename"`
+		VersionNumber     string `json:"version_number"`
+		LibCType          string `json:"lib_c_type"`
+		Architecture      string `json:"architecture"`
+		OperatingSystem   string `json:"operating_system"`
+		ArchiveType       string `json:"archive_type"`
+		Links             struct {
 			PkgInfoURI          string `json:"pkg_info_uri"`
 			PkgDownloadRedirect string `json:"pkg_download_redirect"`
 		} `json:"links"`
