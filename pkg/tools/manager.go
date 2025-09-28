@@ -70,6 +70,9 @@ type Tool interface {
 
 	// Checksum generation method
 	GetChecksum(version, filename string) (ChecksumInfo, error)
+
+	// GetBinaryName returns the binary name for the tool
+	GetBinaryName() string
 }
 
 // ToolInfoProvider is an optional interface for tools that can provide detailed information

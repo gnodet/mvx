@@ -19,109 +19,6 @@ func NewPathResolver(toolsDir string) *PathResolver {
 	}
 }
 
-// DirectorySearchOptions configures directory search behavior
-type DirectorySearchOptions struct {
-	// Subdirectory to look for within matched directories (e.g., "bin")
-	BinSubdirectory string
-	// Binary name to verify exists (e.g., "mvn", "node")
-	BinaryName string
-	// Whether to use platform-specific binary extensions (.exe, .cmd)
-	UsePlatformExtensions bool
-	// Preferred Windows extension (e.g., ".cmd" for Maven tools, ".exe" for others)
-	PreferredWindowsExtension string
-	// Fallback to parent directory if bin subdirectory not found
-	FallbackToParent bool
-}
-
-// FindToolBinaryPath searches for a tool's binary path in an installation directory
-func (pr *PathResolver) FindToolBinaryPath(installDir string, options DirectorySearchOptions) (string, error) {
-	entries, err := os.ReadDir(installDir)
-	if err != nil {
-		return "", fmt.Errorf("failed to read installation directory: %w", err)
-	}
-
-	// Walk all subdirectories and look for the binary
-	for _, entry := range entries {
-		if entry.IsDir() {
-			toolHome := filepath.Join(installDir, entry.Name())
-
-			// Check for bin subdirectory
-			if options.BinSubdirectory != "" {
-				binPath := filepath.Join(toolHome, options.BinSubdirectory)
-				if pr.verifyBinaryExists(binPath, options.BinaryName, options) {
-					return binPath, nil
-				}
-			}
-
-			// Fallback to parent directory if enabled
-			if options.FallbackToParent {
-				if pr.verifyBinaryExists(toolHome, options.BinaryName, options) {
-					return toolHome, nil
-				}
-			}
-		}
-	}
-
-	// If no subdirectory worked, check direct installation
-	if options.BinSubdirectory != "" {
-		binPath := filepath.Join(installDir, options.BinSubdirectory)
-		if pr.verifyBinaryExists(binPath, options.BinaryName, options) {
-			return binPath, nil
-		}
-	}
-
-	// Final fallback to install directory itself
-	if options.FallbackToParent {
-		if pr.verifyBinaryExists(installDir, options.BinaryName, options) {
-			return installDir, nil
-		}
-	}
-
-	return "", fmt.Errorf("binary %s not found in installation directory", options.BinaryName)
-}
-
-// verifyBinaryExists checks if a binary exists in the given directory
-func (pr *PathResolver) verifyBinaryExists(binPath, binaryName string, options DirectorySearchOptions) bool {
-	if binaryName == "" {
-		// If no binary name specified, just check if directory exists
-		if info, err := os.Stat(binPath); err == nil && info.IsDir() {
-			return true
-		}
-		return false
-	}
-
-	platformMapper := NewPlatformMapper()
-
-	// Try exact binary name first
-	fullPath := filepath.Join(binPath, binaryName)
-	if _, err := os.Stat(fullPath); err == nil {
-		return true
-	}
-
-	// Try platform-specific extensions if enabled
-	if options.UsePlatformExtensions && platformMapper.IsWindows() {
-		if !strings.HasSuffix(binaryName, ".exe") && !strings.HasSuffix(binaryName, ".cmd") {
-			// Try preferred extension first if specified
-			if options.PreferredWindowsExtension != "" {
-				preferredPath := fullPath + options.PreferredWindowsExtension
-				if _, err := os.Stat(preferredPath); err == nil {
-					return true
-				}
-			}
-
-			// Try .exe as fallback
-			if options.PreferredWindowsExtension != ".exe" {
-				exePath := fullPath + ".exe"
-				if _, err := os.Stat(exePath); err == nil {
-					return true
-				}
-			}
-		}
-	}
-
-	return false
-}
-
 // PathEnvironmentManager provides utilities for managing PATH environment variable
 type PathEnvironmentManager struct{}
 
@@ -234,4 +131,29 @@ func (ipm *InstallationPathManager) CleanupFailedInstallation(installDir string)
 	}
 
 	return os.RemoveAll(installDir)
+}
+
+// FindBinaryParentDir recursively searches for any binary in binaryNames under rootDir.
+// Returns the parent directory of the first found binary.
+func (r *PathResolver) FindBinaryParentDir(rootDir string, binaryName string) (string, error) {
+	var foundPath string
+	err := filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			if info.Name() == binaryName {
+				foundPath = filepath.Dir(path)
+				return filepath.SkipDir // Stop walking once found
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	if foundPath == "" {
+		return "", os.ErrNotExist
+	}
+	return foundPath, nil
 }

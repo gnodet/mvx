@@ -5,7 +5,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/gnodet/mvx/pkg/config"
@@ -19,10 +18,17 @@ type MvndTool struct {
 	*BaseTool
 }
 
+func getMvndBinaryName() string {
+	if NewPlatformMapper().IsWindows() {
+		return "mvnd.exe"
+	}
+	return "mvnd"
+}
+
 // NewMvndTool creates a new Mvnd tool instance
 func NewMvndTool(manager *Manager) *MvndTool {
 	return &MvndTool{
-		BaseTool: NewBaseTool(manager, "mvnd"),
+		BaseTool: NewBaseTool(manager, "mvnd", getMvndBinaryName()),
 	}
 }
 
@@ -38,41 +44,33 @@ func (m *MvndTool) Install(version string, cfg config.ToolConfig) error {
 
 // IsInstalled checks if the specified version is installed
 func (m *MvndTool) IsInstalled(version string, cfg config.ToolConfig) bool {
-	return m.StandardIsInstalled(version, cfg, m.GetPath, "mvnd")
+	return m.StandardIsInstalled(version, cfg, m.GetPath, m.GetBinaryName())
 }
 
 // GetPath returns the binary path for the specified version (for PATH management)
 func (m *MvndTool) GetPath(version string, cfg config.ToolConfig) (string, error) {
-	return m.StandardGetPath(version, cfg, m.getInstalledPath, "mvnd")
+	return m.StandardGetPath(version, cfg, m.getInstalledPath, m.GetBinaryName())
+}
+
+func (m *MvndTool) GetBinaryName() string {
+	return getMvndBinaryName()
 }
 
 // getInstalledPath returns the path for an installed Mvnd version
 func (m *MvndTool) getInstalledPath(version string, cfg config.ToolConfig) (string, error) {
 	installDir := m.manager.GetToolVersionDir("mvnd", version, "")
 	pathResolver := NewPathResolver(m.manager.GetToolsDir())
-
-	// Use robust directory walking approach
-	options := DirectorySearchOptions{
-		BinSubdirectory:           "bin",
-		BinaryName:                "mvnd",
-		UsePlatformExtensions:     true,
-		PreferredWindowsExtension: ".cmd", // Mvnd uses .cmd on Windows
-		FallbackToParent:          false,  // Mvnd always has bin subdirectory
-	}
-
-	binPath, err := pathResolver.FindToolBinaryPath(installDir, options)
+	binDir, err := pathResolver.FindBinaryParentDir(installDir, m.GetBinaryName())
 	if err != nil {
-		// Final fallback to default bin directory
-		return filepath.Join(installDir, "bin"), nil
+		return "", err
 	}
-
-	return binPath, nil
+	return binDir, nil
 }
 
 // Verify checks if the installation is working correctly
 func (m *MvndTool) Verify(version string, cfg config.ToolConfig) error {
 	verifyConfig := VerificationConfig{
-		BinaryName:  "mvnd",
+		BinaryName:  m.GetBinaryName(),
 		VersionArgs: []string{"--version"},
 		DebugInfo:   false,
 	}
@@ -216,7 +214,7 @@ func (m *MvndTool) fetchChecksumFromURL(url string) (string, error) {
 func (m *MvndTool) installWithFallback(version string, cfg config.ToolConfig) error {
 	// Check if we should use system tool instead of downloading
 	if UseSystemTool("mvnd") {
-		return m.StandardInstallWithOptions(version, cfg, m.getDownloadURL, []string{"mvnd.cmd"}, []string{"MVND_HOME"})
+		return m.StandardInstallWithOptions(version, cfg, m.getDownloadURL, []string{"MVND_HOME"})
 	}
 
 	// Create installation directory

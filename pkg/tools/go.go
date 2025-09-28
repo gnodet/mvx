@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"path/filepath"
 	"time"
 
 	"github.com/gnodet/mvx/pkg/config"
@@ -18,10 +17,18 @@ type GoTool struct {
 	*BaseTool
 }
 
+func getGoBinaryName() string {
+	platformMapper := NewPlatformMapper()
+	if platformMapper.IsWindows() {
+		return "go.exe"
+	}
+	return "go"
+}
+
 // NewGoTool creates a new Go tool instance
 func NewGoTool(manager *Manager) *GoTool {
 	return &GoTool{
-		BaseTool: NewBaseTool(manager, "go"),
+		BaseTool: NewBaseTool(manager, "go", getGoBinaryName()),
 	}
 }
 
@@ -37,41 +44,33 @@ func (g *GoTool) Install(version string, cfg config.ToolConfig) error {
 
 // IsInstalled checks if the specified version is installed
 func (g *GoTool) IsInstalled(version string, cfg config.ToolConfig) bool {
-	return g.StandardIsInstalled(version, cfg, g.GetPath, "go")
+	return g.StandardIsInstalled(version, cfg, g.GetPath, g.GetBinaryName())
 }
 
 // GetPath returns the binary path for the specified version (for PATH management)
 func (g *GoTool) GetPath(version string, cfg config.ToolConfig) (string, error) {
-	return g.StandardGetPath(version, cfg, g.getInstalledPath, "go")
+	return g.StandardGetPath(version, cfg, g.getInstalledPath, g.GetBinaryName())
+}
+
+func (g *GoTool) GetBinaryName() string {
+	return getGoBinaryName()
 }
 
 // getInstalledPath returns the path for an installed Go version
 func (g *GoTool) getInstalledPath(version string, cfg config.ToolConfig) (string, error) {
 	installDir := g.manager.GetToolVersionDir("go", version, "")
 	pathResolver := NewPathResolver(g.manager.GetToolsDir())
-
-	// Use robust directory walking approach
-	options := DirectorySearchOptions{
-		BinSubdirectory:           "bin",
-		BinaryName:                "go",
-		UsePlatformExtensions:     true,
-		PreferredWindowsExtension: ".exe", // Go uses .exe on Windows
-		FallbackToParent:          false,  // Go always has bin subdirectory
-	}
-
-	binPath, err := pathResolver.FindToolBinaryPath(installDir, options)
+	binDir, err := pathResolver.FindBinaryParentDir(installDir, g.GetBinaryName())
 	if err != nil {
-		// Final fallback to default bin directory
-		return filepath.Join(installDir, "bin"), nil
+		return "", err
 	}
-
-	return binPath, nil
+	return binDir, nil
 }
 
 // Verify checks if the installation is working correctly
 func (g *GoTool) Verify(version string, cfg config.ToolConfig) error {
 	verifyConfig := VerificationConfig{
-		BinaryName:  "go",
+		BinaryName:  g.GetBinaryName(),
 		VersionArgs: []string{"version"},
 		DebugInfo:   false,
 	}

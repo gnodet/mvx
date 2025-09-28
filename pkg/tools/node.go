@@ -20,10 +20,17 @@ type NodeTool struct {
 	*BaseTool
 }
 
+func getNodeBinaryName() string {
+	if NewPlatformMapper().IsWindows() {
+		return "node.exe"
+	}
+	return "node"
+}
+
 // NewNodeTool creates a new Node tool instance
 func NewNodeTool(manager *Manager) *NodeTool {
 	return &NodeTool{
-		BaseTool: NewBaseTool(manager, "node"),
+		BaseTool: NewBaseTool(manager, "node", getNodeBinaryName()),
 	}
 }
 
@@ -34,32 +41,31 @@ func (n *NodeTool) Install(version string, cfg config.ToolConfig) error {
 }
 
 func (n *NodeTool) IsInstalled(version string, cfg config.ToolConfig) bool {
-	return n.StandardIsInstalled(version, cfg, n.GetPath, "node")
+	return n.StandardIsInstalled(version, cfg, n.GetPath, n.GetBinaryName())
 }
 
 func (n *NodeTool) GetPath(version string, cfg config.ToolConfig) (string, error) {
-	return n.StandardGetPath(version, cfg, n.getInstalledPath, "node")
+	return n.StandardGetPath(version, cfg, n.getInstalledPath, n.GetBinaryName())
+}
+
+func (n *NodeTool) GetBinaryName() string {
+	return getNodeBinaryName()
 }
 
 // getInstalledPath returns the path for an installed Node version
 func (n *NodeTool) getInstalledPath(version string, cfg config.ToolConfig) (string, error) {
 	installDir := n.manager.GetToolVersionDir("node", version, "")
 	pathResolver := NewPathResolver(n.manager.GetToolsDir())
-
-	options := DirectorySearchOptions{
-		BinSubdirectory:           "bin",
-		BinaryName:                "node",
-		UsePlatformExtensions:     true,
-		PreferredWindowsExtension: ".exe", // Node uses .exe on Windows
-		FallbackToParent:          true,   // On Windows, Node distributes binaries at root
+	binDir, err := pathResolver.FindBinaryParentDir(installDir, n.GetBinaryName())
+	if err != nil {
+		return "", err
 	}
-
-	return pathResolver.FindToolBinaryPath(installDir, options)
+	return binDir, nil
 }
 
 func (n *NodeTool) Verify(version string, cfg config.ToolConfig) error {
 	verifyConfig := VerificationConfig{
-		BinaryName:  "node",
+		BinaryName:  n.GetBinaryName(),
 		VersionArgs: []string{"--version"},
 		DebugInfo:   false,
 	}
@@ -85,13 +91,6 @@ func (n *NodeTool) GetDownloadOptions() DownloadOptions {
 // GetDisplayName returns the display name for Node.js
 func (n *NodeTool) GetDisplayName() string {
 	return "Node.js"
-}
-
-func (n *NodeTool) nodeBinaryName() string {
-	if runtime.GOOS == "windows" {
-		return "node.exe"
-	}
-	return "node"
 }
 
 func (n *NodeTool) getDownloadURL(version string) string {

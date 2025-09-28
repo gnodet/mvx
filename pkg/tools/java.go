@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -27,10 +26,7 @@ func getSystemJavaHome() (string, error) {
 	}
 
 	// Check if JAVA_HOME points to a valid Java installation
-	javaExe := filepath.Join(javaHome, "bin", "java")
-	if runtime.GOOS == "windows" {
-		javaExe += ".exe"
-	}
+	javaExe := filepath.Join(javaHome, "bin", getJavaBinaryName())
 
 	if _, err := os.Stat(javaExe); err != nil {
 		return "", SystemToolError("java", fmt.Errorf("Java executable not found at %s: %w", javaExe, err))
@@ -41,10 +37,7 @@ func getSystemJavaHome() (string, error) {
 
 // getSystemJavaVersion returns the version of the system Java installation
 func getSystemJavaVersion(javaHome string) (string, error) {
-	javaExe := filepath.Join(javaHome, "bin", "java")
-	if runtime.GOOS == "windows" {
-		javaExe += ".exe"
-	}
+	javaExe := filepath.Join(javaHome, "bin", getJavaBinaryName())
 
 	cmd := exec.Command(javaExe, "-version")
 	output, err := cmd.CombinedOutput()
@@ -101,10 +94,17 @@ type JavaTool struct {
 	*BaseTool
 }
 
+func getJavaBinaryName() string {
+	if NewPlatformMapper().IsWindows() {
+		return "java.exe"
+	}
+	return "java"
+}
+
 // NewJavaTool creates a new Java tool instance
 func NewJavaTool(manager *Manager) *JavaTool {
 	return &JavaTool{
-		BaseTool: NewBaseTool(manager, "java"),
+		BaseTool: NewBaseTool(manager, "java", getJavaBinaryName()),
 	}
 }
 
@@ -253,7 +253,7 @@ func (j *JavaTool) getDownloadURLWithChecksum(version, distribution string) (str
 // IsInstalled checks if the specified version is installed
 func (j *JavaTool) IsInstalled(version string, cfg config.ToolConfig) bool {
 	// Use standardized installation check with Java-specific environment variables
-	return j.StandardIsInstalledWithOptions(version, cfg, j.GetPath, "java", nil, []string{"JAVA_HOME"})
+	return j.StandardIsInstalledWithOptions(version, cfg, j.GetPath, "java", []string{"JAVA_HOME"})
 }
 
 // isVersionCompatible checks if the system Java version is compatible with the requested version
@@ -353,10 +353,7 @@ func (j *JavaTool) getJavaHomeUncached(version string, cfg config.ToolConfig) (s
 
 // findJavaExecutable recursively searches for the java executable in the given directory
 func (j *JavaTool) findJavaExecutable(dir string) (string, error) {
-	javaExeName := "java"
-	if runtime.GOOS == "windows" {
-		javaExeName = "java.exe"
-	}
+	javaExeName := j.GetBinaryName()
 
 	var foundPath string
 	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
@@ -388,25 +385,31 @@ func (j *JavaTool) findJavaExecutable(dir string) (string, error) {
 	return foundPath, nil
 }
 
+func (j *JavaTool) GetBinaryName() string {
+	return getJavaBinaryName()
+}
+
 // GetPath returns the binary path for the specified version (for PATH management)
 func (j *JavaTool) GetPath(version string, cfg config.ToolConfig) (string, error) {
 	// Use standardized path resolution with Java-specific environment variables
-	return j.StandardGetPathWithOptions(version, cfg, j.getInstalledPath, "java", nil, []string{"JAVA_HOME"})
+	return j.StandardGetPathWithOptions(version, cfg, j.getInstalledPath, "java", []string{"JAVA_HOME"})
 }
 
 // getInstalledPath returns the bin directory path for an installed Java version
 func (j *JavaTool) getInstalledPath(version string, cfg config.ToolConfig) (string, error) {
-	javaHome, err := j.GetJavaHome(version, cfg)
+	installDir := j.manager.GetToolVersionDir("java", version, "")
+	pathResolver := NewPathResolver(j.manager.GetToolsDir())
+	binDir, err := pathResolver.FindBinaryParentDir(installDir, j.GetBinaryName())
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(javaHome, "bin"), nil
+	return binDir, nil
 }
 
 // Verify checks if the installation is working correctly
 func (j *JavaTool) Verify(version string, cfg config.ToolConfig) error {
 	verifyConfig := VerificationConfig{
-		BinaryName:      "java",
+		BinaryName:      j.GetBinaryName(),
 		VersionArgs:     []string{"-version"},
 		ExpectedVersion: version,
 		DebugInfo:       true, // Java needs detailed debug info

@@ -395,6 +395,15 @@ func (s *MVXShell) executeCommandChain(chain CommandChain) error {
 	return nil
 }
 
+func expandHome(path string) string {
+	if strings.HasPrefix(path, "~/") {
+		if home, err := os.UserHomeDir(); err == nil {
+			return home + path[1:]
+		}
+	}
+	return path
+}
+
 // executeCommand executes a single command
 func (s *MVXShell) executeCommand(cmd Command) error {
 	// Create environment map for variable expansion
@@ -418,6 +427,11 @@ func (s *MVXShell) executeCommand(cmd Command) error {
 	expandedArgs := make([]string, len(cmd.Args))
 	for i, arg := range cmd.Args {
 		expandedArgs[i] = s.ExpandVariables(arg, envMap)
+	}
+
+	// Expand ~ in all arguments
+	for i, arg := range expandedArgs {
+		expandedArgs[i] = expandHome(arg)
 	}
 
 	// Create new command with expanded values

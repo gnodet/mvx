@@ -5,10 +5,7 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"regexp"
-	"runtime"
 	"strings"
 
 	"github.com/gnodet/mvx/pkg/config"
@@ -22,98 +19,23 @@ type MavenTool struct {
 	*BaseTool
 }
 
+func getMavenBinaryName() string {
+	if NewPlatformMapper().IsWindows() {
+		return "mvn.exe"
+	}
+	return "mvn"
+}
+
 // NewMavenTool creates a new Maven tool instance
 func NewMavenTool(manager *Manager) *MavenTool {
 	return &MavenTool{
-		BaseTool: NewBaseTool(manager, "maven"),
+		BaseTool: NewBaseTool(manager, "maven", getMavenBinaryName()),
 	}
 }
 
 // Name returns the tool name
 func (m *MavenTool) Name() string {
 	return "maven"
-}
-
-// getSystemMavenHome returns the system MAVEN_HOME if available and valid
-func getSystemMavenHome() (string, error) {
-	// Try MAVEN_HOME first
-	mavenHome := os.Getenv("MAVEN_HOME")
-	if mavenHome != "" {
-		mvnExe := filepath.Join(mavenHome, "bin", "mvn")
-		if runtime.GOOS == "windows" {
-			mvnExe += ".cmd"
-		}
-		if _, err := os.Stat(mvnExe); err == nil {
-			return mavenHome, nil
-		}
-	}
-
-	// Try to find mvn in PATH
-	mvnExe := "mvn"
-	if runtime.GOOS == "windows" {
-		mvnExe = "mvn.cmd"
-	}
-
-	if mvnPath, err := exec.LookPath(mvnExe); err == nil {
-		// Try to determine MAVEN_HOME from mvn path
-		// mvn is typically at $MAVEN_HOME/bin/mvn
-		binDir := filepath.Dir(mvnPath)
-		mavenHome := filepath.Dir(binDir)
-
-		// Verify this looks like a Maven installation
-		if _, err := os.Stat(filepath.Join(mavenHome, "lib")); err == nil {
-			return mavenHome, nil
-		}
-	}
-
-	return "", SystemToolError("maven", fmt.Errorf("Maven not found in MAVEN_HOME or PATH"))
-}
-
-// getSystemMavenVersion returns the version of the system Maven installation
-func getSystemMavenVersion(mavenHome string) (string, error) {
-	mvnExe := filepath.Join(mavenHome, "bin", "mvn")
-	if runtime.GOOS == "windows" {
-		mvnExe += ".cmd"
-	}
-
-	cmd := exec.Command(mvnExe, "--version")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("failed to get Maven version: %w", err)
-	}
-
-	// Parse version from output (e.g., "Apache Maven 3.9.6 (bc0240f3c744dd6b6ec2920b3cd08dcc295161ae)")
-	outputStr := string(output)
-	lines := strings.Split(outputStr, "\n")
-	if len(lines) == 0 {
-		return "", fmt.Errorf("no version output from Maven")
-	}
-
-	// Look for "Apache Maven" in the first line
-	versionLine := lines[0]
-	if strings.Contains(versionLine, "Apache Maven") {
-		parts := strings.Fields(versionLine)
-		if len(parts) >= 3 {
-			version := parts[2]
-			// Remove ANSI escape sequences (e.g., "3.6.3\x1b[m" -> "3.6.3")
-			ansiRegex := regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
-			version = ansiRegex.ReplaceAllString(version, "")
-			// Also remove any remaining bracket sequences
-			if idx := strings.Index(version, "["); idx != -1 {
-				version = version[:idx]
-			}
-			return version, nil // "Apache Maven 3.9.6" -> "3.9.6"
-		}
-	}
-
-	return "", fmt.Errorf("could not parse Maven version from: %s", versionLine)
-}
-
-// isMavenVersionCompatible checks if the system Maven version is compatible with the requested version
-func isMavenVersionCompatible(systemVersion, requestedVersion string) bool {
-	// For Maven, we can be more flexible - allow compatible versions
-	// For now, exact match, but this could be enhanced to support semantic versioning
-	return systemVersion == requestedVersion
 }
 
 // Install downloads and installs the specified Maven version
@@ -126,7 +48,7 @@ func (m *MavenTool) installWithFallback(version string, cfg config.ToolConfig) e
 	// Check if we should use system tool instead of downloading (use standardized approach)
 	if UseSystemTool("maven") {
 		// Use standardized system tool detection
-		return m.StandardInstallWithOptions(version, cfg, m.getDownloadURL, []string{"mvn.cmd"}, []string{"MAVEN_HOME"})
+		return m.StandardInstallWithOptions(version, cfg, m.getDownloadURL, []string{"MAVEN_HOME"})
 	}
 
 	// Create installation directory
@@ -171,41 +93,33 @@ func (m *MavenTool) installWithFallback(version string, cfg config.ToolConfig) e
 
 // IsInstalled checks if the specified version is installed
 func (m *MavenTool) IsInstalled(version string, cfg config.ToolConfig) bool {
-	return m.StandardIsInstalledWithOptions(version, cfg, m.GetPath, "mvn", nil, []string{"MAVEN_HOME"})
+	return m.StandardIsInstalledWithOptions(version, cfg, m.GetPath, "mvn", []string{"MAVEN_HOME"})
 }
 
 // GetPath returns the binary path for the specified version (for PATH management)
 func (m *MavenTool) GetPath(version string, cfg config.ToolConfig) (string, error) {
-	return m.StandardGetPathWithOptions(version, cfg, m.getInstalledPath, "mvn", nil, []string{"MAVEN_HOME"})
+	return m.StandardGetPathWithOptions(version, cfg, m.getInstalledPath, "mvn", []string{"MAVEN_HOME"})
+}
+
+func (m *MavenTool) GetBinaryName() string {
+	return getMavenBinaryName()
 }
 
 // getInstalledPath returns the path for an installed Maven version
 func (m *MavenTool) getInstalledPath(version string, cfg config.ToolConfig) (string, error) {
 	installDir := m.manager.GetToolVersionDir("maven", version, "")
 	pathResolver := NewPathResolver(m.manager.GetToolsDir())
-
-	// Use robust directory walking approach
-	options := DirectorySearchOptions{
-		BinSubdirectory:           "bin",
-		BinaryName:                "mvn",
-		UsePlatformExtensions:     true,
-		PreferredWindowsExtension: ".cmd", // Maven uses .cmd on Windows
-		FallbackToParent:          false,  // Maven always has bin subdirectory
-	}
-
-	binPath, err := pathResolver.FindToolBinaryPath(installDir, options)
+	binDir, err := pathResolver.FindBinaryParentDir(installDir, m.GetBinaryName())
 	if err != nil {
-		// Final fallback to default bin directory
-		return filepath.Join(installDir, "bin"), nil
+		return "", err
 	}
-
-	return binPath, nil
+	return binDir, nil
 }
 
 // Verify checks if the installation is working correctly
 func (m *MavenTool) Verify(version string, cfg config.ToolConfig) error {
 	verifyConfig := VerificationConfig{
-		BinaryName:  "mvn",
+		BinaryName:  m.GetBinaryName(),
 		VersionArgs: []string{"--version"},
 		DebugInfo:   false,
 	}
@@ -245,10 +159,7 @@ func (m *MavenTool) findJavaInDirectory(dir string) (string, error) {
 		for _, entry := range entries {
 			if entry.IsDir() {
 				subPath := filepath.Join(dir, entry.Name())
-				javaExe := filepath.Join(subPath, "bin", "java")
-				if runtime.GOOS == "windows" {
-					javaExe += ".exe"
-				}
+				javaExe := filepath.Join(subPath, "bin", getJavaBinaryName())
 				if _, err := os.Stat(javaExe); err == nil {
 					return subPath, nil
 				}
@@ -257,10 +168,7 @@ func (m *MavenTool) findJavaInDirectory(dir string) (string, error) {
 	}
 
 	// Also check if java is directly in the directory
-	javaExe := filepath.Join(dir, "bin", "java")
-	if runtime.GOOS == "windows" {
-		javaExe += ".exe"
-	}
+	javaExe := filepath.Join(dir, "bin", getJavaBinaryName())
 	if _, err := os.Stat(javaExe); err == nil {
 		return dir, nil
 	}

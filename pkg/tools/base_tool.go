@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 
@@ -64,18 +63,20 @@ type pathCacheEntry struct {
 
 // BaseTool provides common functionality for all tools
 type BaseTool struct {
-	manager   *Manager
-	toolName  string
-	pathCache map[string]pathCacheEntry
-	cacheMux  sync.RWMutex
+	manager    *Manager
+	toolName   string
+	binaryName string
+	pathCache  map[string]pathCacheEntry
+	cacheMux   sync.RWMutex
 }
 
 // NewBaseTool creates a new base tool instance
-func NewBaseTool(manager *Manager, toolName string) *BaseTool {
+func NewBaseTool(manager *Manager, toolName string, binaryName string) *BaseTool {
 	return &BaseTool{
-		manager:   manager,
-		toolName:  toolName,
-		pathCache: make(map[string]pathCacheEntry),
+		manager:    manager,
+		toolName:   toolName,
+		binaryName: binaryName,
+		pathCache:  make(map[string]pathCacheEntry),
 	}
 }
 
@@ -131,54 +132,23 @@ func (b *BaseTool) ClearPathCache() {
 
 // getPlatformBinaryPath returns the platform-specific binary path
 func (b *BaseTool) getPlatformBinaryPath(binPath, binaryName string) string {
-	return b.getPlatformBinaryPathWithExtension(binPath, binaryName, ".exe")
+	return b.getPlatformBinaryPathWithExtension(binPath, binaryName)
 }
 
 // getPlatformBinaryPathWithExtension returns the platform-specific binary path with custom extension
-func (b *BaseTool) getPlatformBinaryPathWithExtension(binPath, binaryName, windowsExt string) string {
-	platformMapper := NewPlatformMapper()
-
-	// Add platform-specific extension if needed
-	if platformMapper.IsWindows() && binaryName != "" {
-		if !strings.HasSuffix(binaryName, ".exe") && !strings.HasSuffix(binaryName, ".cmd") {
-			binaryName = binaryName + windowsExt
-		}
-	}
-
+func (b *BaseTool) getPlatformBinaryPathWithExtension(binPath, binaryName string) string {
 	return filepath.Join(binPath, binaryName)
 }
 
 // checkSystemBinaryExists checks if a system binary exists with platform-specific extensions
 func (b *BaseTool) checkSystemBinaryExists(basePath, binaryName string) (bool, string) {
-	return b.checkSystemBinaryExistsWithExtensions(basePath, binaryName, []string{".exe", ".cmd"})
-}
-
-// checkSystemBinaryExistsWithExtensions checks if a system binary exists with custom extensions
-func (b *BaseTool) checkSystemBinaryExistsWithExtensions(basePath, binaryName string, windowsExtensions []string) (bool, string) {
-	platformMapper := NewPlatformMapper()
-
 	// Try the exact binary name first
 	fullPath := filepath.Join(basePath, binaryName)
 	if _, err := os.Stat(fullPath); err == nil {
 		return true, fullPath
 	}
 
-	// On Windows, try specified extensions
-	if platformMapper.IsWindows() && !strings.HasSuffix(binaryName, ".exe") && !strings.HasSuffix(binaryName, ".cmd") {
-		for _, ext := range windowsExtensions {
-			extPath := fullPath + ext
-			if _, err := os.Stat(extPath); err == nil {
-				return true, extPath
-			}
-		}
-	}
-
 	return false, ""
-}
-
-// wrapError wraps an error with tool context using standardized error types
-func (b *BaseTool) wrapError(operation, version string, err error) error {
-	return WrapError(b.toolName, version, operation, err)
 }
 
 // CreateInstallDir creates the installation directory for a tool version
@@ -233,7 +203,7 @@ func (b *BaseTool) Extract(archivePath, destDir string, options DownloadOptions)
 
 // VerificationConfig contains configuration for tool verification
 type VerificationConfig struct {
-	BinaryName      string   // Primary binary name to verify
+	BinaryName      string   // Binary name to verify
 	VersionArgs     []string // Arguments to get version (e.g., ["--version"])
 	ExpectedVersion string   // Expected version string in output
 	DebugInfo       bool     // Whether to show debug information on failure
@@ -262,29 +232,25 @@ func (b *BaseTool) Verify(installDir, version string, cfg config.ToolConfig) err
 // VerifyWithConfig performs comprehensive verification using configuration
 func (b *BaseTool) VerifyWithConfig(version string, cfg config.ToolConfig, verifyConfig VerificationConfig) error {
 	// Get tool path
-	tool, err := b.manager.GetTool(b.toolName)
+	_, err := b.manager.GetTool(b.toolName)
 	if err != nil {
 		return VerifyError(b.toolName, version, fmt.Errorf("failed to get tool: %w", err))
 	}
 
-	// Get path using tool's GetPath method
-	var binPath string
-	if pathProvider, hasGetPath := tool.(interface {
-		GetPath(string, config.ToolConfig) (string, error)
-	}); hasGetPath {
-		binPath, err = pathProvider.GetPath(version, cfg)
-		if err != nil {
-			if verifyConfig.DebugInfo {
-				b.printVerificationDebugInfo(version, cfg, err)
-			}
-			return VerifyError(b.toolName, version, fmt.Errorf("failed to get binary path: %w", err))
+	// Use FindBinaryParentDir to locate the binary directory
+	installDir := b.manager.GetToolVersionDir(b.toolName, version, cfg.Distribution)
+	binaryName := verifyConfig.BinaryName
+	pathResolver := NewPathResolver(b.manager.GetToolsDir())
+	binDir, err := pathResolver.FindBinaryParentDir(installDir, binaryName)
+	if err != nil {
+		if verifyConfig.DebugInfo {
+			b.printVerificationDebugInfo(version, cfg, err)
 		}
-	} else {
-		return VerifyError(b.toolName, version, fmt.Errorf("tool does not implement GetPath method"))
+		return VerifyError(b.toolName, version, fmt.Errorf("failed to get binary path: %w", err))
 	}
 
 	// Verify binary exists and works
-	if err := b.VerifyBinaryWithConfig(binPath, verifyConfig); err != nil {
+	if err := b.VerifyBinaryWithConfig(binDir, verifyConfig); err != nil {
 		return VerifyError(b.toolName, version, err)
 	}
 
@@ -460,11 +426,11 @@ func (b *BaseTool) getDownloadOptions() DownloadOptions {
 
 // StandardInstall provides a standard installation flow for most tools
 func (b *BaseTool) StandardInstall(version string, cfg config.ToolConfig, getDownloadURL func(string) string) error {
-	return b.StandardInstallWithOptions(version, cfg, getDownloadURL, nil, nil)
+	return b.StandardInstallWithOptions(version, cfg, getDownloadURL, nil)
 }
 
 // StandardInstallWithOptions provides a standard installation flow with system tool support
-func (b *BaseTool) StandardInstallWithOptions(version string, cfg config.ToolConfig, getDownloadURL func(string) string, alternativeNames []string, envVars []string) error {
+func (b *BaseTool) StandardInstallWithOptions(version string, cfg config.ToolConfig, getDownloadURL func(string) string, envVars []string) error {
 	// Check if we should use system tool instead of downloading
 	if UseSystemTool(b.toolName) {
 		logVerbose("%s=true, forcing use of system %s", getSystemToolEnvVar(b.toolName), b.toolName)
@@ -474,7 +440,7 @@ func (b *BaseTool) StandardInstallWithOptions(version string, cfg config.ToolCon
 			if envValue := os.Getenv(envVar); envValue != "" {
 				// Verify the tool exists in this environment path
 				binPath := filepath.Join(envValue, "bin")
-				if exists, _ := b.checkSystemBinaryExists(binPath, b.toolName); exists {
+				if exists, _ := b.checkSystemBinaryExists(binPath, b.binaryName); exists {
 					fmt.Printf("  🔗 Using system %s from %s: %s\n", b.toolName, envVar, envValue)
 					fmt.Printf("  ✅ System %s configured (mvx will use system PATH)\n", b.toolName)
 					return nil
@@ -483,19 +449,10 @@ func (b *BaseTool) StandardInstallWithOptions(version string, cfg config.ToolCon
 		}
 
 		// Try primary binary name in PATH
-		if toolPath, err := exec.LookPath(b.toolName); err == nil {
+		if toolPath, err := exec.LookPath(b.binaryName); err == nil {
 			fmt.Printf("  🔗 Using system %s from PATH: %s\n", b.toolName, toolPath)
 			fmt.Printf("  ✅ System %s configured (mvx will use system PATH)\n", b.toolName)
 			return nil
-		}
-
-		// Try alternative binary names in PATH
-		for _, altName := range alternativeNames {
-			if toolPath, err := exec.LookPath(altName); err == nil {
-				fmt.Printf("  🔗 Using system %s from PATH as %s: %s\n", b.toolName, altName, toolPath)
-				fmt.Printf("  ✅ System %s configured (mvx will use system PATH)\n", b.toolName)
-				return nil
-			}
 		}
 
 		return fmt.Errorf("MVX_USE_SYSTEM_%s=true but system %s not available", strings.ToUpper(b.toolName), b.toolName)
@@ -537,9 +494,9 @@ func (b *BaseTool) StandardInstallWithOptions(version string, cfg config.ToolCon
 				// Installation verification failed, clean up the installation directory
 				fmt.Printf("  ❌ %s installation verification failed: %v\n", b.toolName, err)
 				fmt.Printf("  🧹 Cleaning up failed installation directory...\n")
-				if removeErr := os.RemoveAll(installDir); removeErr != nil {
-					fmt.Printf("  ⚠️  Warning: failed to clean up installation directory: %v\n", removeErr)
-				}
+				// if removeErr := os.RemoveAll(installDir); removeErr != nil {
+				// 	fmt.Printf("  ⚠️  Warning: failed to clean up installation directory: %v\n", removeErr)
+				// }
 				return InstallError(b.toolName, version, fmt.Errorf("installation verification failed: %w", err))
 			}
 			fmt.Printf("  ✅ %s %s installation verification successful\n", b.toolName, version)
@@ -568,16 +525,16 @@ func (b *BaseTool) StandardVerifyWithConfig(version string, cfg config.ToolConfi
 
 // StandardIsInstalled provides standard installation check for tools
 func (b *BaseTool) StandardIsInstalled(version string, cfg config.ToolConfig, getPath func(string, config.ToolConfig) (string, error), binaryName string) bool {
-	return b.StandardIsInstalledWithAlternatives(version, cfg, getPath, binaryName, nil)
+	return b.StandardIsInstalledWithAlternatives(version, cfg, getPath, binaryName)
 }
 
 // StandardIsInstalledWithAlternatives provides standard installation check for tools with alternative binary names
-func (b *BaseTool) StandardIsInstalledWithAlternatives(version string, cfg config.ToolConfig, getPath func(string, config.ToolConfig) (string, error), binaryName string, alternativeNames []string) bool {
-	return b.StandardIsInstalledWithOptions(version, cfg, getPath, binaryName, alternativeNames, nil)
+func (b *BaseTool) StandardIsInstalledWithAlternatives(version string, cfg config.ToolConfig, getPath func(string, config.ToolConfig) (string, error), binaryName string) bool {
+	return b.StandardIsInstalledWithOptions(version, cfg, getPath, binaryName, nil)
 }
 
 // StandardIsInstalledWithOptions provides standard installation check for tools with full customization options
-func (b *BaseTool) StandardIsInstalledWithOptions(version string, cfg config.ToolConfig, getPath func(string, config.ToolConfig) (string, error), binaryName string, alternativeNames []string, envVars []string) bool {
+func (b *BaseTool) StandardIsInstalledWithOptions(version string, cfg config.ToolConfig, getPath func(string, config.ToolConfig) (string, error), binaryName string, envVars []string) bool {
 	// Check if we should use system tool instead of mvx-managed tool
 	if UseSystemTool(b.toolName) {
 		// Try environment variables first (for tools like Maven that need MAVEN_HOME)
@@ -585,16 +542,6 @@ func (b *BaseTool) StandardIsInstalledWithOptions(version string, cfg config.Too
 			if envValue := os.Getenv(envVar); envValue != "" {
 				// Verify the tool exists in this environment path
 				toolPath := filepath.Join(envValue, "bin", binaryName)
-				if runtime.GOOS == "windows" && !strings.HasSuffix(binaryName, ".exe") && !strings.HasSuffix(binaryName, ".cmd") {
-					if _, err := os.Stat(toolPath + ".cmd"); err == nil {
-						logVerbose("System %s found via %s=%s (MVX_USE_SYSTEM_%s=true)", b.toolName, envVar, envValue, strings.ToUpper(b.toolName))
-						return true
-					}
-					if _, err := os.Stat(toolPath + ".exe"); err == nil {
-						logVerbose("System %s found via %s=%s (MVX_USE_SYSTEM_%s=true)", b.toolName, envVar, envValue, strings.ToUpper(b.toolName))
-						return true
-					}
-				}
 				if _, err := os.Stat(toolPath); err == nil {
 					logVerbose("System %s found via %s=%s (MVX_USE_SYSTEM_%s=true)", b.toolName, envVar, envValue, strings.ToUpper(b.toolName))
 					return true
@@ -606,14 +553,6 @@ func (b *BaseTool) StandardIsInstalledWithOptions(version string, cfg config.Too
 		if _, err := exec.LookPath(binaryName); err == nil {
 			logVerbose("System %s is available in PATH (MVX_USE_SYSTEM_%s=true)", b.toolName, strings.ToUpper(b.toolName))
 			return true
-		}
-
-		// Try alternative binary names in PATH
-		for _, altName := range alternativeNames {
-			if _, err := exec.LookPath(altName); err == nil {
-				logVerbose("System %s is available in PATH as %s (MVX_USE_SYSTEM_%s=true)", b.toolName, altName, strings.ToUpper(b.toolName))
-				return true
-			}
 		}
 
 		logVerbose("System %s not available: not found in environment variables or PATH", b.toolName)
@@ -629,11 +568,11 @@ func (b *BaseTool) StandardIsInstalledWithOptions(version string, cfg config.Too
 
 // StandardGetPath provides standard path resolution with system tool support
 func (b *BaseTool) StandardGetPath(version string, cfg config.ToolConfig, getInstalledPath func(string, config.ToolConfig) (string, error), binaryName string) (string, error) {
-	return b.StandardGetPathWithOptions(version, cfg, getInstalledPath, binaryName, nil, nil)
+	return b.StandardGetPathWithOptions(version, cfg, getInstalledPath, binaryName, nil)
 }
 
 // StandardGetPathWithOptions provides standard path resolution with system tool support and options
-func (b *BaseTool) StandardGetPathWithOptions(version string, cfg config.ToolConfig, getInstalledPath func(string, config.ToolConfig) (string, error), binaryName string, alternativeNames []string, envVars []string) (string, error) {
+func (b *BaseTool) StandardGetPathWithOptions(version string, cfg config.ToolConfig, getInstalledPath func(string, config.ToolConfig) (string, error), binaryName string, envVars []string) (string, error) {
 	// Check cache first
 	cacheKey := b.getCacheKey(version, cfg, "getPath")
 	if cachedPath, cachedErr, found := b.getCachedPath(cacheKey); found {
@@ -646,18 +585,6 @@ func (b *BaseTool) StandardGetPathWithOptions(version string, cfg config.ToolCon
 			if envValue := os.Getenv(envVar); envValue != "" {
 				// Verify the tool exists in this environment path
 				toolPath := filepath.Join(envValue, "bin", binaryName)
-				if runtime.GOOS == "windows" && !strings.HasSuffix(binaryName, ".exe") && !strings.HasSuffix(binaryName, ".cmd") {
-					if _, err := os.Stat(toolPath + ".cmd"); err == nil {
-						logVerbose("Using system %s from %s (MVX_USE_SYSTEM_%s=true)", b.toolName, envVar, strings.ToUpper(b.toolName))
-						b.setCachedPath(cacheKey, "", nil)
-						return "", nil
-					}
-					if _, err := os.Stat(toolPath + ".exe"); err == nil {
-						logVerbose("Using system %s from %s (MVX_USE_SYSTEM_%s=true)", b.toolName, envVar, strings.ToUpper(b.toolName))
-						b.setCachedPath(cacheKey, "", nil)
-						return "", nil
-					}
-				}
 				if _, err := os.Stat(toolPath); err == nil {
 					logVerbose("Using system %s from %s (MVX_USE_SYSTEM_%s=true)", b.toolName, envVar, strings.ToUpper(b.toolName))
 					b.setCachedPath(cacheKey, "", nil)
@@ -671,15 +598,6 @@ func (b *BaseTool) StandardGetPathWithOptions(version string, cfg config.ToolCon
 			logVerbose("Using system %s from PATH (MVX_USE_SYSTEM_%s=true)", b.toolName, strings.ToUpper(b.toolName))
 			b.setCachedPath(cacheKey, "", nil)
 			return "", nil
-		}
-
-		// Try alternative binary names in PATH
-		for _, altName := range alternativeNames {
-			if _, err := exec.LookPath(altName); err == nil {
-				logVerbose("Using system %s from PATH as %s (MVX_USE_SYSTEM_%s=true)", b.toolName, altName, strings.ToUpper(b.toolName))
-				b.setCachedPath(cacheKey, "", nil)
-				return "", nil
-			}
 		}
 
 		systemErr := SystemToolError(b.toolName, fmt.Errorf("MVX_USE_SYSTEM_%s=true but system %s not available", strings.ToUpper(b.toolName), b.toolName))
