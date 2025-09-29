@@ -163,9 +163,10 @@ func (j *JavaTool) installWithDistribution(version string, cfg config.ToolConfig
 		if checksumInfo, err := j.getChecksumFromDiscoAPI(packageID); err == nil {
 			// Add checksum to configuration for download verification
 			configWithChecksum.Checksum = &config.ChecksumConfig{
-				Type:  string(checksumInfo.Type),
-				Value: checksumInfo.Value,
-				URL:   checksumInfo.URL,
+				Type:     string(checksumInfo.Type),
+				Value:    checksumInfo.Value,
+				URL:      checksumInfo.URL,
+				Filename: checksumInfo.Filename,
 			}
 			logVerbose("Added checksum to configuration: %s", checksumInfo.Value)
 		} else {
@@ -695,9 +696,6 @@ func (j *JavaTool) getChecksumFromDiscoAPI(packageID string) (ChecksumInfo, erro
 	}
 
 	pkg := packageInfo.Result[0]
-	if pkg.Checksum == "" {
-		return ChecksumInfo{}, fmt.Errorf("no checksum available for package")
-	}
 
 	// Convert checksum type to our enum
 	var checksumType ChecksumType
@@ -710,12 +708,19 @@ func (j *JavaTool) getChecksumFromDiscoAPI(packageID string) (ChecksumInfo, erro
 		checksumType = SHA256 // Default fallback
 	}
 
-	logVerbose("Found checksum: %s (%s)", pkg.Checksum, pkg.ChecksumType)
+	if pkg.Checksum != "" {
+		logVerbose("Found checksum: %s (%s)", pkg.Checksum, pkg.ChecksumType)
+	} else if pkg.ChecksumURI != "" {
+		logVerbose("Found checksum URI: %s (%s)", pkg.ChecksumURI, pkg.Filename)
+	} else {
+		return ChecksumInfo{}, fmt.Errorf("no checksum available for package")
+	}
 
 	return ChecksumInfo{
-		Type:  checksumType,
-		Value: pkg.Checksum,
-		URL:   pkg.ChecksumURI,
+		Type:     checksumType,
+		Value:    pkg.Checksum,
+		URL:      pkg.ChecksumURI,
+		Filename: pkg.Filename,
 	}, nil
 }
 

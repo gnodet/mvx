@@ -359,12 +359,7 @@ func (b *BaseTool) printVerificationDebugInfo(version string, cfg config.ToolCon
 	fmt.Printf("  🔍 Debug: %s installation verification failed\n", b.toolName)
 
 	// Try to determine install directory
-	installDir := ""
-	if cfg.Distribution != "" {
-		installDir = b.manager.GetToolVersionDir(b.toolName, version, cfg.Distribution)
-	} else {
-		installDir = b.manager.GetToolVersionDir(b.toolName, version, "")
-	}
+	installDir := b.manager.GetToolVersionDir(b.toolName, version, cfg.Distribution)
 
 	fmt.Printf("     Install directory: %s\n", installDir)
 	fmt.Printf("     Error getting bin path: %v\n", pathErr)
