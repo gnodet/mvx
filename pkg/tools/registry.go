@@ -118,7 +118,7 @@ func (r *ToolRegistry) getDiscoVersions(distribution string) ([]string, error) {
 	}
 
 	// Get major versions available for this distribution
-	url := fmt.Sprintf("https://api.foojay.io/disco/v3.0/major_versions?distribution=%s&maintained=true", distribution)
+	url := fmt.Sprintf(FoojayDiscoAPIBase+"/major_versions?distribution=%s&maintained=true", distribution)
 	resp, err := r.httpClient.Get(url)
 	if err != nil {
 		// Fallback to known versions if API is unavailable

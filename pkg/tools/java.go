@@ -489,7 +489,7 @@ func (j *JavaTool) tryDiscoDistribution(version, distribution, osName, arch, rel
 // tryDiscoDistributionWithChecksum attempts to get download URL and package ID from a specific distribution
 func (j *JavaTool) tryDiscoDistributionWithChecksum(version, distribution, osName, arch, releaseStatus string) (DiscoveryResult, error) {
 	// Build Disco API URL for package search
-	url := fmt.Sprintf("https://api.foojay.io/disco/v3.0/packages?version=%s&distribution=%s&operating_system=%s&architecture=%s&package_type=jdk&release_status=%s&latest=available",
+	url := fmt.Sprintf(FoojayDiscoAPIBase+"/packages?version=%s&distribution=%s&operating_system=%s&architecture=%s&package_type=jdk&release_status=%s&latest=available",
 		version, distribution, osName, arch, releaseStatus)
 
 	// Add verbose logging for debugging
@@ -659,7 +659,7 @@ func (j *JavaTool) getChecksumFromDiscoAPI(packageID string) (ChecksumInfo, erro
 	}
 
 	// Build package info URL
-	url := fmt.Sprintf("https://api.foojay.io/disco/v3.0/ids/%s", packageID)
+	url := fmt.Sprintf(FoojayDiscoAPIBase+"/ids/%s", packageID)
 
 	logVerbose("Fetching checksum from Disco API: %s", url)
 
