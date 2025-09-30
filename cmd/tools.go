@@ -152,21 +152,21 @@ func listTools() error {
 	}
 
 	printInfo("Usage:")
-	printInfo("  mvx tools search java        # Search Java versions")
-	printInfo("  mvx tools search maven       # Search Maven versions")
-	printInfo("  mvx tools search mvnd        # Search Maven Daemon versions")
-	printInfo("  mvx tools search node        # Search Node.js versions")
-	printInfo("  mvx tools search go          # Search Go versions")
+	printInfo("  mvx tools search java           # Search Java versions")
+	printInfo("  mvx tools search maven          # Search Maven versions")
+	printInfo("  mvx tools search mvnd           # Search Maven Daemon versions")
+	printInfo("  mvx tools search node           # Search Node.js versions")
+	printInfo("  mvx tools search go             # Search Go versions")
 
-	printInfo("  mvx tools info java          # Show Java details")
+	printInfo("  mvx tools info java             # Show Java details")
 	printInfo("")
 	printInfo("Add tools to your project:")
-	printInfo("  mvx tools add java 21        # Add Java 21 (Temurin)")
-	printInfo("  mvx tools add java 17 zulu   # Add Java 17 (Azul Zulu)")
+	printInfo("  mvx tools add java 21           # Add Java 21 (Temurin)")
+	printInfo("  mvx tools add java 17 zulu      # Add Java 17 (Azul Zulu)")
 	printInfo("  mvx tools add maven 4.0.0-rc-4  # Add Maven 4.0.0-rc-4")
-	printInfo("  mvx tools add node lts       # Add Node.js LTS")
+	printInfo("  mvx tools add node lts          # Add Node.js LTS")
 
-	printInfo("  mvx tools add go 1.23.1      # Add Go 1.23.1")
+	printInfo("  mvx tools add go 1.23.1         # Add Go 1.23.1")
 
 	return nil
 }
