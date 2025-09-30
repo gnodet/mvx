@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -17,6 +18,20 @@ import (
 
 // Compile-time interface validation
 var _ Tool = (*JavaTool)(nil)
+
+// JavaDistribution represents a Java distribution
+type JavaDistribution struct {
+	Name        string
+	DisplayName string
+}
+
+// DiscoDistribution represents a Java distribution from Disco API
+type DiscoDistribution struct {
+	APIParameter string `json:"api_parameter"`
+	Name         string `json:"name"`
+	Maintained   bool   `json:"maintained"`
+	Available    bool   `json:"available"`
+}
 
 // getSystemJavaHome returns the system JAVA_HOME if available and valid
 func getSystemJavaHome() (string, error) {
@@ -408,21 +423,122 @@ func (j *JavaTool) Verify(version string, cfg config.ToolConfig) error {
 
 // ListVersions returns available versions for installation using Disco API
 func (j *JavaTool) ListVersions() ([]string, error) {
-	// Use the registry to get versions from Disco API
-	registry := j.manager.GetRegistry()
-	return registry.GetJavaVersions("temurin") // Default to Temurin
+	return j.getDiscoVersions("temurin") // Default to Temurin
 }
 
 // GetDistributions returns available Java distributions
 func (j *JavaTool) GetDistributions() []JavaDistribution {
+	// Try to get distributions from Disco API
+	if distributions, err := j.getDiscoDistributions(); err == nil {
+		return distributions
+	}
+
+	// Fallback to known distributions
+	return []JavaDistribution{
+		{
+			Name:        "temurin",
+			DisplayName: "Eclipse Temurin (OpenJDK)",
+		},
+		{
+			Name:        "graalvm_ce",
+			DisplayName: "GraalVM Community Edition",
+		},
+		{
+			Name:        "oracle",
+			DisplayName: "Oracle JDK",
+		},
+		{
+			Name:        "corretto",
+			DisplayName: "Amazon Corretto",
+		},
+		{
+			Name:        "liberica",
+			DisplayName: "BellSoft Liberica",
+		},
+		{
+			Name:        "zulu",
+			DisplayName: "Azul Zulu",
+		},
+		{
+			Name:        "microsoft",
+			DisplayName: "Microsoft Build of OpenJDK",
+		},
+	}
+}
+
+// getDiscoDistributions fetches available distributions from Disco API
+func (j *JavaTool) getDiscoDistributions() ([]JavaDistribution, error) {
 	registry := j.manager.GetRegistry()
-	return registry.GetJavaDistributions()
+	resp, err := registry.GetHTTPClient().Get(FoojayDiscoAPIBase + "/distributions")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var discoDistributions []DiscoDistribution
+	if err := json.NewDecoder(resp.Body).Decode(&discoDistributions); err != nil {
+		return nil, err
+	}
+
+	var distributions []JavaDistribution
+	for _, dist := range discoDistributions {
+		if dist.Available && dist.Maintained {
+			distributions = append(distributions, JavaDistribution{
+				Name:        dist.APIParameter,
+				DisplayName: dist.Name,
+			})
+		}
+	}
+
+	return distributions, nil
 }
 
 // GetVersionsForDistribution returns available versions for a specific distribution
 func (j *JavaTool) GetVersionsForDistribution(distribution string) ([]string, error) {
+	return j.getDiscoVersions(distribution)
+}
+
+// getDiscoVersions fetches available versions for a distribution from Disco API
+func (j *JavaTool) getDiscoVersions(distribution string) ([]string, error) {
+	if distribution == "" {
+		distribution = "temurin" // Default to Temurin
+	}
+
 	registry := j.manager.GetRegistry()
-	return registry.GetJavaVersions(distribution)
+	// Get major versions available for this distribution
+	url := fmt.Sprintf(FoojayDiscoAPIBase+"/major_versions?distribution=%s&maintained=true", distribution)
+	resp, err := registry.GetHTTPClient().Get(url)
+	if err != nil {
+		// Fallback to known versions if API is unavailable
+		return []string{"8", "11", "17", "21", "22", "23", "24", "25"}, nil
+	}
+	defer resp.Body.Close()
+
+	var majorVersions []struct {
+		MajorVersion int  `json:"major_version"`
+		Maintained   bool `json:"maintained"`
+		EarlyAccess  bool `json:"early_access"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&majorVersions); err != nil {
+		return []string{"8", "11", "17", "21", "22", "23", "24", "25"}, nil
+	}
+
+	var versions []string
+	for _, mv := range majorVersions {
+		if mv.EarlyAccess {
+			versions = append(versions, fmt.Sprintf("%d-ea", mv.MajorVersion))
+		} else {
+			versions = append(versions, fmt.Sprintf("%d", mv.MajorVersion))
+		}
+	}
+
+	// Sort in descending order (newest first)
+	sort.Slice(versions, func(i, j int) bool {
+		return versions[i] > versions[j]
+	})
+
+	return versions, nil
 }
 
 // GetDownloadOptions returns download options specific to Java
@@ -761,8 +877,7 @@ func (j *JavaTool) ResolveVersion(versionSpec, distribution string) (string, err
 		distribution = "temurin" // Default distribution
 	}
 
-	registry := j.manager.GetRegistry()
-	availableVersions, err := registry.GetJavaVersions(distribution)
+	availableVersions, err := j.getDiscoVersions(distribution)
 	if err != nil {
 		return "", err
 	}
