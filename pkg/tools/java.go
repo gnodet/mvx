@@ -16,7 +16,6 @@ import (
 
 // Compile-time interface validation
 var _ Tool = (*JavaTool)(nil)
-var _ ChecksumProvider = (*JavaTool)(nil)
 
 // getSystemJavaHome returns the system JAVA_HOME if available and valid
 func getSystemJavaHome() (string, error) {
