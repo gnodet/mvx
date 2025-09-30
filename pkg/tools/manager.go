@@ -795,8 +795,11 @@ func (m *Manager) resolveVersionInternal(toolName string, toolConfig config.Tool
 
 	// Check cache first
 	if cached, found := m.getCachedVersion(toolName, toolConfig.Version, distribution); found {
+		logVerbose("Using cached version resolution: %s %s (%s) -> %s", toolName, toolConfig.Version, distribution, cached)
 		return cached, nil
 	}
+
+	logVerbose("Resolving version online: %s %s (%s)", toolName, toolConfig.Version, distribution)
 
 	// Get the tool instance
 	tool, err := m.GetTool(toolName)
@@ -815,6 +818,8 @@ func (m *Manager) resolveVersionInternal(toolName string, toolConfig config.Tool
 		// Fallback: return version as-is for tools that don't implement VersionResolver
 		resolved = toolConfig.Version
 	}
+
+	logVerbose("Resolved %s %s (%s) -> %s (caching for 24h)", toolName, toolConfig.Version, distribution, resolved)
 
 	// Cache the resolved version
 	m.setCachedVersion(toolName, toolConfig.Version, distribution, resolved)
