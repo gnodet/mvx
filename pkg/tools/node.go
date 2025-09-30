@@ -85,10 +85,6 @@ func (n *NodeTool) ListVersions() ([]string, error) {
 func (n *NodeTool) GetDownloadOptions() DownloadOptions {
 	return DownloadOptions{
 		FileExtension: ExtTarXz,
-		ExpectedType:  "application",
-		MinSize:       1 * 1024 * 1024,   // 1MB (very permissive, rely on checksums)
-		MaxSize:       200 * 1024 * 1024, // 200MB (generous upper bound)
-		ArchiveType:   ArchiveTypeTarXz,
 	}
 }
 

@@ -87,10 +87,6 @@ func (g *GoTool) ListVersions() ([]string, error) {
 func (g *GoTool) GetDownloadOptions() DownloadOptions {
 	return DownloadOptions{
 		FileExtension: ExtTarGz,
-		ExpectedType:  "application",
-		MinSize:       50 * 1024 * 1024,  // 50MB
-		MaxSize:       200 * 1024 * 1024, // 200MB
-		ArchiveType:   ArchiveTypeTarGz,
 	}
 }
 

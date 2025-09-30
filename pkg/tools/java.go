@@ -416,10 +416,6 @@ func (j *JavaTool) ListVersions() ([]string, error) {
 func (j *JavaTool) GetDownloadOptions() DownloadOptions {
 	return DownloadOptions{
 		FileExtension: ExtTarGz,
-		ExpectedType:  "application",
-		MinSize:       10 * 1024 * 1024,  // 10MB (very permissive, rely on checksums)
-		MaxSize:       800 * 1024 * 1024, // 800MB (generous upper bound)
-		ArchiveType:   ArchiveTypeTarGz,
 	}
 }
 

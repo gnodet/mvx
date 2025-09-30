@@ -174,9 +174,7 @@ func (b *BaseTool) Download(url, version string, cfg config.ToolConfig, options 
 
 	// Configure robust download with checksum verification
 	downloadConfig := DefaultDownloadConfig(url, tmpFile.Name())
-	downloadConfig.ExpectedType = options.ExpectedType
-	downloadConfig.MinSize = options.MinSize
-	downloadConfig.MaxSize = options.MaxSize
+	// Note: MinSize/MaxSize/ExpectedType removed - we rely on checksums for validation
 	downloadConfig.ToolName = b.toolName
 	downloadConfig.Version = version
 	downloadConfig.Config = cfg
@@ -204,7 +202,7 @@ func (b *BaseTool) Download(url, version string, cfg config.ToolConfig, options 
 
 // Extract extracts an archive file to the destination directory
 func (b *BaseTool) Extract(archivePath, destDir string, options DownloadOptions) error {
-	return b.extractFile(archivePath, destDir, options.ArchiveType)
+	return b.extractFile(archivePath, destDir, options.GetArchiveType())
 }
 
 // VerificationConfig contains configuration for tool verification
@@ -279,11 +277,28 @@ func (b *BaseTool) DownloadAndExtract(url, destDir, version string, cfg config.T
 
 // DownloadOptions contains options for downloading and extracting files
 type DownloadOptions struct {
-	FileExtension string // e.g., ".tar.gz", ".zip"
-	ExpectedType  string // e.g., "application"
-	MinSize       int64  // Minimum expected file size
-	MaxSize       int64  // Maximum expected file size
-	ArchiveType   string // "tar.gz", "zip", "tar.xz"
+	FileExtension string // e.g., ".tar.gz", ".zip" - used to infer archive type
+}
+
+// GetArchiveType infers the archive type from the file extension
+func (o DownloadOptions) GetArchiveType() string {
+	ext := o.FileExtension
+	// Normalize extension
+	if !strings.HasPrefix(ext, ".") {
+		ext = "." + ext
+	}
+
+	switch ext {
+	case ".zip":
+		return ArchiveTypeZip
+	case ".tar.gz", ".tgz":
+		return ArchiveTypeTarGz
+	case ".tar.xz":
+		return ArchiveTypeTarXz
+	default:
+		// Default to tar.gz for unknown extensions
+		return ArchiveTypeTarGz
+	}
 }
 
 // extractFile extracts an archive file based on its type
@@ -390,10 +405,6 @@ func (b *BaseTool) PrintDownloadMessage(version string) {
 func (b *BaseTool) GetDefaultDownloadOptions() DownloadOptions {
 	return DownloadOptions{
 		FileExtension: ExtTarGz,
-		ExpectedType:  "application",
-		MinSize:       100 * 1024,        // 100KB (very permissive, rely on checksums)
-		MaxSize:       500 * 1024 * 1024, // 500MB (generous upper bound)
-		ArchiveType:   ArchiveTypeTarGz,
 	}
 }
 

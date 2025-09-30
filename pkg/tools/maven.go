@@ -123,10 +123,6 @@ func (m *MavenTool) ListVersions() ([]string, error) {
 func (m *MavenTool) GetDownloadOptions() DownloadOptions {
 	return DownloadOptions{
 		FileExtension: ExtZip,
-		ExpectedType:  "application",
-		MinSize:       5 * 1024 * 1024,   // 5MB
-		MaxSize:       100 * 1024 * 1024, // 100MB
-		ArchiveType:   ArchiveTypeZip,
 	}
 }
 
@@ -262,9 +258,7 @@ func (m *MavenTool) downloadWithAlternatingURLs(primaryURL, archiveURL, version 
 		// Create download config with reduced retries per URL
 		downloadConfig := DefaultDownloadConfig(currentURL.url, "")
 		downloadConfig.MaxRetries = retriesPerURL
-		downloadConfig.ExpectedType = options.ExpectedType
-		downloadConfig.MinSize = options.MinSize
-		downloadConfig.MaxSize = options.MaxSize
+		// Note: MinSize/MaxSize/ExpectedType removed - we rely on checksums for validation
 		downloadConfig.ToolName = m.toolName
 		downloadConfig.Version = version
 		downloadConfig.Config = cfg

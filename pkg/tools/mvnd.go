@@ -87,10 +87,6 @@ func (m *MvndTool) ListVersions() ([]string, error) {
 func (m *MvndTool) GetDownloadOptions() DownloadOptions {
 	return DownloadOptions{
 		FileExtension: ".zip",
-		ExpectedType:  "application",
-		MinSize:       5 * 1024 * 1024,   // 5MB
-		MaxSize:       100 * 1024 * 1024, // 100MB
-		ArchiveType:   "zip",
 	}
 }
 
@@ -279,9 +275,7 @@ func (m *MvndTool) downloadWithAlternatingURLs(primaryURL, archiveURL, version s
 		// Create download config with reduced retries per URL
 		downloadConfig := DefaultDownloadConfig(currentURL.url, "")
 		downloadConfig.MaxRetries = retriesPerURL
-		downloadConfig.ExpectedType = options.ExpectedType
-		downloadConfig.MinSize = options.MinSize
-		downloadConfig.MaxSize = options.MaxSize
+		// Note: MinSize/MaxSize/ExpectedType removed - we rely on checksums for validation
 		downloadConfig.ToolName = "mvnd"
 		downloadConfig.Version = version
 		downloadConfig.Config = cfg
