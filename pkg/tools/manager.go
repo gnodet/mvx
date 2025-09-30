@@ -22,14 +22,13 @@ type VersionCacheEntry struct {
 
 // Manager handles tool installation and management
 type Manager struct {
-	cacheDir         string
-	tools            map[string]Tool
-	registry         *ToolRegistry
-	checksumRegistry *ChecksumRegistry
-	versionCache     map[string]VersionCacheEntry
-	installedCache   map[string]bool   // Cache for IsInstalled checks
-	pathCache        map[string]string // Cache for GetPath results
-	cacheMutex       sync.RWMutex
+	cacheDir       string
+	tools          map[string]Tool
+	registry       *ToolRegistry
+	versionCache   map[string]VersionCacheEntry
+	installedCache map[string]bool   // Cache for IsInstalled checks
+	pathCache      map[string]string // Cache for GetPath results
+	cacheMutex     sync.RWMutex
 }
 
 var (
@@ -72,6 +71,9 @@ type Tool interface {
 
 	// Checksum generation method
 	GetChecksum(version, filename string) (ChecksumInfo, error)
+
+	// SupportsChecksumVerification returns whether this tool supports checksum verification
+	SupportsChecksumVerification() bool
 
 	// GetBinaryName returns the binary name for the tool
 	GetBinaryName() string
@@ -118,13 +120,12 @@ func NewManager() (*Manager, error) {
 	}
 
 	manager := &Manager{
-		cacheDir:         cacheDir,
-		tools:            make(map[string]Tool),
-		registry:         NewToolRegistry(),
-		checksumRegistry: NewChecksumRegistry(),
-		versionCache:     make(map[string]VersionCacheEntry),
-		installedCache:   make(map[string]bool),
-		pathCache:        make(map[string]string),
+		cacheDir:       cacheDir,
+		tools:          make(map[string]Tool),
+		registry:       NewToolRegistry(),
+		versionCache:   make(map[string]VersionCacheEntry),
+		installedCache: make(map[string]bool),
+		pathCache:      make(map[string]string),
 	}
 
 	// Load version cache from disk
@@ -795,11 +796,6 @@ func (m *Manager) isConcreteVersion(toolName, versionSpec string) bool {
 // GetRegistry returns the tool registry
 func (m *Manager) GetRegistry() *ToolRegistry {
 	return m.registry
-}
-
-// GetChecksumRegistry returns the checksum registry
-func (m *Manager) GetChecksumRegistry() *ChecksumRegistry {
-	return m.checksumRegistry
 }
 
 // loadVersionCache loads the version resolution cache from disk

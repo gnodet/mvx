@@ -96,6 +96,12 @@ func (b *BaseTool) GetBinaryName() string {
 	return b.binaryName
 }
 
+// SupportsChecksumVerification returns whether this tool supports checksum verification
+// Default implementation returns true for all tools
+func (b *BaseTool) SupportsChecksumVerification() bool {
+	return true
+}
+
 // getCacheKey generates a cache key for path operations
 func (b *BaseTool) getCacheKey(version string, cfg config.ToolConfig, operation string) string {
 	return fmt.Sprintf("%s:%s:%s:%s", operation, version, cfg.Distribution, b.toolName)
@@ -178,7 +184,6 @@ func (b *BaseTool) Download(url, version string, cfg config.ToolConfig, options 
 	downloadConfig.ToolName = b.toolName
 	downloadConfig.Version = version
 	downloadConfig.Config = cfg
-	downloadConfig.ChecksumRegistry = b.manager.GetChecksumRegistry()
 
 	// Get the tool instance for checksum verification
 	if tool, err := b.manager.GetTool(b.toolName); err == nil {

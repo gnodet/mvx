@@ -294,7 +294,6 @@ func (m *MvndTool) downloadWithAlternatingURLs(primaryURL, archiveURL, version s
 		downloadConfig.ToolName = "mvnd"
 		downloadConfig.Version = version
 		downloadConfig.Config = cfg
-		downloadConfig.ChecksumRegistry = m.manager.GetChecksumRegistry()
 		downloadConfig.Tool = m
 
 		// Create temporary file for download

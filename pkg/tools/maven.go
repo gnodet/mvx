@@ -277,7 +277,6 @@ func (m *MavenTool) downloadWithAlternatingURLs(primaryURL, archiveURL, version 
 		downloadConfig.ToolName = m.toolName
 		downloadConfig.Version = version
 		downloadConfig.Config = cfg
-		downloadConfig.ChecksumRegistry = m.manager.GetChecksumRegistry()
 		downloadConfig.Tool = m
 
 		// Create temporary file for download
