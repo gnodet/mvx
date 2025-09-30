@@ -623,10 +623,9 @@ func (b *BaseTool) StandardIsInstalled(versionSpec string, cfg config.ToolConfig
 			continue
 		}
 
-		if err := tool.Verify(candidate.info.Version, candidateCfg); err != nil {
-			logVerbose("Verification failed for installed %s %s: %v", b.toolName, candidate.info.Version, err)
-			continue
-		}
+		// Skip verification during IsInstalled check for performance
+		// Binary existence is sufficient - verification happens during Install/Verify
+		// This avoids running "java -version", "mvn --version", etc. on every startup
 
 		// Found a valid installation - return immediately
 		logVerbose("Using previously installed %s %s (%s)", b.toolName, candidate.info.Version, candidate.info.Distribution)
