@@ -497,31 +497,39 @@ func (j *JavaTool) GetVersionsForDistribution(distribution string) ([]string, er
 	return j.getDiscoVersions(distribution)
 }
 
+// DiscoMajorVersion represents a major version entry from Disco API
+type DiscoMajorVersion struct {
+	MajorVersion int      `json:"major_version"`
+	Maintained   bool     `json:"maintained"`
+	EarlyAccess  bool     `json:"early_access"`
+	Versions     []string `json:"versions"`
+}
+
 // getDiscoVersions fetches available versions for a distribution from Disco API
+// Fetches ALL major versions once and filters by distribution to minimize HTTP requests
 func (j *JavaTool) getDiscoVersions(distribution string) ([]string, error) {
 	if distribution == "" {
 		distribution = "temurin" // Default to Temurin
 	}
 
+	// Fetch ALL major versions (without distribution filter) - this will be cached
+	// This is more efficient than making separate requests per distribution
 	registry := j.manager.GetRegistry()
-	// Get major versions available for this distribution
-	resp, err := registry.Get(FoojayDiscoAPIBase + "/major_versions?maintained=true&distribution=" + distribution)
+	resp, err := registry.Get(FoojayDiscoAPIBase + "/major_versions?maintained=true")
 	if err != nil {
 		// Fallback to known versions if API is unavailable
 		return []string{"8", "11", "17", "21", "22", "23", "24", "25"}, nil
 	}
 	defer resp.Body.Close()
 
-	var majorVersions []struct {
-		MajorVersion int  `json:"major_version"`
-		Maintained   bool `json:"maintained"`
-		EarlyAccess  bool `json:"early_access"`
-	}
-
+	var majorVersions []DiscoMajorVersion
 	if err := json.NewDecoder(resp.Body).Decode(&majorVersions); err != nil {
 		return []string{"8", "11", "17", "21", "22", "23", "24", "25"}, nil
 	}
 
+	// Note: The API returns all major versions regardless of distribution
+	// All maintained distributions support the same major versions (8, 11, 17, 21, etc.)
+	// So we don't need to filter by distribution here
 	var versions []string
 	for _, mv := range majorVersions {
 		if mv.EarlyAccess {

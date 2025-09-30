@@ -1,8 +1,10 @@
 package tools
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -21,14 +23,21 @@ type VersionCacheEntry struct {
 	Timestamp       time.Time `json:"timestamp"`
 }
 
+// HTTPCacheEntry represents a cached HTTP response
+type HTTPCacheEntry struct {
+	Body      []byte
+	Timestamp time.Time
+}
+
 // Manager handles tool installation and management
 type Manager struct {
 	cacheDir       string
 	tools          map[string]Tool
 	registry       *ToolRegistry
 	versionCache   map[string]VersionCacheEntry
-	installedCache map[string]bool   // Cache for IsInstalled checks
-	pathCache      map[string]string // Cache for GetPath results
+	installedCache map[string]bool           // Cache for IsInstalled checks
+	pathCache      map[string]string         // Cache for GetPath results
+	httpCache      map[string]HTTPCacheEntry // In-memory HTTP response cache
 	cacheMutex     sync.RWMutex
 	httpClient     *http.Client
 }
@@ -130,6 +139,7 @@ func NewManager() (*Manager, error) {
 		versionCache:   make(map[string]VersionCacheEntry),
 		installedCache: make(map[string]bool),
 		pathCache:      make(map[string]string),
+		httpCache:      make(map[string]HTTPCacheEntry),
 		httpClient: &http.Client{
 			Timeout: getTimeoutFromEnv("MVX_HTTP_TIMEOUT", 120*time.Second), // Default: 2 minutes for slow servers
 		},
@@ -158,9 +168,29 @@ func ResetManager() {
 	globalManager = nil
 }
 
-// Get performs an HTTP GET request with verbose logging
+// Get performs an HTTP GET request with verbose logging and in-memory caching
 // This centralizes all HTTP requests and provides visibility into API calls
+// Responses are cached in memory for 5 minutes to avoid redundant requests
 func (m *Manager) Get(url string) (*http.Response, error) {
+	// Check cache first
+	m.cacheMutex.RLock()
+	if cached, ok := m.httpCache[url]; ok {
+		// Cache valid for 5 minutes
+		if time.Since(cached.Timestamp) < 5*time.Minute {
+			m.cacheMutex.RUnlock()
+			if os.Getenv("MVX_VERBOSE") == "true" {
+				fmt.Printf("💾 HTTP GET (cached): %s\n", url)
+			}
+			// Return a fake response with cached body
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewReader(cached.Body)),
+				Header:     make(http.Header),
+			}, nil
+		}
+	}
+	m.cacheMutex.RUnlock()
+
 	// Log the request if verbose mode is enabled
 	if os.Getenv("MVX_VERBOSE") == "true" {
 		fmt.Printf("🌐 HTTP GET: %s\n", url)
@@ -176,6 +206,32 @@ func (m *Manager) Get(url string) (*http.Response, error) {
 
 	if os.Getenv("MVX_VERBOSE") == "true" {
 		fmt.Printf("✅ HTTP GET %d: %s\n", resp.StatusCode, url)
+	}
+
+	// Cache successful responses (200 OK)
+	if resp.StatusCode == 200 {
+		// Read the body
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			return nil, err
+		}
+
+		// Store in cache
+		m.cacheMutex.Lock()
+		m.httpCache[url] = HTTPCacheEntry{
+			Body:      body,
+			Timestamp: time.Now(),
+		}
+		m.cacheMutex.Unlock()
+
+		// Return a new response with the body
+		return &http.Response{
+			StatusCode: resp.StatusCode,
+			Body:       io.NopCloser(bytes.NewReader(body)),
+			Header:     resp.Header,
+			Status:     resp.Status,
+		}, nil
 	}
 
 	return resp, nil
