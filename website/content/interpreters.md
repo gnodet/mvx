@@ -138,14 +138,14 @@ The mvx-shell interpreter provides comprehensive variable expansion for all comm
   commands: {
     "setup-project": {
       description: "Setup project structure",
-      script: "mkdir $PROJECT_NAME && cd $PROJECT_NAME && echo 'Created ${PROJECT_NAME}_config.json'",
+      script: "mkdir $PROJECT_NAME && cd $PROJECT_NAME && echo 'Created $\{PROJECT_NAME}_config.json'",
       environment: {
         PROJECT_NAME: "myapp"
       }
     },
     "deploy": {
       description: "Deploy application",
-      script: "echo 'Deploying $PROJECT_NAME in $BUILD_MODE mode to ${DEPLOY_ENV}_server'",
+      script: "echo 'Deploying $PROJECT_NAME in $BUILD_MODE mode to $\{DEPLOY_ENV}_server'",
       environment: {
         PROJECT_NAME: "myapp",
         BUILD_MODE: "production",
@@ -170,7 +170,7 @@ The mvx-shell interpreter provides comprehensive variable expansion for all comm
 # These all work with variable expansion in mvx-shell:
 mkdir $PROJECT_DIR                    # Create directory with variable name
 echo "Hello $USER_NAME"              # Print with variable expansion
-rm ${TEMP_DIR}/cache                 # Remove with braced variable syntax
+rm $\{TEMP_DIR}/cache                 # Remove with braced variable syntax
 cd $PROJECT_DIR && echo "In project" # Chain commands with variables
 ```
 
