@@ -9,6 +9,9 @@ import (
 )
 
 func TestExecutor_SetupEnvironment(t *testing.T) {
+	// Reset manager for test isolation
+	tools.ResetManager()
+
 	// Create a temporary directory for testing
 	tempDir := t.TempDir()
 
@@ -79,6 +82,9 @@ func TestExecutor_SetupEnvironment(t *testing.T) {
 }
 
 func TestExecutor_ProcessScriptString(t *testing.T) {
+	// Reset manager for test isolation
+	tools.ResetManager()
+
 	tempDir := t.TempDir()
 	cfg := &config.Config{}
 	manager, _ := tools.NewManager()
@@ -121,6 +127,9 @@ func TestExecutor_ProcessScriptString(t *testing.T) {
 }
 
 func TestExecutor_ListCommands(t *testing.T) {
+	// Reset manager for test isolation
+	tools.ResetManager()
+
 	tempDir := t.TempDir()
 	cfg := &config.Config{
 		Commands: map[string]config.CommandConfig{
@@ -161,6 +170,9 @@ func TestExecutor_ListCommands(t *testing.T) {
 }
 
 func TestExecutor_GetCommandInfo(t *testing.T) {
+	// Reset manager for test isolation
+	tools.ResetManager()
+
 	tempDir := t.TempDir()
 	cfg := &config.Config{
 		Commands: map[string]config.CommandConfig{
@@ -194,6 +206,9 @@ func TestExecutor_GetCommandInfo(t *testing.T) {
 }
 
 func TestExecutor_ValidateCommand(t *testing.T) {
+	// Reset manager for test isolation
+	tools.ResetManager()
+
 	tempDir := t.TempDir()
 	cfg := &config.Config{
 		Tools: map[string]config.ToolConfig{
@@ -228,9 +243,11 @@ func TestExecutor_ValidateCommand(t *testing.T) {
 	}
 
 	// Test command with missing tool requirement
+	// Note: ValidateCommand is now deprecated and only checks command existence
+	// Tools are auto-installed via EnsureTool, so this should NOT error
 	err = executor.ValidateCommand("requires-missing")
-	if err == nil {
-		t.Error("Expected error for command requiring missing tool")
+	if err != nil {
+		t.Errorf("ValidateCommand() error = %v (should not error for missing tools, they are auto-installed)", err)
 	}
 
 	// Test non-existent command
@@ -241,6 +258,9 @@ func TestExecutor_ValidateCommand(t *testing.T) {
 }
 
 func TestExecutor_InterpreterSelection(t *testing.T) {
+	// Reset manager for test isolation
+	tools.ResetManager()
+
 	cfg := &config.Config{}
 	manager, _ := tools.NewManager()
 	_ = NewExecutor(cfg, manager, "")

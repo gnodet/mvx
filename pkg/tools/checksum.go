@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 // ChecksumType represents the type of checksum algorithm
@@ -33,15 +32,13 @@ type ChecksumInfo struct {
 
 // ChecksumVerifier handles checksum verification for downloaded files
 type ChecksumVerifier struct {
-	client *http.Client
+	manager *Manager
 }
 
 // NewChecksumVerifier creates a new checksum verifier
-func NewChecksumVerifier() *ChecksumVerifier {
+func NewChecksumVerifier(manager *Manager) *ChecksumVerifier {
 	return &ChecksumVerifier{
-		client: &http.Client{
-			Timeout: getTimeoutFromEnv("MVX_CHECKSUM_TIMEOUT", 120*time.Second), // Default: 2 minutes for slow Apache servers
-		},
+		manager: manager,
 	}
 }
 
@@ -103,7 +100,7 @@ func (cv *ChecksumVerifier) calculateChecksum(filePath string, checksumType Chec
 
 // fetchChecksumFromURL fetches checksum from a remote URL
 func (cv *ChecksumVerifier) fetchChecksumFromURL(url, filename string) (string, error) {
-	resp, err := cv.client.Get(url)
+	resp, err := cv.manager.Get(url)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch checksum URL: %w", err)
 	}

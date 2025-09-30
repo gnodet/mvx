@@ -31,18 +31,6 @@ func TestUseSystemMaven(t *testing.T) {
 	os.Unsetenv("MVX_USE_SYSTEM_MAVEN")
 }
 
-func TestMavenSystemDetector(t *testing.T) {
-	// Test getSystemMavenHome when no Maven environment variables are set
-	os.Unsetenv("MAVEN_HOME")
-	os.Unsetenv("M2_HOME")
-
-	_, err := getSystemMavenHome()
-	// This might succeed if mvn is in PATH, so we don't assert failure
-	if err != nil {
-		t.Logf("Maven not found in system (expected): %v", err)
-	}
-}
-
 func TestMavenToolWithSystemMaven(t *testing.T) {
 	// Save original environment variables
 	originalUseSystemMaven := os.Getenv("MVX_USE_SYSTEM_MAVEN")

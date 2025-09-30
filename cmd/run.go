@@ -142,11 +142,6 @@ func runCustomCommand(commandName string, args []string) error {
 	// Create executor
 	exec := executor.NewExecutor(cfg, manager, projectRoot)
 
-	// Validate command exists and requirements are met
-	if err := exec.ValidateCommand(commandName); err != nil {
-		return err
-	}
-
-	// Execute command
+	// Execute command (tools are auto-installed via EnsureTool)
 	return exec.ExecuteCommand(commandName, args)
 }

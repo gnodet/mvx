@@ -92,8 +92,6 @@ func init() {
 	// Add subcommands
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(setupCmd)
-	rootCmd.AddCommand(buildCmd)
-	rootCmd.AddCommand(testCmd)
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(updateBootstrapCmd)
 }
@@ -247,17 +245,13 @@ func setupGlobalEnvironment(cfg *config.Config, manager *tools.Manager) error {
 		resolvedConfig := toolConfig
 		resolvedConfig.Version = resolvedVersion
 
-		// Check if tool is installed
-		if tool.IsInstalled(resolvedVersion, resolvedConfig) {
-			binPath, err := tool.GetPath(resolvedVersion, resolvedConfig)
-			if err != nil {
-				printVerbose("Skipping tool %s: failed to get bin path: %v", toolName, err)
-				continue
-			}
+		// Try to get tool path - if successful, tool is installed and we can add it to PATH
+		binPath, err := tool.GetPath(resolvedVersion, resolvedConfig)
+		if err != nil {
+			printVerbose("Tool %s version %s is not installed or path unavailable, skipping PATH setup: %v", toolName, resolvedVersion, err)
+		} else {
 			printVerbose("Adding %s bin path to global PATH: %s", toolName, binPath)
 			pathDirs = append(pathDirs, binPath)
-		} else {
-			printVerbose("Tool %s version %s is not installed, skipping PATH setup", toolName, resolvedVersion)
 		}
 	}
 
@@ -353,8 +347,9 @@ func addCustomCommands() error {
 
 	// Add each custom command as a top-level command
 	for cmdName, cmdConfig := range cfg.Commands {
-		// Skip built-in commands unless they have override flag
-		if isBuiltinCommand(cmdName) && !cmdConfig.Override {
+		// Skip commands with spaces (they're subcommands, handled by their parent command)
+		if strings.Contains(cmdName, " ") {
+			printVerbose("Skipping custom command with space: %s (handled by parent command)", cmdName)
 			continue
 		}
 
@@ -468,22 +463,4 @@ Examples:
 			}
 		},
 	}
-}
-
-// isBuiltinCommand checks if a command name is a built-in mvx command
-func isBuiltinCommand(commandName string) bool {
-	builtinCommands := map[string]bool{
-		"build":            true,
-		"test":             true,
-		"setup":            true,
-		"init":             true,
-		"tools":            true,
-		"version":          true,
-		"help":             true,
-		"completion":       true,
-		"info":             true,
-		"update-bootstrap": true,
-		"run":              true, // Don't override the run command itself
-	}
-	return builtinCommands[commandName]
 }

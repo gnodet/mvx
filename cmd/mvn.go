@@ -114,10 +114,7 @@ Examples:
 		if err != nil {
 			return err
 		}
-		mvnExe := filepath.Join(bin, "mvn")
-		if isWindows() {
-			mvnExe += ".cmd"
-		}
+		mvnExe := filepath.Join(bin, mvnTool.GetBinaryName())
 
 		c := exec.Command(mvnExe, mavenArgs...)
 		c.Dir = projectRoot

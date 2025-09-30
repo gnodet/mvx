@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -18,20 +17,19 @@ import (
 
 // DownloadConfig contains configuration for robust downloads with checksum verification
 type DownloadConfig struct {
-	URL              string
-	DestPath         string
-	MaxRetries       int
-	RetryDelay       time.Duration
-	Timeout          time.Duration
-	ExpectedType     string // Expected content type
-	MinSize          int64  // Minimum expected file size
-	MaxSize          int64  // Maximum expected file size
-	ValidateMagic    bool   // Whether to validate magic bytes
-	ToolName         string // Name of the tool being downloaded (for progress reporting)
-	Version          string // Tool version for checksum verification
-	Config           config.ToolConfig
-	ChecksumRegistry *ChecksumRegistry
-	Tool             Tool // Tool instance for checksum verification
+	URL           string
+	DestPath      string
+	MaxRetries    int
+	RetryDelay    time.Duration
+	Timeout       time.Duration
+	ExpectedType  string // Expected content type
+	MinSize       int64  // Minimum expected file size
+	MaxSize       int64  // Maximum expected file size
+	ValidateMagic bool   // Whether to validate magic bytes
+	ToolName      string // Name of the tool being downloaded (for progress reporting)
+	Version       string // Tool version for checksum verification
+	Config        config.ToolConfig
+	Tool          Tool // Tool instance for checksum verification
 }
 
 // getTimeoutFromEnv returns a timeout from environment variable or default value
@@ -42,21 +40,6 @@ func getTimeoutFromEnv(envVar string, defaultTimeout time.Duration) time.Duratio
 		}
 	}
 	return defaultTimeout
-}
-
-// getMaxRetries returns the maximum number of download retries from environment or default
-func getMaxRetries() int {
-	if retriesStr := os.Getenv("MVX_MAX_RETRIES"); retriesStr != "" {
-		if retries, err := strconv.Atoi(retriesStr); err == nil && retries >= 0 {
-			return retries
-		}
-	}
-	return 3 // Default: 3 retries
-}
-
-// getRetryDelay returns the delay between retries from environment or default
-func getRetryDelay() time.Duration {
-	return getTimeoutFromEnv("MVX_RETRY_DELAY", 2*time.Second) // Default: 2 seconds between retries
 }
 
 // DefaultDownloadConfig returns a default download configuration
@@ -215,8 +198,8 @@ func attemptDownload(config *DownloadConfig) (*DownloadResult, error) {
 		}
 	}
 
-	// Verify checksum if checksum registry is available
-	if config.ChecksumRegistry != nil {
+	// Verify checksum if tool is available
+	if config.Tool != nil {
 		// Update config with final URL for better filename detection
 		finalConfig := *config
 		finalConfig.URL = resp.Request.URL.String()
@@ -411,31 +394,45 @@ func DiagnoseDownloadError(url string, err error) string {
 
 // verifyChecksum verifies the checksum of a downloaded file
 func verifyChecksum(filePath string, config *DownloadConfig) error {
-	if config.ChecksumRegistry == nil {
-		return nil
+	if config.Tool == nil {
+		return nil // No tool provided, skip verification
 	}
 
-	// Get checksum information
-	checksumInfo, hasChecksum := config.ChecksumRegistry.GetChecksumFromConfig(
-		config.ToolName, config.Version, config.Config)
+	// Get checksum information from config
+	var checksumInfo ChecksumInfo
+	var hasChecksum bool
+
+	// Check if checksum is provided in configuration
+	if config.Config.Checksum != nil {
+		checksumType := config.Config.Checksum.Type
+		if checksumType == "" {
+			checksumType = "sha256" // default
+		}
+
+		checksumInfo = ChecksumInfo{
+			Type:     ChecksumType(checksumType),
+			Value:    config.Config.Checksum.Value,
+			URL:      config.Config.Checksum.URL,
+			Filename: config.Config.Checksum.Filename,
+		}
+		hasChecksum = true
+	}
 
 	if !hasChecksum {
-		// Try to get checksum from registry using dynamic lookup
+		// Try to get checksum from tool using dynamic lookup
 		// Extract filename from URL, handling redirects and query parameters
 		filename := extractFilenameFromURL(config.URL)
 		fmt.Printf("  🔍 Attempting to find checksum for file: %s\n", filename)
 
 		// Use tool's GetChecksum method for dynamic checksum resolution
-		if config.Tool != nil {
-			if dynamicChecksum, err := config.Tool.GetChecksum(config.Version, filename); err == nil {
-				checksumInfo = dynamicChecksum
-				hasChecksum = true
-			} else {
-				fmt.Printf("  ⚠️  Tool checksum lookup failed: %v\n", err)
-			}
+		if dynamicChecksum, err := config.Tool.GetChecksum(config.Version, filename); err == nil {
+			checksumInfo = dynamicChecksum
+			hasChecksum = true
+		} else {
+			fmt.Printf("  ⚠️  Tool checksum lookup failed: %v\n", err)
 		}
 
-		if !hasChecksum && config.Tool != nil {
+		if !hasChecksum {
 			// Fallback to URL patterns for tools with static checksum URLs
 			checksumURL := config.Tool.GetChecksumURL(config.Version, filename)
 			if checksumURL != "" {
@@ -451,7 +448,7 @@ func verifyChecksum(filePath string, config *DownloadConfig) error {
 	}
 
 	if !hasChecksum {
-		if config.ChecksumRegistry.SupportsChecksumVerification(config.ToolName) {
+		if config.Tool.SupportsChecksumVerification() {
 			fmt.Printf("⚠️  No checksum available for %s %s\n", config.ToolName, config.Version)
 			fmt.Printf("   Consider adding checksum verification to your configuration for enhanced security.\n")
 		}
@@ -459,10 +456,10 @@ func verifyChecksum(filePath string, config *DownloadConfig) error {
 	}
 
 	// Check if checksum verification is required
-	isRequired := config.ChecksumRegistry.IsChecksumRequired(config.Config)
+	isRequired := config.Config.Checksum != nil && config.Config.Checksum.Required
 
 	// Create checksum verifier
-	verifier := NewChecksumVerifier()
+	verifier := NewChecksumVerifier(config.Tool.GetManager())
 
 	if isRequired {
 		// Strict verification - fail on error

@@ -5,24 +5,32 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/gnodet/mvx/pkg/config"
+	"github.com/gnodet/mvx/pkg/version"
 )
 
 // Compile-time interface validation
 var _ Tool = (*MvndTool)(nil)
+var _ ToolMetadataProvider = (*MvndTool)(nil)
 
 // MvndTool implements Tool interface for Maven Daemon management
 type MvndTool struct {
 	*BaseTool
 }
 
+func getMvndBinaryName() string {
+	if NewPlatformMapper().IsWindows() {
+		return "mvnd.exe"
+	}
+	return "mvnd"
+}
+
 // NewMvndTool creates a new Mvnd tool instance
 func NewMvndTool(manager *Manager) *MvndTool {
 	return &MvndTool{
-		BaseTool: NewBaseTool(manager, "mvnd"),
+		BaseTool: NewBaseTool(manager, "mvnd", getMvndBinaryName()),
 	}
 }
 
@@ -38,41 +46,33 @@ func (m *MvndTool) Install(version string, cfg config.ToolConfig) error {
 
 // IsInstalled checks if the specified version is installed
 func (m *MvndTool) IsInstalled(version string, cfg config.ToolConfig) bool {
-	return m.StandardIsInstalled(version, cfg, m.GetPath, "mvnd")
+	return m.StandardIsInstalled(version, cfg, m.GetPath)
 }
 
 // GetPath returns the binary path for the specified version (for PATH management)
 func (m *MvndTool) GetPath(version string, cfg config.ToolConfig) (string, error) {
-	return m.StandardGetPath(version, cfg, m.getInstalledPath, "mvnd")
+	return m.StandardGetPath(version, cfg, m.getInstalledPath)
+}
+
+func (m *MvndTool) GetBinaryName() string {
+	return getMvndBinaryName()
 }
 
 // getInstalledPath returns the path for an installed Mvnd version
 func (m *MvndTool) getInstalledPath(version string, cfg config.ToolConfig) (string, error) {
 	installDir := m.manager.GetToolVersionDir("mvnd", version, "")
 	pathResolver := NewPathResolver(m.manager.GetToolsDir())
-
-	options := DirectorySearchOptions{
-		DirectoryPrefix:           "maven-mvnd-",
-		BinSubdirectory:           "bin",
-		BinaryName:                "mvnd",
-		UsePlatformExtensions:     true,
-		PreferredWindowsExtension: ".cmd", // Mvnd uses .cmd on Windows
-		FallbackToParent:          false,  // Mvnd always has bin subdirectory
-	}
-
-	binPath, err := pathResolver.FindToolBinaryPath(installDir, options)
+	binDir, err := pathResolver.FindBinaryParentDir(installDir, m.GetBinaryName())
 	if err != nil {
-		// Fallback to default bin directory if search fails
-		return filepath.Join(installDir, "bin"), nil
+		return "", err
 	}
-
-	return binPath, nil
+	return binDir, nil
 }
 
 // Verify checks if the installation is working correctly
 func (m *MvndTool) Verify(version string, cfg config.ToolConfig) error {
 	verifyConfig := VerificationConfig{
-		BinaryName:  "mvnd",
+		BinaryName:  m.GetBinaryName(),
 		VersionArgs: []string{"--version"},
 		DebugInfo:   false,
 	}
@@ -81,24 +81,57 @@ func (m *MvndTool) Verify(version string, cfg config.ToolConfig) error {
 
 // ListVersions returns available mvnd versions
 func (m *MvndTool) ListVersions() ([]string, error) {
+	// Try to fetch versions from Apache archive
+	versions, err := m.fetchMvndVersionsFromApache()
+	if err != nil {
+		// Fallback to known versions if API is unavailable
+		return m.getFallbackMvndVersions(), nil
+	}
+	return version.SortVersions(versions), nil
+}
+
+// GetDisplayName returns the human-readable name for Mvnd (implements ToolMetadataProvider)
+func (m *MvndTool) GetDisplayName() string {
+	return "Maven Daemon (mvnd)"
+}
+
+// GetEmoji returns the emoji icon for Mvnd (implements ToolMetadataProvider)
+func (m *MvndTool) GetEmoji() string {
+	return "🚀"
+}
+
+// fetchMvndVersionsFromApache fetches mvnd versions from Apache archive
+func (m *MvndTool) fetchMvndVersionsFromApache() ([]string, error) {
 	registry := m.manager.GetRegistry()
-	return registry.GetMvndVersions()
+	// Fetch mvnd versions from archive
+	mvndVersions, err := registry.FetchVersionsFromApacheRepo(ApacheMavenBase + "/mvnd/")
+	if err != nil {
+		return nil, fmt.Errorf("no mvnd versions found from Apache archive: %w", err)
+	}
+
+	return mvndVersions, nil
+}
+
+// getFallbackMvndVersions returns known mvnd versions as fallback
+func (m *MvndTool) getFallbackMvndVersions() []string {
+	return []string{
+		// Maven Daemon 2.x
+		"2.0.0", "2.0.0-beta-1", "2.0.0-alpha-1",
+
+		// Maven Daemon 1.x
+		"1.0.2", "1.0.1", "1.0.0", "1.0.0-m8", "1.0.0-m7", "1.0.0-m6", "1.0.0-m5",
+		"1.0.0-m4", "1.0.0-m3", "1.0.0-m2", "1.0.0-m1",
+
+		// Maven Daemon 0.x
+		"0.9.0", "0.8.2", "0.8.1", "0.8.0", "0.7.1", "0.7.0", "0.6.0", "0.5.2", "0.5.1", "0.5.0",
+	}
 }
 
 // GetDownloadOptions returns download options specific to Maven Daemon
 func (m *MvndTool) GetDownloadOptions() DownloadOptions {
 	return DownloadOptions{
 		FileExtension: ".zip",
-		ExpectedType:  "application",
-		MinSize:       5 * 1024 * 1024,   // 5MB
-		MaxSize:       100 * 1024 * 1024, // 100MB
-		ArchiveType:   "zip",
 	}
-}
-
-// GetDisplayName returns the display name for Maven Daemon
-func (m *MvndTool) GetDisplayName() string {
-	return "Maven Daemon"
 }
 
 // getDownloadURL returns the download URL for the specified version
@@ -142,9 +175,23 @@ func (m *MvndTool) getPlatformString() string {
 }
 
 // ResolveVersion resolves a Mvnd version specification to a concrete version
-func (m *MvndTool) ResolveVersion(version, distribution string) (string, error) {
-	registry := m.manager.GetRegistry()
-	return registry.ResolveMvndVersion(version)
+func (m *MvndTool) ResolveVersion(versionSpec, distribution string) (string, error) {
+	availableVersions, err := m.ListVersions()
+	if err != nil {
+		return "", err
+	}
+
+	spec, err := version.ParseSpec(versionSpec)
+	if err != nil {
+		return "", fmt.Errorf("invalid version specification %s: %w", versionSpec, err)
+	}
+
+	resolved, err := spec.Resolve(availableVersions)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve mvnd version %s: %w", versionSpec, err)
+	}
+
+	return resolved, nil
 }
 
 // GetDownloadURL implements Tool interface for Maven Daemon
@@ -216,7 +263,7 @@ func (m *MvndTool) fetchChecksumFromURL(url string) (string, error) {
 func (m *MvndTool) installWithFallback(version string, cfg config.ToolConfig) error {
 	// Check if we should use system tool instead of downloading
 	if UseSystemTool("mvnd") {
-		return m.StandardInstallWithOptions(version, cfg, m.getDownloadURL, []string{"mvnd.cmd"}, []string{"MVND_HOME"})
+		return m.StandardInstall(version, cfg, m.getDownloadURL)
 	}
 
 	// Create installation directory
@@ -281,13 +328,10 @@ func (m *MvndTool) downloadWithAlternatingURLs(primaryURL, archiveURL, version s
 		// Create download config with reduced retries per URL
 		downloadConfig := DefaultDownloadConfig(currentURL.url, "")
 		downloadConfig.MaxRetries = retriesPerURL
-		downloadConfig.ExpectedType = options.ExpectedType
-		downloadConfig.MinSize = options.MinSize
-		downloadConfig.MaxSize = options.MaxSize
+		// Note: MinSize/MaxSize/ExpectedType removed - we rely on checksums for validation
 		downloadConfig.ToolName = "mvnd"
 		downloadConfig.Version = version
 		downloadConfig.Config = cfg
-		downloadConfig.ChecksumRegistry = m.manager.GetChecksumRegistry()
 		downloadConfig.Tool = m
 
 		// Create temporary file for download

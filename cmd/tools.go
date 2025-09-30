@@ -90,102 +90,83 @@ func listTools() error {
 		return fmt.Errorf("failed to create tool manager: %w", err)
 	}
 
-	registry := manager.GetRegistry()
-
 	printInfo("🛠️  Available Tools")
 	printInfo("")
 
-	// Java
-	printInfo("📦 Java Development Kit")
-	distributions := registry.GetJavaDistributions()
-	for _, dist := range distributions {
-		printInfo("  %s - %s", dist.Name, dist.DisplayName)
-		if versions, err := registry.GetJavaVersions(dist.Name); err == nil && len(versions) > 0 {
-			// Show first few versions
-			shown := versions
-			if len(versions) > 5 {
-				shown = versions[:5]
+	// Get all tools from manager
+	allTools := manager.GetAllTools()
+
+	// Define tool order for consistent display
+	toolOrder := []string{tools.ToolJava, tools.ToolMaven, tools.ToolMvnd, tools.ToolNode, tools.ToolGo}
+
+	for _, toolName := range toolOrder {
+		tool, exists := allTools[toolName]
+		if !exists {
+			continue
+		}
+
+		// Get display metadata
+		emoji := "📦" // default emoji
+		displayName := toolName
+		if metadataProvider, ok := tool.(tools.ToolMetadataProvider); ok {
+			emoji = metadataProvider.GetEmoji()
+			displayName = metadataProvider.GetDisplayName()
+		}
+
+		printInfo("%s %s", emoji, displayName)
+
+		// Check if tool supports distributions
+		if distProvider, ok := tool.(tools.DistributionProvider); ok {
+			distributions := distProvider.GetDistributions()
+			for _, dist := range distributions {
+				printInfo("  %s - %s", dist.Name, dist.DisplayName)
+
+				// Get versions for this distribution if supported
+				if distVersionProvider, ok := tool.(tools.DistributionVersionProvider); ok {
+					if versions, err := distVersionProvider.ListVersionsForDistribution(dist.Name); err == nil && len(versions) > 0 {
+						shown := versions
+						if len(versions) > 5 {
+							shown = versions[:5]
+						}
+						printInfo("    Versions: %s", strings.Join(shown, ", "))
+						if len(versions) > 5 {
+							printInfo("    ... and %d more", len(versions)-5)
+						}
+					}
+				}
 			}
-			printInfo("    Versions: %s", strings.Join(shown, ", "))
-			if len(versions) > 5 {
-				printInfo("    ... and %d more", len(versions)-5)
+		} else {
+			// Tool doesn't support distributions, just list versions
+			if versions, err := tool.ListVersions(); err == nil && len(versions) > 0 {
+				shown := versions
+				if len(versions) > 8 {
+					shown = versions[:8]
+				}
+				printInfo("  Versions: %s", strings.Join(shown, ", "))
+				if len(versions) > 8 {
+					printInfo("  ... and %d more", len(versions)-8)
+				}
 			}
 		}
+		printInfo("")
 	}
-	printInfo("")
-
-	// Maven
-	printInfo("📦 Apache Maven")
-	if versions, err := registry.GetMavenVersions(); err == nil && len(versions) > 0 {
-		// Show first few versions
-		shown := versions
-		if len(versions) > 8 {
-			shown = versions[:8]
-		}
-		printInfo("  Versions: %s", strings.Join(shown, ", "))
-		if len(versions) > 8 {
-			printInfo("  ... and %d more", len(versions)-8)
-		}
-	}
-	printInfo("")
-
-	// Maven Daemon
-	printInfo("🚀 Maven Daemon (mvnd)")
-	if versions, err := registry.GetMvndVersions(); err == nil && len(versions) > 0 {
-		shown := versions
-		if len(versions) > 8 {
-			shown = versions[:8]
-		}
-		printInfo("  Versions: %s", strings.Join(shown, ", "))
-		if len(versions) > 8 {
-			printInfo("  ... and %d more", len(versions)-8)
-		}
-	}
-
-	// Node.js
-	printInfo("📦 Node.js")
-	if versions, err := registry.GetNodeVersions(); err == nil && len(versions) > 0 {
-		shown := versions
-		if len(versions) > 8 {
-			shown = versions[:8]
-		}
-		printInfo("  Versions: %s", strings.Join(shown, ", "))
-		if len(versions) > 8 {
-			printInfo("  ... and %d more", len(versions)-8)
-		}
-	}
-
-	// Go
-	printInfo("🐹 Go Programming Language")
-	if versions, err := registry.GetGoVersions(); err == nil && len(versions) > 0 {
-		shown := versions
-		if len(versions) > 8 {
-			shown = versions[:8]
-		}
-		printInfo("  Versions: %s", strings.Join(shown, ", "))
-		if len(versions) > 8 {
-			printInfo("  ... and %d more", len(versions)-8)
-		}
-	}
-
-	printInfo("")
 
 	printInfo("Usage:")
-	printInfo("  mvx tools search java        # Search Java versions")
-	printInfo("  mvx tools search maven       # Search Maven versions")
-	printInfo("  mvx tools search mvnd        # Search Maven Daemon versions")
-	printInfo("  mvx tools search node        # Search Node.js versions")
-	printInfo("  mvx tools search go          # Search Go versions")
+	printInfo("  mvx tools search java           # Search Java versions")
+	printInfo("  mvx tools search maven          # Search Maven versions")
+	printInfo("  mvx tools search mvnd           # Search Maven Daemon versions")
+	printInfo("  mvx tools search node           # Search Node.js versions")
+	printInfo("  mvx tools search go             # Search Go versions")
 
-	printInfo("  mvx tools info java          # Show Java details")
+	printInfo("  mvx tools info java             # Show Java details")
 	printInfo("")
 	printInfo("Add tools to your project:")
-	printInfo("  mvx tools add java 21        # Add Java 21 (Temurin)")
-	printInfo("  mvx tools add java 17 zulu   # Add Java 17 (Azul Zulu)")
+	printInfo("  mvx tools add java 21           # Add Java 21 (Temurin)")
+	printInfo("  mvx tools add java 17 zulu      # Add Java 17 (Azul Zulu)")
 	printInfo("  mvx tools add maven 4.0.0-rc-4  # Add Maven 4.0.0-rc-4")
-	printInfo("  mvx tools add node lts       # Add Node.js LTS")
+	printInfo("  mvx tools add node lts          # Add Node.js LTS")
 
-	printInfo("  mvx tools add go 1.23.1      # Add Go 1.23.1")
+	printInfo("  mvx tools add go 1.23.1         # Add Go 1.23.1")
 
 	return nil
 }
@@ -250,7 +231,7 @@ func showToolInfo(toolName string) error {
 	printInfo("Name: %s", info["name"])
 
 	// Display distributions if available (for Java)
-	if distributions, ok := info["distributions"].([]tools.JavaDistribution); ok {
+	if distributions, ok := info["distributions"].([]tools.Distribution); ok {
 		printInfo("")
 		printInfo("Available Distributions:")
 		for _, dist := range distributions {

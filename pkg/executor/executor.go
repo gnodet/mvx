@@ -82,30 +82,10 @@ func (e *Executor) ExecuteTool(toolName string, args []string) error {
 		return fmt.Errorf("tool %s is not configured in this project", toolName)
 	}
 
-	// Get the tool instance
-	tool, err := e.toolManager.GetTool(toolName)
+	// EnsureTool handles everything: resolve, check, install, get path
+	toolBinPath, err := e.toolManager.EnsureTool(toolName, toolConfig)
 	if err != nil {
-		return fmt.Errorf("failed to get tool %s: %w", toolName, err)
-	}
-
-	// Resolve tool version using the manager
-	resolvedVersion, err := e.toolManager.ResolveVersion(toolName, toolConfig)
-	if err != nil {
-		return fmt.Errorf("failed to resolve %s version %s: %w", toolName, toolConfig.Version, err)
-	}
-
-	// Check if tool is installed, auto-install if needed
-	if !tool.IsInstalled(resolvedVersion, toolConfig) {
-		fmt.Printf("🔧 Auto-installing %s %s...\n", toolName, resolvedVersion)
-		if err := tool.Install(resolvedVersion, toolConfig); err != nil {
-			return fmt.Errorf("failed to install %s %s: %w", toolName, resolvedVersion, err)
-		}
-	}
-
-	// Get tool binary path
-	toolBinPath, err := tool.GetPath(resolvedVersion, toolConfig)
-	if err != nil {
-		return fmt.Errorf("failed to get %s binary path: %w", toolName, err)
+		return fmt.Errorf("failed to ensure %s is installed: %w", toolName, err)
 	}
 
 	// Setup environment with tool paths
@@ -129,97 +109,6 @@ func (e *Executor) ExecuteTool(toolName string, args []string) error {
 	cmd.Dir = e.projectRoot
 
 	return cmd.Run()
-}
-
-// ExecuteBuiltinCommand executes a built-in command with optional hooks and overrides
-func (e *Executor) ExecuteBuiltinCommand(commandName string, args []string, builtinFunc func([]string) error) error {
-	// Check if command is overridden
-	if e.config.HasCommandOverride(commandName) {
-		cmdConfig, _ := e.config.GetCommandConfig(commandName)
-		fmt.Printf("🔨 Running overridden command: %s\n", commandName)
-		if cmdConfig.Description != "" {
-			fmt.Printf("   %s\n", cmdConfig.Description)
-		}
-		return e.ExecuteCommand(commandName, args)
-	}
-
-	// Check if command has hooks
-	if e.config.HasCommandHooks(commandName) {
-		return e.executeWithHooks(commandName, args, builtinFunc)
-	}
-
-	// Execute built-in command normally
-	return builtinFunc(args)
-}
-
-// executeWithHooks executes a built-in command with pre/post hooks
-func (e *Executor) executeWithHooks(commandName string, args []string, builtinFunc func([]string) error) error {
-	cmdConfig, _ := e.config.GetCommandConfig(commandName)
-
-	// Setup environment
-	env, err := e.setupEnvironment(cmdConfig)
-	if err != nil {
-		return fmt.Errorf("failed to setup environment: %w", err)
-	}
-
-	// Determine working directory
-	workDir := e.projectRoot
-	if cmdConfig.WorkingDir != "" {
-		workDir = filepath.Join(e.projectRoot, cmdConfig.WorkingDir)
-	}
-
-	fmt.Printf("🔨 Running command with hooks: %s\n", commandName)
-	if cmdConfig.Description != "" {
-		fmt.Printf("   %s\n", cmdConfig.Description)
-	}
-
-	// Execute pre-hook
-	if config.HasValidScript(cmdConfig.Pre) {
-		fmt.Printf("   ⚡ Running pre-hook...\n")
-		preScript, preInterpreter, err := config.ResolvePlatformScriptWithInterpreter(cmdConfig.Pre, cmdConfig.Interpreter)
-		if err != nil {
-			return fmt.Errorf("pre-hook script resolution failed: %w", err)
-		}
-		processedPreScript := e.processScriptString(preScript, args)
-		if err := e.executeScriptWithInterpreter(processedPreScript, workDir, env, preInterpreter); err != nil {
-			return fmt.Errorf("pre-hook failed: %w", err)
-		}
-	}
-
-	// Execute built-in command or custom script
-	if config.HasValidScript(cmdConfig.Script) {
-		// Custom script instead of built-in
-		fmt.Printf("   🔧 Running custom script...\n")
-		script, scriptInterpreter, err := config.ResolvePlatformScriptWithInterpreter(cmdConfig.Script, cmdConfig.Interpreter)
-		if err != nil {
-			return fmt.Errorf("custom script resolution failed: %w", err)
-		}
-		processedScript := e.processScriptString(script, args)
-		if err := e.executeScriptWithInterpreter(processedScript, workDir, env, scriptInterpreter); err != nil {
-			return fmt.Errorf("custom script failed: %w", err)
-		}
-	} else {
-		// Built-in command
-		fmt.Printf("   🏗️  Running built-in command...\n")
-		if err := builtinFunc(args); err != nil {
-			return fmt.Errorf("built-in command failed: %w", err)
-		}
-	}
-
-	// Execute post-hook
-	if config.HasValidScript(cmdConfig.Post) {
-		fmt.Printf("   ⚡ Running post-hook...\n")
-		postScript, postInterpreter, err := config.ResolvePlatformScriptWithInterpreter(cmdConfig.Post, cmdConfig.Interpreter)
-		if err != nil {
-			return fmt.Errorf("post-hook script resolution failed: %w", err)
-		}
-		processedPostScript := e.processScriptString(postScript, args)
-		if err := e.executeScriptWithInterpreter(processedPostScript, workDir, env, postInterpreter); err != nil {
-			return fmt.Errorf("post-hook failed: %w", err)
-		}
-	}
-
-	return nil
 }
 
 // ListCommands returns available commands from configuration
@@ -282,34 +171,15 @@ func (e *Executor) setupEnvironment(cmdConfig config.CommandConfig) ([]string, e
 	// Add tool bin directories to PATH
 	for _, toolName := range requiredTools {
 		if toolConfig, exists := e.config.Tools[toolName]; exists {
-			tool, err := e.toolManager.GetTool(toolName)
+			// EnsureTool handles version resolution, installation check, auto-install, and path retrieval
+			binPath, err := e.toolManager.EnsureTool(toolName, toolConfig)
 			if err != nil {
 				logVerbose("Skipping tool %s: %v", toolName, err)
-				continue // Skip unknown tools
+				continue
 			}
 
-			// Resolve version to handle any overrides
-			resolvedVersion, err := e.toolManager.ResolveVersion(toolName, toolConfig)
-			if err != nil {
-				logVerbose("Skipping tool %s: version resolution failed: %v", toolName, err)
-				continue // Skip tools with resolution errors
-			}
-
-			// Create resolved config
-			resolvedConfig := toolConfig
-			resolvedConfig.Version = resolvedVersion
-
-			if tool.IsInstalled(resolvedVersion, resolvedConfig) {
-				binPath, err := tool.GetPath(resolvedVersion, resolvedConfig)
-				if err != nil {
-					logVerbose("Skipping tool %s: failed to get bin path: %v", toolName, err)
-					continue
-				}
-				logVerbose("Adding %s bin path to PATH: %s", toolName, binPath)
-				pathDirs = append(pathDirs, binPath)
-			} else {
-				logVerbose("Tool %s version %s is not installed", toolName, resolvedVersion)
-			}
+			logVerbose("Adding %s bin path to PATH: %s", toolName, binPath)
+			pathDirs = append(pathDirs, binPath)
 		}
 	}
 
@@ -335,17 +205,6 @@ func (e *Executor) setupEnvironment(cmdConfig config.CommandConfig) ([]string, e
 	return env, nil
 }
 
-// processScript processes the script, handling platform-specific scripts and arguments
-func (e *Executor) processScript(script interface{}, args []string) (string, error) {
-	// Resolve platform-specific script
-	resolvedScript, err := config.ResolvePlatformScript(script)
-	if err != nil {
-		return "", err
-	}
-
-	return e.processScriptString(resolvedScript, args), nil
-}
-
 // processScriptString processes a script string with arguments
 func (e *Executor) processScriptString(script string, args []string) string {
 	// If there are arguments, append them to the script
@@ -356,12 +215,6 @@ func (e *Executor) processScriptString(script string, args []string) string {
 	}
 
 	return script
-}
-
-// executeScript executes a script in the specified working directory with environment
-// This method is kept for backward compatibility
-func (e *Executor) executeScript(script, workDir string, env []string) error {
-	return e.executeScriptWithInterpreter(script, workDir, env, "")
 }
 
 // executeScriptWithInterpreter executes a script using the specified interpreter
@@ -418,31 +271,15 @@ func (e *Executor) executeNativeScript(script, workDir string, env []string) err
 	return cmd.Run()
 }
 
-// ValidateCommand checks if a command can be executed
+// ValidateCommand is deprecated - tools are now auto-installed via EnsureTool
+// This method is kept for backward compatibility but does nothing
 func (e *Executor) ValidateCommand(commandName string) error {
-	cmdConfig, exists := e.config.Commands[commandName]
+	// Just check if command exists
+	_, exists := e.config.Commands[commandName]
 	if !exists {
 		return fmt.Errorf("unknown command: %s", commandName)
 	}
-
-	// Check if required tools are installed
-	for _, toolName := range cmdConfig.Requires {
-		toolConfig, exists := e.config.Tools[toolName]
-		if !exists {
-			return fmt.Errorf("command %s requires tool %s, but it's not configured", commandName, toolName)
-		}
-
-		tool, err := e.toolManager.GetTool(toolName)
-		if err != nil {
-			return fmt.Errorf("unknown tool %s required by command %s", toolName, commandName)
-		}
-
-		if !tool.IsInstalled(toolConfig.Version, toolConfig) {
-			return fmt.Errorf("tool %s %s is required by command %s but not installed. Run 'mvx setup' first",
-				toolName, toolConfig.Version, commandName)
-		}
-	}
-
+	// Note: Tool installation checks removed - EnsureTool handles automatic installation
 	return nil
 }
 

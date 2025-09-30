@@ -2,6 +2,7 @@ package tools
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/gnodet/mvx/pkg/config"
@@ -149,9 +150,8 @@ func TestResolveVersionWithOverride(t *testing.T) {
 				}
 			}
 
-			// Test version resolution (this will use concrete versions to avoid network calls)
+			// Test version resolution
 			if tt.expectOverride && tt.overrideValue != "" {
-				// Use concrete version to avoid network resolution
 				concreteConfig := config.ToolConfig{
 					Version: tt.overrideValue,
 				}
@@ -159,8 +159,17 @@ func TestResolveVersionWithOverride(t *testing.T) {
 				if err != nil {
 					t.Errorf("Failed to resolve version: %v", err)
 				}
-				if resolved != tt.overrideValue {
-					t.Errorf("Expected resolved version %s, got %s", tt.overrideValue, resolved)
+				// For Java, major versions (e.g., "21") are resolved to concrete versions (e.g., "21.0.8")
+				// For other tools, the version is returned as-is
+				if tt.toolName == "java" {
+					// Check that the resolved version starts with the major version
+					if !strings.HasPrefix(resolved, tt.overrideValue+".") && resolved != tt.overrideValue {
+						t.Errorf("Expected resolved version to start with %s, got %s", tt.overrideValue, resolved)
+					}
+				} else {
+					if resolved != tt.overrideValue {
+						t.Errorf("Expected resolved version %s, got %s", tt.overrideValue, resolved)
+					}
 				}
 			}
 		})

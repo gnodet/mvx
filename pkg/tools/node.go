@@ -1,18 +1,20 @@
 package tools
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/gnodet/mvx/pkg/config"
+	"github.com/gnodet/mvx/pkg/version"
 )
 
 // Compile-time interface validation
 var _ Tool = (*NodeTool)(nil)
+var _ ToolMetadataProvider = (*NodeTool)(nil)
 
 // NodeTool manages Node.js
 // Downloads from https://nodejs.org/dist/
@@ -20,47 +22,56 @@ type NodeTool struct {
 	*BaseTool
 }
 
+func getNodeBinaryName() string {
+	if NewPlatformMapper().IsWindows() {
+		return BinaryNode + ExtExe
+	}
+	return BinaryNode
+}
+
+func getNodeToolName() string {
+	return ToolNode
+}
+
 // NewNodeTool creates a new Node tool instance
 func NewNodeTool(manager *Manager) *NodeTool {
 	return &NodeTool{
-		BaseTool: NewBaseTool(manager, "node"),
+		BaseTool: NewBaseTool(manager, getNodeToolName(), getNodeBinaryName()),
 	}
 }
 
-func (n *NodeTool) Name() string { return "node" }
+func (n *NodeTool) Name() string { return getNodeToolName() }
 
 func (n *NodeTool) Install(version string, cfg config.ToolConfig) error {
 	return n.StandardInstall(version, cfg, n.getDownloadURL)
 }
 
 func (n *NodeTool) IsInstalled(version string, cfg config.ToolConfig) bool {
-	return n.StandardIsInstalled(version, cfg, n.GetPath, "node")
+	return n.StandardIsInstalled(version, cfg, n.GetPath)
 }
 
 func (n *NodeTool) GetPath(version string, cfg config.ToolConfig) (string, error) {
-	return n.StandardGetPath(version, cfg, n.getInstalledPath, "node")
+	return n.StandardGetPath(version, cfg, n.getInstalledPath)
+}
+
+func (n *NodeTool) GetBinaryName() string {
+	return getNodeBinaryName()
 }
 
 // getInstalledPath returns the path for an installed Node version
 func (n *NodeTool) getInstalledPath(version string, cfg config.ToolConfig) (string, error) {
-	installDir := n.manager.GetToolVersionDir("node", version, "")
+	installDir := n.manager.GetToolVersionDir(n.Name(), version, "")
 	pathResolver := NewPathResolver(n.manager.GetToolsDir())
-
-	options := DirectorySearchOptions{
-		DirectoryPrefix:           "node-",
-		BinSubdirectory:           "bin",
-		BinaryName:                "node",
-		UsePlatformExtensions:     true,
-		PreferredWindowsExtension: ".exe", // Node uses .exe on Windows
-		FallbackToParent:          true,   // On Windows, Node distributes binaries at root
+	binDir, err := pathResolver.FindBinaryParentDir(installDir, n.GetBinaryName())
+	if err != nil {
+		return "", err
 	}
-
-	return pathResolver.FindToolBinaryPath(installDir, options)
+	return binDir, nil
 }
 
 func (n *NodeTool) Verify(version string, cfg config.ToolConfig) error {
 	verifyConfig := VerificationConfig{
-		BinaryName:  "node",
+		BinaryName:  n.GetBinaryName(),
 		VersionArgs: []string{"--version"},
 		DebugInfo:   false,
 	}
@@ -68,31 +79,85 @@ func (n *NodeTool) Verify(version string, cfg config.ToolConfig) error {
 }
 
 func (n *NodeTool) ListVersions() ([]string, error) {
-	registry := n.manager.GetRegistry()
-	return registry.GetNodeVersions()
+	versions, err := n.fetchNodeVersions()
+	if err != nil {
+		// minimal fallback
+		return []string{"22.5.1", "22.4.1", "20.15.0", "18.20.4"}, nil
+	}
+	return version.SortVersions(versions), nil
+}
+
+// GetDisplayName returns the human-readable name for Node.js (implements ToolMetadataProvider)
+func (n *NodeTool) GetDisplayName() string {
+	return "Node.js"
+}
+
+// GetEmoji returns the emoji icon for Node.js (implements ToolMetadataProvider)
+func (n *NodeTool) GetEmoji() string {
+	return "📦"
+}
+
+func (n *NodeTool) fetchNodeVersions() ([]string, error) {
+	entries, err := n.fetchNodeIndex()
+	if err != nil {
+		return nil, err
+	}
+	var versions []string
+	for _, e := range entries {
+		v := strings.TrimPrefix(e.Version, "v")
+		versions = append(versions, v)
+	}
+	return versions, nil
+}
+
+type nodeIndexEntry struct {
+	Version string      `json:"version"`
+	LTS     interface{} `json:"lts"`
+}
+
+func (n *NodeTool) fetchNodeIndex() ([]nodeIndexEntry, error) {
+	resp, err := n.manager.Get(NodeJSDistBase + "/index.json")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("node index fetch failed: %d", resp.StatusCode)
+	}
+	var entries []nodeIndexEntry
+	dec := json.NewDecoder(resp.Body)
+	if err := dec.Decode(&entries); err != nil {
+		return nil, err
+	}
+	return entries, nil
+}
+
+// fetchNodeLTSVersions fetches available Node.js LTS versions
+func (n *NodeTool) fetchNodeLTSVersions() ([]string, error) {
+	entries, err := n.fetchNodeIndex()
+	if err != nil {
+		return nil, err
+	}
+	var versions []string
+	for _, e := range entries {
+		// LTS can be false (not LTS), true (LTS but no codename), or a string (LTS with codename)
+		if e.LTS != nil && e.LTS != false {
+			// Check if it's a boolean true or a string (both indicate LTS)
+			if ltsValue, ok := e.LTS.(bool); ok && ltsValue {
+				versions = append(versions, strings.TrimPrefix(e.Version, "v"))
+			} else if ltsString, ok := e.LTS.(string); ok && ltsString != "" {
+				versions = append(versions, strings.TrimPrefix(e.Version, "v"))
+			}
+		}
+	}
+	return versions, nil
 }
 
 // GetDownloadOptions returns download options specific to Node.js
 func (n *NodeTool) GetDownloadOptions() DownloadOptions {
 	return DownloadOptions{
-		FileExtension: ".tar.xz",
-		ExpectedType:  "application",
-		MinSize:       1 * 1024 * 1024,   // 1MB (very permissive, rely on checksums)
-		MaxSize:       200 * 1024 * 1024, // 200MB (generous upper bound)
-		ArchiveType:   "tar.xz",
+		FileExtension: ExtTarGz,
 	}
-}
-
-// GetDisplayName returns the display name for Node.js
-func (n *NodeTool) GetDisplayName() string {
-	return "Node.js"
-}
-
-func (n *NodeTool) nodeBinaryName() string {
-	if runtime.GOOS == "windows" {
-		return "node.exe"
-	}
-	return "node"
 }
 
 func (n *NodeTool) getDownloadURL(version string) string {
@@ -122,18 +187,43 @@ func (n *NodeTool) getDownloadURL(version string) string {
 	// Determine file extension
 	var fileExt string
 	if platformMapper.IsWindows() {
-		fileExt = ".zip"
+		fileExt = ExtZip
 	} else {
-		fileExt = ".tar.xz"
+		fileExt = ExtTarGz
 	}
 
-	return fmt.Sprintf("https://nodejs.org/dist/v%[1]s/node-v%[1]s-%[2]s%[3]s", version, platform, fileExt)
+	return fmt.Sprintf(NodeJSDistBase+"/v%[1]s/node-v%[1]s-%[2]s%[3]s", version, platform, fileExt)
 }
 
 // ResolveVersion resolves a Node version specification to a concrete version
-func (n *NodeTool) ResolveVersion(version, distribution string) (string, error) {
-	registry := n.manager.GetRegistry()
-	return registry.ResolveNodeVersion(version)
+func (n *NodeTool) ResolveVersion(versionSpec, distribution string) (string, error) {
+	// Special handling for "lts"
+	if versionSpec == "lts" {
+		lts, err := n.fetchNodeLTSVersions()
+		if err != nil || len(lts) == 0 {
+			return "", fmt.Errorf("failed to resolve Node LTS version")
+		}
+		// Return highest LTS (first element since SortVersions returns descending order)
+		sorted := version.SortVersions(lts)
+		return sorted[0], nil
+	}
+
+	availableVersions, err := n.ListVersions()
+	if err != nil {
+		return "", err
+	}
+
+	spec, err := version.ParseSpec(versionSpec)
+	if err != nil {
+		return "", fmt.Errorf("invalid version specification %s: %w", versionSpec, err)
+	}
+
+	resolved, err := spec.Resolve(availableVersions)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve Node version %s: %w", versionSpec, err)
+	}
+
+	return resolved, nil
 }
 
 // GetChecksum implements ChecksumProvider interface for Node.js
@@ -155,13 +245,9 @@ func (n *NodeTool) GetChecksum(version, filename string) (ChecksumInfo, error) {
 
 // fetchNodeChecksum fetches Node.js checksum from SHASUMS256.txt
 func (n *NodeTool) fetchNodeChecksum(version, filename string) (string, error) {
-	url := fmt.Sprintf("https://nodejs.org/dist/v%s/SHASUMS256.txt", version)
+	url := fmt.Sprintf("%s/v%s/SHASUMS256.txt", NodeJSDistBase, version)
 
-	client := &http.Client{
-		Timeout: 120 * time.Second, // 2 minutes for slow servers
-	}
-
-	resp, err := client.Get(url)
+	resp, err := n.manager.Get(url)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch Node.js checksums: %w", err)
 	}
@@ -248,11 +334,11 @@ func (n *NodeTool) getNodeFilename(version string) string {
 		platform = "win-x64"
 	}
 
-	// Windows uses zip, others tar.xz
+	// Windows uses zip, others tar.gz
 	if runtime.GOOS == "windows" {
 		return fmt.Sprintf("node-v%s-%s.zip", version, platform)
 	}
-	return fmt.Sprintf("node-v%s-%s.tar.xz", version, platform)
+	return fmt.Sprintf("node-v%s-%s.tar.gz", version, platform)
 }
 
 // GetDownloadURL implements URLProvider interface for Node.js

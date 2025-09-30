@@ -4,30 +4,39 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"path/filepath"
-	"time"
+	"strings"
 
 	"github.com/gnodet/mvx/pkg/config"
+	"github.com/gnodet/mvx/pkg/version"
 )
 
 // Compile-time interface validation
 var _ Tool = (*GoTool)(nil)
+var _ ToolMetadataProvider = (*GoTool)(nil)
 
 // GoTool implements Tool interface for Go toolchain management
 type GoTool struct {
 	*BaseTool
 }
 
+func getGoBinaryName() string {
+	platformMapper := NewPlatformMapper()
+	if platformMapper.IsWindows() {
+		return "go.exe"
+	}
+	return "go"
+}
+
 // NewGoTool creates a new Go tool instance
 func NewGoTool(manager *Manager) *GoTool {
 	return &GoTool{
-		BaseTool: NewBaseTool(manager, "go"),
+		BaseTool: NewBaseTool(manager, ToolGo, getGoBinaryName()),
 	}
 }
 
 // Name returns the tool name
 func (g *GoTool) Name() string {
-	return "go"
+	return ToolGo
 }
 
 // Install downloads and installs the specified Go version
@@ -37,41 +46,33 @@ func (g *GoTool) Install(version string, cfg config.ToolConfig) error {
 
 // IsInstalled checks if the specified version is installed
 func (g *GoTool) IsInstalled(version string, cfg config.ToolConfig) bool {
-	return g.StandardIsInstalled(version, cfg, g.GetPath, "go")
+	return g.StandardIsInstalled(version, cfg, g.GetPath)
 }
 
 // GetPath returns the binary path for the specified version (for PATH management)
 func (g *GoTool) GetPath(version string, cfg config.ToolConfig) (string, error) {
-	return g.StandardGetPath(version, cfg, g.getInstalledPath, "go")
+	return g.StandardGetPath(version, cfg, g.getInstalledPath)
+}
+
+func (g *GoTool) GetBinaryName() string {
+	return getGoBinaryName()
 }
 
 // getInstalledPath returns the path for an installed Go version
 func (g *GoTool) getInstalledPath(version string, cfg config.ToolConfig) (string, error) {
-	installDir := g.manager.GetToolVersionDir("go", version, "")
+	installDir := g.manager.GetToolVersionDir(g.Name(), version, "")
 	pathResolver := NewPathResolver(g.manager.GetToolsDir())
-
-	options := DirectorySearchOptions{
-		DirectoryPrefix:           "go",
-		BinSubdirectory:           "bin",
-		BinaryName:                "go",
-		UsePlatformExtensions:     true,
-		PreferredWindowsExtension: ".exe", // Go uses .exe on Windows
-		FallbackToParent:          false,  // Go always has bin subdirectory
-	}
-
-	binPath, err := pathResolver.FindToolBinaryPath(installDir, options)
+	binDir, err := pathResolver.FindBinaryParentDir(installDir, g.GetBinaryName())
 	if err != nil {
-		// Fallback to default bin directory if search fails
-		return filepath.Join(installDir, "bin"), nil
+		return "", err
 	}
-
-	return binPath, nil
+	return binDir, nil
 }
 
 // Verify checks if the installation is working correctly
 func (g *GoTool) Verify(version string, cfg config.ToolConfig) error {
 	verifyConfig := VerificationConfig{
-		BinaryName:  "go",
+		BinaryName:  g.GetBinaryName(),
 		VersionArgs: []string{"version"},
 		DebugInfo:   false,
 	}
@@ -80,24 +81,84 @@ func (g *GoTool) Verify(version string, cfg config.ToolConfig) error {
 
 // ListVersions returns available versions for installation
 func (g *GoTool) ListVersions() ([]string, error) {
-	registry := g.manager.GetRegistry()
-	return registry.GetGoVersions()
+	// Try to fetch versions from Go releases API
+	versions, err := g.fetchGoVersions()
+	if err != nil {
+		// Fallback to known versions if API is unavailable
+		return g.getFallbackGoVersions(), nil
+	}
+
+	// If API returned empty results, use fallback
+	if len(versions) == 0 {
+		return g.getFallbackGoVersions(), nil
+	}
+
+	return version.SortVersions(versions), nil
+}
+
+// GetDisplayName returns the human-readable name for Go (implements ToolMetadataProvider)
+func (g *GoTool) GetDisplayName() string {
+	return "Go Programming Language"
+}
+
+// GetEmoji returns the emoji icon for Go (implements ToolMetadataProvider)
+func (g *GoTool) GetEmoji() string {
+	return "🐹"
+}
+
+// fetchGoVersions fetches Go versions from GitHub releases API
+func (g *GoTool) fetchGoVersions() ([]string, error) {
+	resp, err := g.manager.Get(GoGithubAPIBase + "/tags?per_page=100")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("failed to fetch Go versions: status %d", resp.StatusCode)
+	}
+
+	var tags []struct {
+		Name string `json:"name"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&tags); err != nil {
+		return nil, err
+	}
+
+	var versions []string
+	for _, tag := range tags {
+		// Go tags are like "go1.21.0", "go1.20.5", etc.
+		if strings.HasPrefix(tag.Name, "go") && g.isValidGoVersion(tag.Name[2:]) {
+			versions = append(versions, tag.Name[2:]) // Remove "go" prefix
+		}
+	}
+
+	return versions, nil
+}
+
+// isValidGoVersion checks if a version string looks like a valid Go version
+func (g *GoTool) isValidGoVersion(version string) bool {
+	// Simple validation: should contain dots and numbers
+	return strings.Contains(version, ".") && len(version) > 2
+}
+
+// getFallbackGoVersions returns known Go versions as fallback
+func (g *GoTool) getFallbackGoVersions() []string {
+	return []string{
+		"1.24.2", "1.24.1", "1.24.0",
+		"1.23.4", "1.23.3", "1.23.2", "1.23.1", "1.23.0",
+		"1.22.10", "1.22.9", "1.22.8", "1.22.7", "1.22.6", "1.22.5", "1.22.4", "1.22.3", "1.22.2", "1.22.1", "1.22.0",
+		"1.21.13", "1.21.12", "1.21.11", "1.21.10", "1.21.9", "1.21.8", "1.21.7", "1.21.6", "1.21.5", "1.21.4", "1.21.3", "1.21.2", "1.21.1", "1.21.0",
+		"1.20.14", "1.20.13", "1.20.12", "1.20.11", "1.20.10", "1.20.9", "1.20.8", "1.20.7", "1.20.6", "1.20.5", "1.20.4", "1.20.3", "1.20.2", "1.20.1", "1.20.0",
+	}
 }
 
 // GetDownloadOptions returns download options specific to Go
 func (g *GoTool) GetDownloadOptions() DownloadOptions {
 	return DownloadOptions{
-		FileExtension: ".tar.gz",
-		ExpectedType:  "application",
-		MinSize:       50 * 1024 * 1024,  // 50MB
-		MaxSize:       200 * 1024 * 1024, // 200MB
-		ArchiveType:   "tar.gz",
+		FileExtension: ExtTarGz,
 	}
-}
-
-// GetDisplayName returns the display name for Go
-func (g *GoTool) GetDisplayName() string {
-	return "Go"
 }
 
 // getDownloadURL returns the download URL for the specified version
@@ -109,21 +170,35 @@ func (g *GoTool) getDownloadURL(version string) string {
 	// Determine file extension
 	var fileExt string
 	if platformMapper.IsWindows() {
-		fileExt = ".zip"
+		fileExt = ExtZip
 	} else {
-		fileExt = ".tar.gz"
+		fileExt = ExtTarGz
 	}
 
 	// Construct filename
 	filename := fmt.Sprintf("go%s.%s-%s%s", version, osName, arch, fileExt)
 
-	return fmt.Sprintf("https://go.dev/dl/%s", filename)
+	return fmt.Sprintf("%s/%s", GoDevAPIBase, filename)
 }
 
 // ResolveVersion resolves a Go version specification to a concrete version
-func (g *GoTool) ResolveVersion(version, distribution string) (string, error) {
-	registry := g.manager.GetRegistry()
-	return registry.ResolveGoVersion(version)
+func (g *GoTool) ResolveVersion(versionSpec, distribution string) (string, error) {
+	availableVersions, err := g.ListVersions()
+	if err != nil {
+		return "", err
+	}
+
+	spec, err := version.ParseSpec(versionSpec)
+	if err != nil {
+		return "", fmt.Errorf("invalid version specification %s: %w", versionSpec, err)
+	}
+
+	resolved, err := spec.Resolve(availableVersions)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve Go version %s: %w", versionSpec, err)
+	}
+
+	return resolved, nil
 }
 
 // GetChecksum implements ChecksumProvider interface for Go
@@ -163,13 +238,9 @@ type GoFile struct {
 
 // fetchGoChecksum fetches Go checksum from go.dev API
 func (g *GoTool) fetchGoChecksum(version, filename string) (string, error) {
-	url := "https://go.dev/dl/?mode=json&include=all"
+	url := GoDevAPIBase + "/?mode=json&include=all"
 
-	client := &http.Client{
-		Timeout: 120 * time.Second, // 2 minutes for slow servers
-	}
-
-	resp, err := client.Get(url)
+	resp, err := g.manager.Get(url)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch Go checksums: %w", err)
 	}

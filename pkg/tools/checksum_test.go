@@ -23,7 +23,12 @@ func TestChecksumVerifier_VerifyFile(t *testing.T) {
 	hasher.Write([]byte(testContent))
 	expectedChecksum := hex.EncodeToString(hasher.Sum(nil))
 
-	verifier := NewChecksumVerifier()
+	manager, err := NewManager()
+	if err != nil {
+		t.Fatalf("Failed to create manager: %v", err)
+	}
+
+	verifier := NewChecksumVerifier(manager)
 
 	tests := []struct {
 		name        string
@@ -79,7 +84,12 @@ func TestChecksumVerifier_calculateChecksum(t *testing.T) {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
-	verifier := NewChecksumVerifier()
+	manager, err := NewManager()
+	if err != nil {
+		t.Fatalf("Failed to create manager: %v", err)
+	}
+
+	verifier := NewChecksumVerifier(manager)
 
 	// Calculate checksum
 	checksum, err := verifier.calculateChecksum(testFile, SHA256)
@@ -98,7 +108,12 @@ func TestChecksumVerifier_calculateChecksum(t *testing.T) {
 }
 
 func TestChecksumVerifier_parseChecksumFile(t *testing.T) {
-	verifier := NewChecksumVerifier()
+	manager, err := NewManager()
+	if err != nil {
+		t.Fatalf("Failed to create manager: %v", err)
+	}
+
+	verifier := NewChecksumVerifier(manager)
 
 	tests := []struct {
 		name        string
@@ -156,54 +171,7 @@ func TestChecksumVerifier_parseChecksumFile(t *testing.T) {
 	}
 }
 
-func TestChecksumRegistry_GetChecksum(t *testing.T) {
-	registry := NewChecksumRegistry()
-
-	// Test known checksum
-	checksum, exists := registry.GetChecksum("maven", "3.9.6", "bin")
-	if !exists {
-		t.Errorf("Expected to find checksum for maven 3.9.6")
-	}
-	if checksum.Type != SHA512 {
-		t.Errorf("Expected SHA512 checksum type, got %s", checksum.Type)
-	}
-	if checksum.URL == "" {
-		t.Errorf("Expected checksum URL to be set")
-	}
-
-	// Test unknown checksum
-	_, exists = registry.GetChecksum("unknown", "1.0.0", "bin")
-	if exists {
-		t.Errorf("Did not expect to find checksum for unknown tool")
-	}
-}
-
-func TestChecksumRegistry_SupportsChecksumVerification(t *testing.T) {
-	registry := NewChecksumRegistry()
-
-	tests := []struct {
-		toolName string
-		expected bool
-	}{
-		{"maven", true},
-		{"mvnd", true},
-		{"go", true},
-		{"java", true}, // Java uses Adoptium API
-		{"node", true}, // Node.js uses SHASUMS256.txt
-		{"unknown", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.toolName, func(t *testing.T) {
-			result := registry.SupportsChecksumVerification(tt.toolName)
-			if result != tt.expected {
-				t.Errorf("Expected %v for %s, got %v", tt.expected, tt.toolName, result)
-			}
-		})
-	}
-}
-
-func TestJavaChecksumProvider(t *testing.T) {
+func TestJavaToolChecksum(t *testing.T) {
 	manager, err := NewManager()
 	if err != nil {
 		t.Fatalf("Failed to create manager: %v", err)
@@ -211,18 +179,15 @@ func TestJavaChecksumProvider(t *testing.T) {
 
 	javaTool := NewJavaTool(manager)
 
-	// Test that Java tool implements ChecksumProvider
-	var provider ChecksumProvider = javaTool
-
 	// Test the GetChecksum method (should return error since Java checksums come from config)
-	_, err = provider.GetChecksum("21", "test-file.tar.gz")
+	_, err = javaTool.GetChecksum("21", "test-file.tar.gz")
 	if err == nil {
 		t.Errorf("Expected error for Java checksum without configuration")
 	}
-	t.Logf("Java checksum provider correctly returns error: %v", err)
+	t.Logf("Java checksum correctly returns error: %v", err)
 }
 
-func TestNodeChecksumProvider(t *testing.T) {
+func TestNodeToolChecksum(t *testing.T) {
 	manager, err := NewManager()
 	if err != nil {
 		t.Fatalf("Failed to create manager: %v", err)
@@ -230,11 +195,8 @@ func TestNodeChecksumProvider(t *testing.T) {
 
 	nodeTool := NewNodeTool(manager)
 
-	// Test that Node tool implements ChecksumProvider
-	var provider ChecksumProvider = nodeTool
-
 	// Test with a known Node.js version (this is a real API call)
-	checksum, err := provider.GetChecksum("22.14.0", "node-v22.14.0-linux-x64.tar.xz")
+	checksum, err := nodeTool.GetChecksum("22.14.0", "node-v22.14.0-linux-x64.tar.xz")
 	if err != nil {
 		t.Logf("Node.js checksum fetch failed (expected in CI): %v", err)
 		return // Skip test if API is not accessible
