@@ -22,15 +22,13 @@ jobs:
       with:
         fetch-depth: 0 # Fetch all history for proper git info
     
-    - name: Setup Java
-      uses: actions/setup-java@v5
-      with:
-        distribution: 'temurin'
-        java-version: '21'
-        cache: 'maven'
+    - name: Setup mvx
+      run: ./mvx setup
 
-    - name: Build website with Javadocs
+    - name: Build website
       shell: bash
+      env:
+        MVX_JAVA_VERSION: "21"
       run: |
         # Fetch GitHub Pages URL
         OWNER=$(echo "$GITHUB_REPOSITORY" | cut -d '/' -f 1)
@@ -40,11 +38,9 @@ jobs:
         echo "SITE_URL=$SITE_URL" >> $GITHUB_ENV
         echo "SITE_PATH=$SITE_PATH" >> $GITHUB_ENV
         echo "GITHUB_REPOSITORY=$GITHUB_REPOSITORY SITE_DIR=$SITE_DIR SITE_URL=$SITE_URL SITE_PATH=$SITE_PATH"
-        QUARKUS_ROQ_GENERATOR_BATCH=true mvn -f website clean package quarkus:run \
-            -DskipTests -Pinclude-javadocs \
+        QUARKUS_ROQ_GENERATOR_BATCH=true ./mvx website build \
             -Dquarkus.http.root-path=$SITE_PATH \
-            -Dsite.url=$SITE_URL \
-            --no-transfer-progress
+            -Dsite.url=$SITE_URL
     
     - name: Upload build artifacts
       uses: actions/upload-pages-artifact@v4

@@ -1,0 +1,1036 @@
+2025-09-27T14:04:44.8555403Z Current runner version: '2.328.0'
+2025-09-27T14:04:44.8580060Z ##[group]Runner Image Provisioner
+2025-09-27T14:04:44.8580883Z Hosted Compute Agent
+2025-09-27T14:04:44.8581392Z Version: 20250912.392
+2025-09-27T14:04:44.8582091Z Commit: d921fda672a98b64f4f82364647e2f10b2267d0b
+2025-09-27T14:04:44.8582750Z Build Date: 2025-09-12T15:23:14Z
+2025-09-27T14:04:44.8583321Z ##[endgroup]
+2025-09-27T14:04:44.8583910Z ##[group]Operating System
+2025-09-27T14:04:44.8584480Z Ubuntu
+2025-09-27T14:04:44.8584917Z 24.04.3
+2025-09-27T14:04:44.8585443Z LTS
+2025-09-27T14:04:44.8585861Z ##[endgroup]
+2025-09-27T14:04:44.8586350Z ##[group]Runner Image
+2025-09-27T14:04:44.8587127Z Image: ubuntu-24.04
+2025-09-27T14:04:44.8587625Z Version: 20250922.53.1
+2025-09-27T14:04:44.8588618Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20250922.53/images/ubuntu/Ubuntu2404-Readme.md
+2025-09-27T14:04:44.8590155Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20250922.53
+2025-09-27T14:04:44.8591107Z ##[endgroup]
+2025-09-27T14:04:44.8592248Z ##[group]GITHUB_TOKEN Permissions
+2025-09-27T14:04:44.8594082Z Contents: read
+2025-09-27T14:04:44.8594709Z Metadata: read
+2025-09-27T14:04:44.8595206Z Packages: read
+2025-09-27T14:04:44.8595705Z ##[endgroup]
+2025-09-27T14:04:44.8598371Z Secret source: Actions
+2025-09-27T14:04:44.8599397Z Prepare workflow directory
+2025-09-27T14:04:44.8989253Z Prepare all required actions
+2025-09-27T14:04:44.9028173Z Getting action download info
+2025-09-27T14:04:45.3234444Z Download action repository 'actions/checkout@v5' (SHA:08c6903cd8c0fde910a37f88322edcfb5dd907a8)
+2025-09-27T14:04:45.4837740Z Download action repository 'actions/setup-java@v5' (SHA:dded0888837ed1f317902acf8a20df0ad188d165)
+2025-09-27T14:04:46.4899988Z Download action repository 'actions/upload-pages-artifact@v4' (SHA:7b1f4a764d45c48632c6b24a0339c27f5614fb0b)
+2025-09-27T14:04:47.0495966Z Getting action download info
+2025-09-27T14:04:47.2189984Z Download action repository 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2025-09-27T14:04:47.3752547Z Complete job name: build
+2025-09-27T14:04:47.4548243Z ##[group]Run actions/checkout@v5
+2025-09-27T14:04:47.4549843Z with:
+2025-09-27T14:04:47.4550536Z   fetch-depth: 0
+2025-09-27T14:04:47.4551282Z   repository: gnodet/mvx
+2025-09-27T14:04:47.4552352Z   token: ***
+2025-09-27T14:04:47.4553053Z   ssh-strict: true
+2025-09-27T14:04:47.4553782Z   ssh-user: git
+2025-09-27T14:04:47.4554519Z   persist-credentials: true
+2025-09-27T14:04:47.4555344Z   clean: true
+2025-09-27T14:04:47.4556097Z   sparse-checkout-cone-mode: true
+2025-09-27T14:04:47.4557164Z   fetch-tags: false
+2025-09-27T14:04:47.4557926Z   show-progress: true
+2025-09-27T14:04:47.4558667Z   lfs: false
+2025-09-27T14:04:47.4559340Z   submodules: false
+2025-09-27T14:04:47.4560098Z   set-safe-directory: true
+2025-09-27T14:04:47.4561232Z ##[endgroup]
+2025-09-27T14:04:47.5552914Z Syncing repository: gnodet/mvx
+2025-09-27T14:04:47.5555473Z ##[group]Getting Git version info
+2025-09-27T14:04:47.5556611Z Working directory is '/home/runner/work/mvx/mvx'
+2025-09-27T14:04:47.5558686Z [command]/usr/bin/git version
+2025-09-27T14:04:47.5611977Z git version 2.51.0
+2025-09-27T14:04:47.5636200Z ##[endgroup]
+2025-09-27T14:04:47.5654721Z Temporarily overriding HOME='/home/runner/work/_temp/158fca11-9947-41ee-91b9-2229526a4eda' before making global git config changes
+2025-09-27T14:04:47.5659299Z Adding repository directory to the temporary git global config as a safe directory
+2025-09-27T14:04:47.5662544Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/mvx/mvx
+2025-09-27T14:04:47.5703020Z Deleting the contents of '/home/runner/work/mvx/mvx'
+2025-09-27T14:04:47.5707799Z ##[group]Initializing the repository
+2025-09-27T14:04:47.5712571Z [command]/usr/bin/git init /home/runner/work/mvx/mvx
+2025-09-27T14:04:47.5831399Z hint: Using 'master' as the name for the initial branch. This default branch name
+2025-09-27T14:04:47.5833487Z hint: is subject to change. To configure the initial branch name to use in all
+2025-09-27T14:04:47.5835951Z hint: of your new repositories, which will suppress this warning, call:
+2025-09-27T14:04:47.5837888Z hint:
+2025-09-27T14:04:47.5839177Z hint: 	git config --global init.defaultBranch <name>
+2025-09-27T14:04:47.5841020Z hint:
+2025-09-27T14:04:47.5842020Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2025-09-27T14:04:47.5843681Z hint: 'development'. The just-created branch can be renamed via this command:
+2025-09-27T14:04:47.5845082Z hint:
+2025-09-27T14:04:47.5846150Z hint: 	git branch -m <name>
+2025-09-27T14:04:47.5847428Z hint:
+2025-09-27T14:04:47.5848519Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2025-09-27T14:04:47.5850245Z Initialized empty Git repository in /home/runner/work/mvx/mvx/.git/
+2025-09-27T14:04:47.5852968Z [command]/usr/bin/git remote add origin https://github.com/gnodet/mvx
+2025-09-27T14:04:47.5895700Z ##[endgroup]
+2025-09-27T14:04:47.5897058Z ##[group]Disabling automatic garbage collection
+2025-09-27T14:04:47.5899112Z [command]/usr/bin/git config --local gc.auto 0
+2025-09-27T14:04:47.5930681Z ##[endgroup]
+2025-09-27T14:04:47.5937481Z ##[group]Setting up auth
+2025-09-27T14:04:47.5938769Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2025-09-27T14:04:47.5969958Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2025-09-27T14:04:47.6308774Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2025-09-27T14:04:47.6341181Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2025-09-27T14:04:47.6573459Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2025-09-27T14:04:47.6615846Z ##[endgroup]
+2025-09-27T14:04:47.6618173Z ##[group]Fetching the repository
+2025-09-27T14:04:47.6629445Z [command]/usr/bin/git -c protocol.version=2 fetch --prune --no-recurse-submodules origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/*
+2025-09-27T14:04:49.4406027Z From https://github.com/gnodet/mvx
+2025-09-27T14:04:49.4407073Z  * [new branch]      feature/gradle-support -> origin/feature/gradle-support
+2025-09-27T14:04:49.4407901Z  * [new branch]      feature/rust-cargo-support -> origin/feature/rust-cargo-support
+2025-09-27T14:04:49.4408347Z  * [new branch]      main                   -> origin/main
+2025-09-27T14:04:49.4408775Z  * [new branch]      perf/optimize-mvn-command -> origin/perf/optimize-mvn-command
+2025-09-27T14:04:49.4409379Z  * [new branch]      refactoring            -> origin/refactoring
+2025-09-27T14:04:49.4409958Z  * [new tag]         v0.1.0                 -> v0.1.0
+2025-09-27T14:04:49.4410306Z  * [new tag]         v0.2.0                 -> v0.2.0
+2025-09-27T14:04:49.4410858Z  * [new tag]         v0.3.0                 -> v0.3.0
+2025-09-27T14:04:49.4411178Z  * [new tag]         v0.4.0                 -> v0.4.0
+2025-09-27T14:04:49.4411484Z  * [new tag]         v0.5.0                 -> v0.5.0
+2025-09-27T14:04:49.4411798Z  * [new tag]         v0.6.0                 -> v0.6.0
+2025-09-27T14:04:49.4412102Z  * [new tag]         v0.6.1                 -> v0.6.1
+2025-09-27T14:04:49.4412405Z  * [new tag]         v0.7.0                 -> v0.7.0
+2025-09-27T14:04:49.4412792Z  * [new tag]         v0.7.1                 -> v0.7.1
+2025-09-27T14:04:49.4413139Z  * [new tag]         v0.8.0                 -> v0.8.0
+2025-09-27T14:04:49.4461322Z [command]/usr/bin/git branch --list --remote origin/main
+2025-09-27T14:04:49.4486809Z   origin/main
+2025-09-27T14:04:49.4495248Z [command]/usr/bin/git rev-parse refs/remotes/origin/main
+2025-09-27T14:04:49.4517469Z 1697c0570978e3d947e94fc9451db75cd6e2d88e
+2025-09-27T14:04:49.4522636Z ##[endgroup]
+2025-09-27T14:04:49.4523514Z ##[group]Determining the checkout info
+2025-09-27T14:04:49.4524201Z ##[endgroup]
+2025-09-27T14:04:49.4529537Z [command]/usr/bin/git sparse-checkout disable
+2025-09-27T14:04:49.4574075Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2025-09-27T14:04:49.4600907Z ##[group]Checking out the ref
+2025-09-27T14:04:49.4604851Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2025-09-27T14:04:49.4720690Z Switched to a new branch 'main'
+2025-09-27T14:04:49.4721874Z branch 'main' set up to track 'origin/main'.
+2025-09-27T14:04:49.4729639Z ##[endgroup]
+2025-09-27T14:04:49.4770137Z [command]/usr/bin/git log -1 --format=%H
+2025-09-27T14:04:49.4792969Z 1697c0570978e3d947e94fc9451db75cd6e2d88e
+2025-09-27T14:04:49.5077156Z ##[group]Run actions/setup-java@v5
+2025-09-27T14:04:49.5077467Z with:
+2025-09-27T14:04:49.5077667Z   distribution: temurin
+2025-09-27T14:04:49.5077868Z   java-version: 21
+2025-09-27T14:04:49.5078062Z   cache: maven
+2025-09-27T14:04:49.5078256Z   java-package: jdk
+2025-09-27T14:04:49.5078459Z   check-latest: false
+2025-09-27T14:04:49.5078650Z   server-id: github
+2025-09-27T14:04:49.5078845Z   server-username: GITHUB_ACTOR
+2025-09-27T14:04:49.5079088Z   server-password: GITHUB_TOKEN
+2025-09-27T14:04:49.5079322Z   overwrite-settings: true
+2025-09-27T14:04:49.5079540Z   job-status: success
+2025-09-27T14:04:49.5079837Z   token: ***
+2025-09-27T14:04:49.5080038Z ##[endgroup]
+2025-09-27T14:04:49.6695148Z ##[group]Installed distributions
+2025-09-27T14:04:49.6978739Z Resolved Java 21.0.8+9 from tool-cache
+2025-09-27T14:04:49.6979214Z Setting Java 21.0.8+9 as the default
+2025-09-27T14:04:49.6990409Z (node:2055) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2025-09-27T14:04:49.6991222Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2025-09-27T14:04:49.6995220Z Creating toolchains.xml for JDK version 21 from temurin
+2025-09-27T14:04:49.7078955Z Writing to /home/runner/.m2/toolchains.xml
+2025-09-27T14:04:49.7079480Z 
+2025-09-27T14:04:49.7079973Z Java configuration:
+2025-09-27T14:04:49.7080368Z   Distribution: temurin
+2025-09-27T14:04:49.7080741Z   Version: 21.0.8+9
+2025-09-27T14:04:49.7081451Z   Path: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.8-9/x64
+2025-09-27T14:04:49.7082141Z 
+2025-09-27T14:04:49.7082908Z ##[endgroup]
+2025-09-27T14:04:49.7102688Z Creating settings.xml with server-id: github
+2025-09-27T14:04:49.7103074Z Writing to /home/runner/.m2/settings.xml
+2025-09-27T14:04:49.9709514Z Cache hit for: setup-java-Linux-x64-maven-bd9366708a786a4e57c19e5ebcb821387dff79604c84ab6475a87035b3393e9e
+2025-09-27T14:04:49.9822151Z (node:2055) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2025-09-27T14:04:51.1817545Z Received 29360128 of 194726364 (15.1%), 28.0 MBs/sec
+2025-09-27T14:04:52.1839074Z Received 167772160 of 194726364 (86.2%), 80.0 MBs/sec
+2025-09-27T14:04:52.4139744Z Received 194726364 of 194726364 (100.0%), 83.2 MBs/sec
+2025-09-27T14:04:52.4141138Z Cache Size: ~186 MB (194726364 B)
+2025-09-27T14:04:52.4183166Z [command]/usr/bin/tar -xf /home/runner/work/_temp/542fcf4b-70be-40d8-b375-a278a92e4a24/cache.tzst -P -C /home/runner/work/mvx/mvx --use-compress-program unzstd
+2025-09-27T14:04:52.8399715Z Cache restored successfully
+2025-09-27T14:04:52.8864136Z Cache restored from key: setup-java-Linux-x64-maven-bd9366708a786a4e57c19e5ebcb821387dff79604c84ab6475a87035b3393e9e
+2025-09-27T14:04:52.8986090Z ##[group]Run # Fetch GitHub Pages URL
+2025-09-27T14:04:52.8986460Z [36;1m# Fetch GitHub Pages URL[0m
+2025-09-27T14:04:52.8986797Z [36;1mOWNER=$(echo "$GITHUB_REPOSITORY" | cut -d '/' -f 1)[0m
+2025-09-27T14:04:52.8987775Z [36;1mREPO=$(echo "$GITHUB_REPOSITORY" | cut -d '/' -f 2)[0m
+2025-09-27T14:04:52.8988126Z [36;1mSITE_URL="https://${OWNER}.github.io"[0m
+2025-09-27T14:04:52.8988647Z [36;1mSITE_PATH="/${REPO}/"[0m
+2025-09-27T14:04:52.8988903Z [36;1mecho "SITE_URL=$SITE_URL" >> $GITHUB_ENV[0m
+2025-09-27T14:04:52.8989200Z [36;1mecho "SITE_PATH=$SITE_PATH" >> $GITHUB_ENV[0m
+2025-09-27T14:04:52.8989677Z [36;1mecho "GITHUB_REPOSITORY=$GITHUB_REPOSITORY SITE_DIR=$SITE_DIR SITE_URL=$SITE_URL SITE_PATH=$SITE_PATH"[0m
+2025-09-27T14:04:52.8990246Z [36;1mQUARKUS_ROQ_GENERATOR_BATCH=true mvn -f website clean package quarkus:run \[0m
+2025-09-27T14:04:52.8990654Z [36;1m    -DskipTests -Pinclude-javadocs \[0m
+2025-09-27T14:04:52.8990983Z [36;1m    -Dquarkus.http.root-path=$SITE_PATH \[0m
+2025-09-27T14:04:52.8991258Z [36;1m    -Dsite.url=$SITE_URL \[0m
+2025-09-27T14:04:52.8991506Z [36;1m    --no-transfer-progress[0m
+2025-09-27T14:04:52.9029809Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2025-09-27T14:04:52.9030134Z env:
+2025-09-27T14:04:52.9030421Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.8-9/x64
+2025-09-27T14:04:52.9030863Z   JAVA_HOME_21_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.8-9/x64
+2025-09-27T14:04:52.9031242Z ##[endgroup]
+2025-09-27T14:04:52.9139614Z GITHUB_REPOSITORY=gnodet/mvx SITE_DIR= SITE_URL=https://gnodet.github.io SITE_PATH=/mvx/
+2025-09-27T14:04:57.2637786Z [INFO] Scanning for projects...
+2025-09-27T14:04:58.5382859Z [WARNING] The requested profile "include-javadocs" could not be activated because it does not exist.
+2025-09-27T14:04:58.5872983Z [INFO] 
+2025-09-27T14:04:58.5898002Z [INFO] ----------------------< io.github.gnodet:website >----------------------
+2025-09-27T14:04:58.5898785Z [INFO] Building website 1.0.0-SNAPSHOT
+2025-09-27T14:04:58.5899241Z [INFO]   from pom.xml
+2025-09-27T14:04:58.5899716Z [INFO] --------------------------------[ jar ]---------------------------------
+2025-09-27T14:04:58.9632189Z [INFO] 
+2025-09-27T14:04:58.9635213Z [INFO] --- clean:3.2.0:clean (default-clean) @ website ---
+2025-09-27T14:04:59.0349606Z [INFO] 
+2025-09-27T14:04:59.0357536Z [INFO] --- resources:3.3.1:resources (default-resources) @ website ---
+2025-09-27T14:04:59.0936740Z [INFO] Copying 1 resource from src/main/resources to target/classes
+2025-09-27T14:04:59.1178450Z [INFO] 
+2025-09-27T14:04:59.1184474Z [INFO] --- quarkus:3.26.4:generate-code (default) @ website ---
+2025-09-27T14:04:59.9909469Z [INFO] 
+2025-09-27T14:04:59.9911905Z [INFO] --- compiler:3.14.0:compile (default-compile) @ website ---
+2025-09-27T14:05:00.1163528Z [INFO] No sources to compile
+2025-09-27T14:05:00.1164597Z [INFO] 
+2025-09-27T14:05:00.1165741Z [INFO] --- quarkus:3.26.4:generate-code-tests (default) @ website ---
+2025-09-27T14:05:01.8589731Z [INFO] 
+2025-09-27T14:05:01.8618749Z [INFO] --- resources:3.3.1:testResources (default-testResources) @ website ---
+2025-09-27T14:05:01.8625845Z [INFO] skip non existing resourceDirectory /home/runner/work/mvx/mvx/website/src/test/resources
+2025-09-27T14:05:01.8630540Z [INFO] 
+2025-09-27T14:05:01.8631363Z [INFO] --- compiler:3.14.0:testCompile (default-testCompile) @ website ---
+2025-09-27T14:05:01.8679112Z [INFO] No sources to compile
+2025-09-27T14:05:01.8681407Z [INFO] 
+2025-09-27T14:05:01.8683592Z [INFO] --- surefire:3.5.3:test (default-test) @ website ---
+2025-09-27T14:05:01.9719506Z [INFO] Tests are skipped.
+2025-09-27T14:05:01.9720125Z [INFO] 
+2025-09-27T14:05:01.9720610Z [INFO] --- jar:3.4.1:jar (default-jar) @ website ---
+2025-09-27T14:05:02.2630709Z [INFO] Building jar: /home/runner/work/mvx/mvx/website/target/website-1.0.0-SNAPSHOT.jar
+2025-09-27T14:05:02.3235696Z [INFO] 
+2025-09-27T14:05:02.3236787Z [INFO] --- quarkus:3.26.4:build (default) @ website ---
+2025-09-27T14:05:03.7302143Z [INFO] [io.quarkiverse.web.bundler.deployment.WebDependenciesProcessor] 0 web Dependencies installed in 2ms.
+2025-09-27T14:05:03.7403127Z [INFO] [io.quarkiverse.web.bundler.deployment.PrepareForBundlingProcessor] Bundling 'main' (1 files)
+2025-09-27T14:05:03.8663771Z [INFO] [io.quarkiverse.roq.data.deployment.RoqDataBeanProcessor] Roq data beans (* add a @DataMapping to enable type-safety): 
+2025-09-27T14:05:03.8664911Z     - io.vertx.core.json.JsonObject[name=menu]*
+2025-09-27T14:05:03.8665911Z     - io.vertx.core.json.JsonObject[name=authors]*
+2025-09-27T14:05:04.1048108Z [INFO] [io.quarkiverse.web.bundler.deployment.BundlingProcessor] Bundle generated 2 files in 360ms
+2025-09-27T14:05:05.3449035Z [INFO] [io.quarkus.deployment.QuarkusAugmentor] Quarkus augmentation completed in 3006ms
+2025-09-27T14:05:05.3534317Z [INFO] 
+2025-09-27T14:05:05.3534840Z [INFO] --- quarkus:3.26.4:run (default-cli) @ website ---
+2025-09-27T14:05:06.5654435Z [INFO] [io.quarkus.deployment.QuarkusAugmentor] Quarkus augmentation completed in 778ms
+2025-09-27T14:05:06.5670713Z [INFO] Executing "/usr/lib/jvm/temurin-21-jdk-amd64/bin/java -Dquarkus.platform.version=3.26.4 -Dquarkus.application.version=1.0.0-SNAPSHOT -Dquarkus.platform.artifact-id=quarkus-bom -Dquarkus.platform.group-id=io.quarkus.platform -Dquarkus.application.name=website -jar /home/runner/work/mvx/mvx/website/target/quarkus-app/quarkus-run.jar"
+2025-09-27T14:05:08.0326400Z __  ____  __  _____   ___  __ ____  ______ 
+2025-09-27T14:05:08.0327183Z  --/ __ \/ / / / _ | / _ \/ //_/ / / / __/ 
+2025-09-27T14:05:08.0327615Z  -/ /_/ / /_/ / __ |/ , _/ ,< / /_/ /\ \   
+2025-09-27T14:05:08.0346726Z --\___\_\____/_/ |_/_/|_/_/|_|\____/___/   
+2025-09-27T14:05:08.0347954Z 2025-09-27 14:05:08,023 INFO  [io.quarkus] (main) website 1.0.0-SNAPSHOT on JVM (powered by Quarkus 3.26.4) started in 1.337s. Listening on: http://0.0.0.0:8080
+2025-09-27T14:05:08.0349063Z 2025-09-27 14:05:08,032 INFO  [io.quarkus] (main) Profile prod activated. 
+2025-09-27T14:05:08.0350551Z 2025-09-27 14:05:08,032 INFO  [io.quarkus] (main) Installed features: [cdi, qute, qute-web-markdown, roq-data, roq-frontmatter, roq-generator, roq-plugin-markdown, smallrye-context-propagation, vertx, web-bundler]
+2025-09-27T14:05:08.3828760Z 2025-09-27 14:05:08,380 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file css/docusaurus-style.css
+2025-09-27T14:05:08.3830595Z 2025-09-27 14:05:08,380 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file css/layout.css
+2025-09-27T14:05:08.3832126Z 2025-09-27 14:05:08,381 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file css/syntax-highlighting.css
+2025-09-27T14:05:08.3878650Z 2025-09-27 14:05:08,381 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file images/mvx-logo.svg
+2025-09-27T14:05:08.3880286Z 2025-09-27 14:05:08,381 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file js/layout.js
+2025-09-27T14:05:08.3881836Z 2025-09-27 14:05:08,381 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file js/syntax-highlighting.js
+2025-09-27T14:05:08.3883533Z 2025-09-27 14:05:08,385 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file static/bundle/assets/fa-brands-400-Q3XCMWHQ.woff2
+2025-09-27T14:05:08.3885349Z 2025-09-27 14:05:08,385 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file static/bundle/assets/fa-regular-400-XUOPSR7E.ttf
+2025-09-27T14:05:08.3887399Z 2025-09-27 14:05:08,385 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file static/bundle/assets/fa-regular-400-QSNYFYRT.woff2
+2025-09-27T14:05:08.3889464Z 2025-09-27 14:05:08,386 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file static/bundle/assets/pt-serif-cyrillic-400-normal-576HUVZF.woff
+2025-09-27T14:05:08.3891614Z 2025-09-27 14:05:08,386 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file static/bundle/assets/fa-solid-900-5ZUYHGA7.woff2
+2025-09-27T14:05:08.3893428Z 2025-09-27 14:05:08,386 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file static/bundle/assets/fa-brands-400-R2XQZCET.ttf
+2025-09-27T14:05:08.3895460Z 2025-09-27 14:05:08,386 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file static/bundle/assets/pt-serif-cyrillic-400-normal-VSLYW2SF.woff2
+2025-09-27T14:05:08.3898028Z 2025-09-27 14:05:08,387 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file static/bundle/assets/pt-serif-cyrillic-ext-400-normal-JMRCZRXH.woff
+2025-09-27T14:05:08.3900037Z 2025-09-27 14:05:08,387 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file static/bundle/assets/pt-serif-latin-400-normal-PNCQDYFT.woff
+2025-09-27T14:05:08.3902033Z 2025-09-27 14:05:08,387 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file static/bundle/assets/pt-serif-latin-400-normal-F2XC2DKS.woff2
+2025-09-27T14:05:08.3903828Z 2025-09-27 14:05:08,387 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file static/bundle/main-XI6TRIKE.js
+2025-09-27T14:05:08.3939209Z 2025-09-27 14:05:08,388 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file static/bundle/main-XI6TRIKE.js.map
+2025-09-27T14:05:08.3940909Z 2025-09-27 14:05:08,388 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file static/bundle/assets/pt-serif-cyrillic-ext-400-normal-LGCPZR4K.woff2
+2025-09-27T14:05:08.3942765Z 2025-09-27 14:05:08,388 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file static/bundle/assets/pt-serif-latin-ext-400-normal-MYUVL4VW.woff2
+2025-09-27T14:05:08.3944441Z 2025-09-27 14:05:08,388 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file static/bundle/assets/pt-serif-latin-ext-400-normal-TVWHLC3N.woff
+2025-09-27T14:05:08.3946067Z 2025-09-27 14:05:08,389 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file static/bundle/roq.css.map
+2025-09-27T14:05:08.3947666Z 2025-09-27 14:05:08,389 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file static/bundle/roq.css
+2025-09-27T14:05:08.3949092Z 2025-09-27 14:05:08,392 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file static/bundle/assets/fa-solid-900-PJNKLK6W.ttf
+2025-09-27T14:05:08.3951516Z 2025-09-27 14:05:08,394 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file static/bundle/roq.js
+2025-09-27T14:05:08.3953384Z 2025-09-27 14:05:08,395 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file static/bundle/roq.js.map
+2025-09-27T14:05:08.4296795Z 2025-09-27 14:05:08,428 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file 404/index.html
+2025-09-27T14:05:08.4600030Z 2025-09-27 14:05:08,459 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file cross-platform-scripts/index.html
+2025-09-27T14:05:08.4935329Z 2025-09-27 14:05:08,493 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file about/index.html
+2025-09-27T14:05:08.4938544Z 2025-09-27 14:05:08,493 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file commands/index.html
+2025-09-27T14:05:08.4944279Z 2025-09-27 14:05:08,494 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file configuration/index.html
+2025-09-27T14:05:08.5002076Z 2025-09-27 14:05:08,498 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file ci-cd/index.html
+2025-09-27T14:05:08.5055816Z 2025-09-27 14:05:08,503 ERROR [io.qua.roq.fro.run.RoqRouteHandler] (executor-thread-2) Error occurred while rendering the template [interpreters.md]: io.quarkus.qute.TemplateException: Rendering error in template [roq-gen/interpreters.html:127]: Key "VARIABLE_NAME" not found in the template data map with keys [site, now, roqVersion, page, locale, brand] in expression {VARIABLE_NAME}
+2025-09-27T14:05:08.5195250Z 2025-09-27 14:05:08,517 ERROR [io.qua.ver.htt.run.QuarkusErrorHandler] (vert.x-eventloop-thread-1) HTTP Request to /mvx/interpreters/ failed, error id: 9f0b7e05-ef06-4656-856c-159ad6841bc2-1: io.quarkus.qute.TemplateException: Rendering error in template [roq-gen/interpreters.html:127]: Key "VARIABLE_NAME" not found in the template data map with keys [site, now, roqVersion, page, locale, brand] in expression {VARIABLE_NAME}
+2025-09-27T14:05:08.5203097Z 	at io.quarkus.qute.TemplateException$Builder.build(TemplateException.java:173)
+2025-09-27T14:05:08.5207595Z 	at io.quarkus.qute.EvaluatorImpl.propertyNotFound(EvaluatorImpl.java:234)
+2025-09-27T14:05:08.5211716Z 	at io.quarkus.qute.EvaluatorImpl.resolve(EvaluatorImpl.java:204)
+2025-09-27T14:05:08.5213891Z 	at io.quarkus.qute.EvaluatorImpl.resolve(EvaluatorImpl.java:172)
+2025-09-27T14:05:08.5216105Z 	at io.quarkus.qute.EvaluatorImpl.resolveReference(EvaluatorImpl.java:131)
+2025-09-27T14:05:08.5218616Z 	at io.quarkus.qute.EvaluatorImpl.evaluate(EvaluatorImpl.java:85)
+2025-09-27T14:05:08.5225064Z 	at io.quarkus.qute.ResolutionContextImpl$ChildResolutionContext.evaluate(ResolutionContextImpl.java:100)
+2025-09-27T14:05:08.5226109Z 	at io.quarkus.qute.ExpressionNode.resolve(ExpressionNode.java:36)
+2025-09-27T14:05:08.5227031Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:132)
+2025-09-27T14:05:08.5227665Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5228331Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:60)
+2025-09-27T14:05:08.5229216Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5230271Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.5231744Z 	at io.quarkiverse.qute.web.markdown.runtime.MarkdownSectionHelperFactory$MarkdownSectionHelper.resolve(MarkdownSectionHelperFactory.java:65)
+2025-09-27T14:05:08.5233032Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5233715Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5234407Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.5235064Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5235745Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:53)
+2025-09-27T14:05:08.5236635Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5237666Z 	at io.quarkus.qute.InsertSectionHelper.resolve(InsertSectionHelper.java:28)
+2025-09-27T14:05:08.5238370Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5238954Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5239525Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.5240079Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5240675Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:60)
+2025-09-27T14:05:08.5241531Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5242537Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.5243393Z 	at io.quarkus.qute.Parser$1.resolve(Parser.java:1331)
+2025-09-27T14:05:08.5244030Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5244840Z 	at io.quarkus.qute.IncludeSectionHelper.resolve(IncludeSectionHelper.java:51)
+2025-09-27T14:05:08.5245641Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5246318Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5247192Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.5248181Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5248843Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:53)
+2025-09-27T14:05:08.5249734Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5250811Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.5251641Z 	at io.quarkus.qute.Parser$1.resolve(Parser.java:1331)
+2025-09-27T14:05:08.5252464Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5253112Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5253902Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderData(TemplateImpl.java:283)
+2025-09-27T14:05:08.5254971Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderAsyncNoTimeout(TemplateImpl.java:245)
+2025-09-27T14:05:08.5256076Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderAsync(TemplateImpl.java:218)
+2025-09-27T14:05:08.5257612Z 	at io.quarkus.qute.runtime.TemplateProducer$InjectableTemplate$InjectableTemplateInstanceImpl.renderAsync(TemplateProducer.java:367)
+2025-09-27T14:05:08.5259119Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handlePage(RoqRouteHandler.java:150)
+2025-09-27T14:05:08.5260264Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handle(RoqRouteHandler.java:89)
+2025-09-27T14:05:08.5261369Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handle(RoqRouteHandler.java:39)
+2025-09-27T14:05:08.5262565Z 	at io.vertx.ext.web.impl.BlockingHandlerDecorator.lambda$handle$0(BlockingHandlerDecorator.java:48)
+2025-09-27T14:05:08.5263640Z 	at io.vertx.core.impl.ContextImpl.lambda$executeBlocking$5(ContextImpl.java:205)
+2025-09-27T14:05:08.5264527Z 	at io.vertx.core.impl.ContextInternal.dispatch(ContextInternal.java:270)
+2025-09-27T14:05:08.5265314Z 	at io.vertx.core.impl.ContextImpl$1.execute(ContextImpl.java:221)
+2025-09-27T14:05:08.5265980Z 	at io.vertx.core.impl.WorkerTask.run(WorkerTask.java:56)
+2025-09-27T14:05:08.5266808Z 	at io.quarkus.vertx.core.runtime.VertxCoreRecorder$15.runWith(VertxCoreRecorder.java:645)
+2025-09-27T14:05:08.5268042Z 	at org.jboss.threads.EnhancedQueueExecutor$Task.doRunWith(EnhancedQueueExecutor.java:2651)
+2025-09-27T14:05:08.5269089Z 	at org.jboss.threads.EnhancedQueueExecutor$Task.run(EnhancedQueueExecutor.java:2630)
+2025-09-27T14:05:08.5270143Z 	at org.jboss.threads.EnhancedQueueExecutor.runThreadBody(EnhancedQueueExecutor.java:1622)
+2025-09-27T14:05:08.5271247Z 	at org.jboss.threads.EnhancedQueueExecutor$ThreadBody.run(EnhancedQueueExecutor.java:1589)
+2025-09-27T14:05:08.5272208Z 	at org.jboss.threads.DelegatingRunnable.run(DelegatingRunnable.java:11)
+2025-09-27T14:05:08.5273237Z 	at org.jboss.threads.ThreadLocalResettingRunnable.run(ThreadLocalResettingRunnable.java:11)
+2025-09-27T14:05:08.5274472Z 	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+2025-09-27T14:05:08.5275300Z 	at java.base/java.lang.Thread.run(Thread.java:1583)
+2025-09-27T14:05:08.5275680Z 
+2025-09-27T14:05:08.5281892Z 2025-09-27 14:05:08,525 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file index.html
+2025-09-27T14:05:08.5283176Z 2025-09-27 14:05:08,525 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file getting-started/index.html
+2025-09-27T14:05:08.5284921Z 2025-09-27 14:05:08,526 ERROR [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq request failed /mvx/interpreters/: io.vertx.core.VertxException: Response status code 500 is not equal to 200
+2025-09-27T14:05:08.5286072Z 
+2025-09-27T14:05:08.5339417Z 2025-09-27 14:05:08,533 INFO  [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generated file tools/index.html
+2025-09-27T14:05:08.5372666Z 2025-09-27 14:05:08,536 ERROR [io.qua.roq.fro.run.RoqRouteHandler] (executor-thread-4) Error occurred while rendering the template [interpreters.md]: io.quarkus.qute.TemplateException: Rendering error in template [roq-gen/interpreters.html:127]: Key "VARIABLE_NAME" not found in the template data map with keys [site, now, roqVersion, page, locale, brand] in expression {VARIABLE_NAME}
+2025-09-27T14:05:08.5389726Z 2025-09-27 14:05:08,537 ERROR [io.qua.ver.htt.run.QuarkusErrorHandler] (vert.x-eventloop-thread-1) HTTP Request to /mvx/interpreters/ failed, error id: 9f0b7e05-ef06-4656-856c-159ad6841bc2-2: io.quarkus.qute.TemplateException: Rendering error in template [roq-gen/interpreters.html:127]: Key "VARIABLE_NAME" not found in the template data map with keys [site, now, roqVersion, page, locale, brand] in expression {VARIABLE_NAME}
+2025-09-27T14:05:08.5393419Z 	at io.quarkus.qute.TemplateException$Builder.build(TemplateException.java:173)
+2025-09-27T14:05:08.5394663Z 	at io.quarkus.qute.EvaluatorImpl.propertyNotFound(EvaluatorImpl.java:234)
+2025-09-27T14:05:08.5395889Z 	at io.quarkus.qute.EvaluatorImpl.resolve(EvaluatorImpl.java:204)
+2025-09-27T14:05:08.5397217Z 	at io.quarkus.qute.EvaluatorImpl.resolve(EvaluatorImpl.java:172)
+2025-09-27T14:05:08.5398272Z 	at io.quarkus.qute.EvaluatorImpl.resolveReference(EvaluatorImpl.java:131)
+2025-09-27T14:05:08.5399241Z 	at io.quarkus.qute.EvaluatorImpl.evaluate(EvaluatorImpl.java:85)
+2025-09-27T14:05:08.5400451Z 	at io.quarkus.qute.ResolutionContextImpl$ChildResolutionContext.evaluate(ResolutionContextImpl.java:100)
+2025-09-27T14:05:08.5404157Z 	at io.quarkus.qute.ExpressionNode.resolve(ExpressionNode.java:36)
+2025-09-27T14:05:08.5411492Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:132)
+2025-09-27T14:05:08.5412169Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5412848Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:60)
+2025-09-27T14:05:08.5413710Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5414659Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.5416083Z 	at io.quarkiverse.qute.web.markdown.runtime.MarkdownSectionHelperFactory$MarkdownSectionHelper.resolve(MarkdownSectionHelperFactory.java:65)
+2025-09-27T14:05:08.5417534Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5418170Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5418781Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.5419391Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5420051Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:53)
+2025-09-27T14:05:08.5420898Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5421861Z 	at io.quarkus.qute.InsertSectionHelper.resolve(InsertSectionHelper.java:28)
+2025-09-27T14:05:08.5423660Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5424285Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5424914Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.5425542Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5426210Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:60)
+2025-09-27T14:05:08.5427371Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5428451Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.5429289Z 	at io.quarkus.qute.Parser$1.resolve(Parser.java:1331)
+2025-09-27T14:05:08.5429695Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5430126Z 	at io.quarkus.qute.IncludeSectionHelper.resolve(IncludeSectionHelper.java:51)
+2025-09-27T14:05:08.5430557Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5430913Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5431260Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.5431885Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5432268Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:53)
+2025-09-27T14:05:08.5433082Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5434084Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.5434871Z 	at io.quarkus.qute.Parser$1.resolve(Parser.java:1331)
+2025-09-27T14:05:08.5435730Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5436308Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5437303Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderData(TemplateImpl.java:283)
+2025-09-27T14:05:08.5438366Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderAsyncNoTimeout(TemplateImpl.java:245)
+2025-09-27T14:05:08.5439518Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderAsync(TemplateImpl.java:218)
+2025-09-27T14:05:08.5440890Z 	at io.quarkus.qute.runtime.TemplateProducer$InjectableTemplate$InjectableTemplateInstanceImpl.renderAsync(TemplateProducer.java:367)
+2025-09-27T14:05:08.5442384Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handlePage(RoqRouteHandler.java:150)
+2025-09-27T14:05:08.5443549Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handle(RoqRouteHandler.java:89)
+2025-09-27T14:05:08.5444697Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handle(RoqRouteHandler.java:39)
+2025-09-27T14:05:08.5445849Z 	at io.vertx.ext.web.impl.BlockingHandlerDecorator.lambda$handle$0(BlockingHandlerDecorator.java:48)
+2025-09-27T14:05:08.5447075Z 	at io.vertx.core.impl.ContextImpl.lambda$executeBlocking$5(ContextImpl.java:205)
+2025-09-27T14:05:08.5447954Z 	at io.vertx.core.impl.ContextInternal.dispatch(ContextInternal.java:270)
+2025-09-27T14:05:08.5448734Z 	at io.vertx.core.impl.ContextImpl$1.execute(ContextImpl.java:221)
+2025-09-27T14:05:08.5449402Z 	at io.vertx.core.impl.WorkerTask.run(WorkerTask.java:56)
+2025-09-27T14:05:08.5450208Z 	at io.quarkus.vertx.core.runtime.VertxCoreRecorder$15.runWith(VertxCoreRecorder.java:645)
+2025-09-27T14:05:08.5451281Z 	at org.jboss.threads.EnhancedQueueExecutor$Task.doRunWith(EnhancedQueueExecutor.java:2651)
+2025-09-27T14:05:08.5452157Z 	at org.jboss.threads.EnhancedQueueExecutor$Task.run(EnhancedQueueExecutor.java:2630)
+2025-09-27T14:05:08.5453196Z 	at org.jboss.threads.EnhancedQueueExecutor.runThreadBody(EnhancedQueueExecutor.java:1622)
+2025-09-27T14:05:08.5454233Z 	at org.jboss.threads.EnhancedQueueExecutor$ThreadBody.run(EnhancedQueueExecutor.java:1589)
+2025-09-27T14:05:08.5455141Z 	at org.jboss.threads.DelegatingRunnable.run(DelegatingRunnable.java:11)
+2025-09-27T14:05:08.5456113Z 	at org.jboss.threads.ThreadLocalResettingRunnable.run(ThreadLocalResettingRunnable.java:11)
+2025-09-27T14:05:08.5457461Z 	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+2025-09-27T14:05:08.5458312Z 	at java.base/java.lang.Thread.run(Thread.java:1583)
+2025-09-27T14:05:08.5458706Z 
+2025-09-27T14:05:08.5459755Z 2025-09-27 14:05:08,541 ERROR [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq request failed /mvx/interpreters/: io.vertx.core.VertxException: Response status code 500 is not equal to 200
+2025-09-27T14:05:08.5460916Z 
+2025-09-27T14:05:08.5490127Z 2025-09-27 14:05:08,548 ERROR [io.qua.roq.fro.run.RoqRouteHandler] (executor-thread-4) Error occurred while rendering the template [interpreters.md]: io.quarkus.qute.TemplateException: Rendering error in template [roq-gen/interpreters.html:127]: Key "VARIABLE_NAME" not found in the template data map with keys [site, now, roqVersion, page, locale, brand] in expression {VARIABLE_NAME}
+2025-09-27T14:05:08.5506290Z 2025-09-27 14:05:08,549 ERROR [io.qua.ver.htt.run.QuarkusErrorHandler] (vert.x-eventloop-thread-2) HTTP Request to /mvx/interpreters/ failed, error id: 9f0b7e05-ef06-4656-856c-159ad6841bc2-3: io.quarkus.qute.TemplateException: Rendering error in template [roq-gen/interpreters.html:127]: Key "VARIABLE_NAME" not found in the template data map with keys [site, now, roqVersion, page, locale, brand] in expression {VARIABLE_NAME}
+2025-09-27T14:05:08.5510996Z 	at io.quarkus.qute.TemplateException$Builder.build(TemplateException.java:173)
+2025-09-27T14:05:08.5511937Z 	at io.quarkus.qute.EvaluatorImpl.propertyNotFound(EvaluatorImpl.java:234)
+2025-09-27T14:05:08.5512782Z 	at io.quarkus.qute.EvaluatorImpl.resolve(EvaluatorImpl.java:204)
+2025-09-27T14:05:08.5513878Z 	at io.quarkus.qute.EvaluatorImpl.resolve(EvaluatorImpl.java:172)
+2025-09-27T14:05:08.5516003Z 	at io.quarkus.qute.EvaluatorImpl.resolveReference(EvaluatorImpl.java:131)
+2025-09-27T14:05:08.5516997Z 	at io.quarkus.qute.EvaluatorImpl.evaluate(EvaluatorImpl.java:85)
+2025-09-27T14:05:08.5518151Z 	at io.quarkus.qute.ResolutionContextImpl$ChildResolutionContext.evaluate(ResolutionContextImpl.java:100)
+2025-09-27T14:05:08.5519206Z 	at io.quarkus.qute.ExpressionNode.resolve(ExpressionNode.java:36)
+2025-09-27T14:05:08.5519950Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:132)
+2025-09-27T14:05:08.5520620Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5521283Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:60)
+2025-09-27T14:05:08.5522144Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5523205Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.5524673Z 	at io.quarkiverse.qute.web.markdown.runtime.MarkdownSectionHelperFactory$MarkdownSectionHelper.resolve(MarkdownSectionHelperFactory.java:65)
+2025-09-27T14:05:08.5525946Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5526619Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5527442Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.5528043Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5528705Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:53)
+2025-09-27T14:05:08.5529510Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5530481Z 	at io.quarkus.qute.InsertSectionHelper.resolve(InsertSectionHelper.java:28)
+2025-09-27T14:05:08.5531309Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5531959Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5532615Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.5533241Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5533912Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:60)
+2025-09-27T14:05:08.5534806Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5535850Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.5536702Z 	at io.quarkus.qute.Parser$1.resolve(Parser.java:1331)
+2025-09-27T14:05:08.5537566Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5538365Z 	at io.quarkus.qute.IncludeSectionHelper.resolve(IncludeSectionHelper.java:51)
+2025-09-27T14:05:08.5539176Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5539851Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5540539Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.5541212Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5541887Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:53)
+2025-09-27T14:05:08.5542786Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5543800Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.5544590Z 	at io.quarkus.qute.Parser$1.resolve(Parser.java:1331)
+2025-09-27T14:05:08.5545478Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5546157Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5547311Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderData(TemplateImpl.java:283)
+2025-09-27T14:05:08.5548439Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderAsyncNoTimeout(TemplateImpl.java:245)
+2025-09-27T14:05:08.5549519Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderAsync(TemplateImpl.java:218)
+2025-09-27T14:05:08.5551154Z 	at io.quarkus.qute.runtime.TemplateProducer$InjectableTemplate$InjectableTemplateInstanceImpl.renderAsync(TemplateProducer.java:367)
+2025-09-27T14:05:08.5552634Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handlePage(RoqRouteHandler.java:150)
+2025-09-27T14:05:08.5553847Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handle(RoqRouteHandler.java:89)
+2025-09-27T14:05:08.5554988Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handle(RoqRouteHandler.java:39)
+2025-09-27T14:05:08.5556161Z 	at io.vertx.ext.web.impl.BlockingHandlerDecorator.lambda$handle$0(BlockingHandlerDecorator.java:48)
+2025-09-27T14:05:08.5557430Z 	at io.vertx.core.impl.ContextImpl.lambda$executeBlocking$5(ContextImpl.java:205)
+2025-09-27T14:05:08.5558243Z 	at io.vertx.core.impl.ContextInternal.dispatch(ContextInternal.java:270)
+2025-09-27T14:05:08.5558991Z 	at io.vertx.core.impl.ContextImpl$1.execute(ContextImpl.java:221)
+2025-09-27T14:05:08.5559639Z 	at io.vertx.core.impl.WorkerTask.run(WorkerTask.java:56)
+2025-09-27T14:05:08.5560449Z 	at io.quarkus.vertx.core.runtime.VertxCoreRecorder$15.runWith(VertxCoreRecorder.java:645)
+2025-09-27T14:05:08.5561588Z 	at org.jboss.threads.EnhancedQueueExecutor$Task.doRunWith(EnhancedQueueExecutor.java:2651)
+2025-09-27T14:05:08.5562598Z 	at org.jboss.threads.EnhancedQueueExecutor$Task.run(EnhancedQueueExecutor.java:2630)
+2025-09-27T14:05:08.5563675Z 	at org.jboss.threads.EnhancedQueueExecutor.runThreadBody(EnhancedQueueExecutor.java:1622)
+2025-09-27T14:05:08.5564807Z 	at org.jboss.threads.EnhancedQueueExecutor$ThreadBody.run(EnhancedQueueExecutor.java:1589)
+2025-09-27T14:05:08.5565807Z 	at org.jboss.threads.DelegatingRunnable.run(DelegatingRunnable.java:11)
+2025-09-27T14:05:08.5567057Z 	at org.jboss.threads.ThreadLocalResettingRunnable.run(ThreadLocalResettingRunnable.java:11)
+2025-09-27T14:05:08.5568245Z 	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+2025-09-27T14:05:08.5569148Z 	at java.base/java.lang.Thread.run(Thread.java:1583)
+2025-09-27T14:05:08.5569517Z 
+2025-09-27T14:05:08.5570571Z 2025-09-27 14:05:08,551 ERROR [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq request failed /mvx/interpreters/: io.vertx.core.VertxException: Response status code 500 is not equal to 200
+2025-09-27T14:05:08.5571752Z 
+2025-09-27T14:05:08.5589420Z 2025-09-27 14:05:08,557 ERROR [io.qua.roq.fro.run.RoqRouteHandler] (executor-thread-4) Error occurred while rendering the template [interpreters.md]: io.quarkus.qute.TemplateException: Rendering error in template [roq-gen/interpreters.html:127]: Key "VARIABLE_NAME" not found in the template data map with keys [site, now, roqVersion, page, locale, brand] in expression {VARIABLE_NAME}
+2025-09-27T14:05:08.5593855Z 2025-09-27 14:05:08,558 ERROR [io.qua.ver.htt.run.QuarkusErrorHandler] (vert.x-eventloop-thread-2) HTTP Request to /mvx/interpreters/ failed, error id: 9f0b7e05-ef06-4656-856c-159ad6841bc2-4: io.quarkus.qute.TemplateException: Rendering error in template [roq-gen/interpreters.html:127]: Key "VARIABLE_NAME" not found in the template data map with keys [site, now, roqVersion, page, locale, brand] in expression {VARIABLE_NAME}
+2025-09-27T14:05:08.5596666Z 	at io.quarkus.qute.TemplateException$Builder.build(TemplateException.java:173)
+2025-09-27T14:05:08.5597822Z 	at io.quarkus.qute.EvaluatorImpl.propertyNotFound(EvaluatorImpl.java:234)
+2025-09-27T14:05:08.5598672Z 	at io.quarkus.qute.EvaluatorImpl.resolve(EvaluatorImpl.java:204)
+2025-09-27T14:05:08.5599749Z 	at io.quarkus.qute.EvaluatorImpl.resolve(EvaluatorImpl.java:172)
+2025-09-27T14:05:08.5600643Z 	at io.quarkus.qute.EvaluatorImpl.resolveReference(EvaluatorImpl.java:131)
+2025-09-27T14:05:08.5601451Z 	at io.quarkus.qute.EvaluatorImpl.evaluate(EvaluatorImpl.java:85)
+2025-09-27T14:05:08.5602498Z 	at io.quarkus.qute.ResolutionContextImpl$ChildResolutionContext.evaluate(ResolutionContextImpl.java:100)
+2025-09-27T14:05:08.5603629Z 	at io.quarkus.qute.ExpressionNode.resolve(ExpressionNode.java:36)
+2025-09-27T14:05:08.5604699Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:132)
+2025-09-27T14:05:08.5605386Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5606078Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:60)
+2025-09-27T14:05:08.5607262Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5608359Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.5609890Z 	at io.quarkiverse.qute.web.markdown.runtime.MarkdownSectionHelperFactory$MarkdownSectionHelper.resolve(MarkdownSectionHelperFactory.java:65)
+2025-09-27T14:05:08.5611195Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5611907Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5612590Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.5613282Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5613975Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:53)
+2025-09-27T14:05:08.5614893Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5615934Z 	at io.quarkus.qute.InsertSectionHelper.resolve(InsertSectionHelper.java:28)
+2025-09-27T14:05:08.5616775Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5617815Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5618526Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.5619205Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5619895Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:60)
+2025-09-27T14:05:08.5620793Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5621884Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.5622759Z 	at io.quarkus.qute.Parser$1.resolve(Parser.java:1331)
+2025-09-27T14:05:08.5623428Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5624236Z 	at io.quarkus.qute.IncludeSectionHelper.resolve(IncludeSectionHelper.java:51)
+2025-09-27T14:05:08.5625079Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5625770Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5626446Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.5627388Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5628101Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:53)
+2025-09-27T14:05:08.5629006Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5630085Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.5630945Z 	at io.quarkus.qute.Parser$1.resolve(Parser.java:1331)
+2025-09-27T14:05:08.5631586Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5632299Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5633153Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderData(TemplateImpl.java:283)
+2025-09-27T14:05:08.5634289Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderAsyncNoTimeout(TemplateImpl.java:245)
+2025-09-27T14:05:08.5635891Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderAsync(TemplateImpl.java:218)
+2025-09-27T14:05:08.5637556Z 	at io.quarkus.qute.runtime.TemplateProducer$InjectableTemplate$InjectableTemplateInstanceImpl.renderAsync(TemplateProducer.java:367)
+2025-09-27T14:05:08.5639056Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handlePage(RoqRouteHandler.java:150)
+2025-09-27T14:05:08.5640248Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handle(RoqRouteHandler.java:89)
+2025-09-27T14:05:08.5641712Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handle(RoqRouteHandler.java:39)
+2025-09-27T14:05:08.5642893Z 	at io.vertx.ext.web.impl.BlockingHandlerDecorator.lambda$handle$0(BlockingHandlerDecorator.java:48)
+2025-09-27T14:05:08.5643990Z 	at io.vertx.core.impl.ContextImpl.lambda$executeBlocking$5(ContextImpl.java:205)
+2025-09-27T14:05:08.5644891Z 	at io.vertx.core.impl.ContextInternal.dispatch(ContextInternal.java:270)
+2025-09-27T14:05:08.5645698Z 	at io.vertx.core.impl.ContextImpl$1.execute(ContextImpl.java:221)
+2025-09-27T14:05:08.5646422Z 	at io.vertx.core.impl.WorkerTask.run(WorkerTask.java:56)
+2025-09-27T14:05:08.5647479Z 	at io.quarkus.vertx.core.runtime.VertxCoreRecorder$15.runWith(VertxCoreRecorder.java:645)
+2025-09-27T14:05:08.5648588Z 	at org.jboss.threads.EnhancedQueueExecutor$Task.doRunWith(EnhancedQueueExecutor.java:2651)
+2025-09-27T14:05:08.5649628Z 	at org.jboss.threads.EnhancedQueueExecutor$Task.run(EnhancedQueueExecutor.java:2630)
+2025-09-27T14:05:08.5650736Z 	at org.jboss.threads.EnhancedQueueExecutor.runThreadBody(EnhancedQueueExecutor.java:1622)
+2025-09-27T14:05:08.5651869Z 	at org.jboss.threads.EnhancedQueueExecutor$ThreadBody.run(EnhancedQueueExecutor.java:1589)
+2025-09-27T14:05:08.5652876Z 	at org.jboss.threads.DelegatingRunnable.run(DelegatingRunnable.java:11)
+2025-09-27T14:05:08.5653895Z 	at org.jboss.threads.ThreadLocalResettingRunnable.run(ThreadLocalResettingRunnable.java:11)
+2025-09-27T14:05:08.5655053Z 	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+2025-09-27T14:05:08.5655945Z 	at java.base/java.lang.Thread.run(Thread.java:1583)
+2025-09-27T14:05:08.5656324Z 
+2025-09-27T14:05:08.5657588Z 2025-09-27 14:05:08,559 ERROR [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq request failed /mvx/interpreters/: io.vertx.core.VertxException: Response status code 500 is not equal to 200
+2025-09-27T14:05:08.5658773Z 
+2025-09-27T14:05:08.5700362Z 2025-09-27 14:05:08,567 ERROR [io.qua.roq.fro.run.RoqRouteHandler] (executor-thread-4) Error occurred while rendering the template [interpreters.md]: io.quarkus.qute.TemplateException: Rendering error in template [roq-gen/interpreters.html:127]: Key "VARIABLE_NAME" not found in the template data map with keys [site, now, roqVersion, page, locale, brand] in expression {VARIABLE_NAME}
+2025-09-27T14:05:08.5704619Z 2025-09-27 14:05:08,568 ERROR [io.qua.ver.htt.run.QuarkusErrorHandler] (vert.x-eventloop-thread-2) HTTP Request to /mvx/interpreters/ failed, error id: 9f0b7e05-ef06-4656-856c-159ad6841bc2-5: io.quarkus.qute.TemplateException: Rendering error in template [roq-gen/interpreters.html:127]: Key "VARIABLE_NAME" not found in the template data map with keys [site, now, roqVersion, page, locale, brand] in expression {VARIABLE_NAME}
+2025-09-27T14:05:08.5707423Z 	at io.quarkus.qute.TemplateException$Builder.build(TemplateException.java:173)
+2025-09-27T14:05:08.5708258Z 	at io.quarkus.qute.EvaluatorImpl.propertyNotFound(EvaluatorImpl.java:234)
+2025-09-27T14:05:08.5709035Z 	at io.quarkus.qute.EvaluatorImpl.resolve(EvaluatorImpl.java:204)
+2025-09-27T14:05:08.5709722Z 	at io.quarkus.qute.EvaluatorImpl.resolve(EvaluatorImpl.java:172)
+2025-09-27T14:05:08.5710455Z 	at io.quarkus.qute.EvaluatorImpl.resolveReference(EvaluatorImpl.java:131)
+2025-09-27T14:05:08.5711221Z 	at io.quarkus.qute.EvaluatorImpl.evaluate(EvaluatorImpl.java:85)
+2025-09-27T14:05:08.5712235Z 	at io.quarkus.qute.ResolutionContextImpl$ChildResolutionContext.evaluate(ResolutionContextImpl.java:100)
+2025-09-27T14:05:08.5713288Z 	at io.quarkus.qute.ExpressionNode.resolve(ExpressionNode.java:36)
+2025-09-27T14:05:08.5714339Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:132)
+2025-09-27T14:05:08.5714956Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5715629Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:60)
+2025-09-27T14:05:08.5716508Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5717777Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.5719440Z 	at io.quarkiverse.qute.web.markdown.runtime.MarkdownSectionHelperFactory$MarkdownSectionHelper.resolve(MarkdownSectionHelperFactory.java:65)
+2025-09-27T14:05:08.5720693Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5721306Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5721922Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.5722526Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5723141Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:53)
+2025-09-27T14:05:08.5723948Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5724860Z 	at io.quarkus.qute.InsertSectionHelper.resolve(InsertSectionHelper.java:28)
+2025-09-27T14:05:08.5725592Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5726204Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5727004Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.5727828Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5728476Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:60)
+2025-09-27T14:05:08.5729361Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5730427Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.5731369Z 	at io.quarkus.qute.Parser$1.resolve(Parser.java:1331)
+2025-09-27T14:05:08.5732017Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5732849Z 	at io.quarkus.qute.IncludeSectionHelper.resolve(IncludeSectionHelper.java:51)
+2025-09-27T14:05:08.5733696Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5734395Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5735104Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.5735781Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5736441Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:53)
+2025-09-27T14:05:08.5737536Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5738606Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.5739454Z 	at io.quarkus.qute.Parser$1.resolve(Parser.java:1331)
+2025-09-27T14:05:08.5740100Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5740775Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5741622Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderData(TemplateImpl.java:283)
+2025-09-27T14:05:08.5742741Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderAsyncNoTimeout(TemplateImpl.java:245)
+2025-09-27T14:05:08.5743881Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderAsync(TemplateImpl.java:218)
+2025-09-27T14:05:08.5745289Z 	at io.quarkus.qute.runtime.TemplateProducer$InjectableTemplate$InjectableTemplateInstanceImpl.renderAsync(TemplateProducer.java:367)
+2025-09-27T14:05:08.5746799Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handlePage(RoqRouteHandler.java:150)
+2025-09-27T14:05:08.5748182Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handle(RoqRouteHandler.java:89)
+2025-09-27T14:05:08.5749592Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handle(RoqRouteHandler.java:39)
+2025-09-27T14:05:08.5750844Z 	at io.vertx.ext.web.impl.BlockingHandlerDecorator.lambda$handle$0(BlockingHandlerDecorator.java:48)
+2025-09-27T14:05:08.5751968Z 	at io.vertx.core.impl.ContextImpl.lambda$executeBlocking$5(ContextImpl.java:205)
+2025-09-27T14:05:08.5752886Z 	at io.vertx.core.impl.ContextInternal.dispatch(ContextInternal.java:270)
+2025-09-27T14:05:08.5754064Z 	at io.vertx.core.impl.ContextImpl$1.execute(ContextImpl.java:221)
+2025-09-27T14:05:08.5754782Z 	at io.vertx.core.impl.WorkerTask.run(WorkerTask.java:56)
+2025-09-27T14:05:08.5755651Z 	at io.quarkus.vertx.core.runtime.VertxCoreRecorder$15.runWith(VertxCoreRecorder.java:645)
+2025-09-27T14:05:08.5756728Z 	at org.jboss.threads.EnhancedQueueExecutor$Task.doRunWith(EnhancedQueueExecutor.java:2651)
+2025-09-27T14:05:08.5757988Z 	at org.jboss.threads.EnhancedQueueExecutor$Task.run(EnhancedQueueExecutor.java:2630)
+2025-09-27T14:05:08.5759066Z 	at org.jboss.threads.EnhancedQueueExecutor.runThreadBody(EnhancedQueueExecutor.java:1622)
+2025-09-27T14:05:08.5760205Z 	at org.jboss.threads.EnhancedQueueExecutor$ThreadBody.run(EnhancedQueueExecutor.java:1589)
+2025-09-27T14:05:08.5761201Z 	at org.jboss.threads.DelegatingRunnable.run(DelegatingRunnable.java:11)
+2025-09-27T14:05:08.5762227Z 	at org.jboss.threads.ThreadLocalResettingRunnable.run(ThreadLocalResettingRunnable.java:11)
+2025-09-27T14:05:08.5763391Z 	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+2025-09-27T14:05:08.5764279Z 	at java.base/java.lang.Thread.run(Thread.java:1583)
+2025-09-27T14:05:08.5764657Z 
+2025-09-27T14:05:08.5765702Z 2025-09-27 14:05:08,571 ERROR [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq request failed /mvx/interpreters/: io.vertx.core.VertxException: Response status code 500 is not equal to 200
+2025-09-27T14:05:08.5766815Z 
+2025-09-27T14:05:08.5795826Z 2025-09-27 14:05:08,578 ERROR [io.qua.roq.fro.run.RoqRouteHandler] (executor-thread-4) Error occurred while rendering the template [interpreters.md]: io.quarkus.qute.TemplateException: Rendering error in template [roq-gen/interpreters.html:127]: Key "VARIABLE_NAME" not found in the template data map with keys [site, now, roqVersion, page, locale, brand] in expression {VARIABLE_NAME}
+2025-09-27T14:05:08.5813604Z 2025-09-27 14:05:08,580 ERROR [io.qua.ver.htt.run.QuarkusErrorHandler] (vert.x-eventloop-thread-2) HTTP Request to /mvx/interpreters/ failed, error id: 9f0b7e05-ef06-4656-856c-159ad6841bc2-6: io.quarkus.qute.TemplateException: Rendering error in template [roq-gen/interpreters.html:127]: Key "VARIABLE_NAME" not found in the template data map with keys [site, now, roqVersion, page, locale, brand] in expression {VARIABLE_NAME}
+2025-09-27T14:05:08.5816376Z 	at io.quarkus.qute.TemplateException$Builder.build(TemplateException.java:173)
+2025-09-27T14:05:08.5817653Z 	at io.quarkus.qute.EvaluatorImpl.propertyNotFound(EvaluatorImpl.java:234)
+2025-09-27T14:05:08.5818482Z 	at io.quarkus.qute.EvaluatorImpl.resolve(EvaluatorImpl.java:204)
+2025-09-27T14:05:08.5819208Z 	at io.quarkus.qute.EvaluatorImpl.resolve(EvaluatorImpl.java:172)
+2025-09-27T14:05:08.5819972Z 	at io.quarkus.qute.EvaluatorImpl.resolveReference(EvaluatorImpl.java:131)
+2025-09-27T14:05:08.5820782Z 	at io.quarkus.qute.EvaluatorImpl.evaluate(EvaluatorImpl.java:85)
+2025-09-27T14:05:08.5821740Z 	at io.quarkus.qute.ResolutionContextImpl$ChildResolutionContext.evaluate(ResolutionContextImpl.java:100)
+2025-09-27T14:05:08.5822737Z 	at io.quarkus.qute.ExpressionNode.resolve(ExpressionNode.java:36)
+2025-09-27T14:05:08.5823436Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:132)
+2025-09-27T14:05:08.5824085Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5824745Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:60)
+2025-09-27T14:05:08.5825620Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5827187Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.5828664Z 	at io.quarkiverse.qute.web.markdown.runtime.MarkdownSectionHelperFactory$MarkdownSectionHelper.resolve(MarkdownSectionHelperFactory.java:65)
+2025-09-27T14:05:08.5829914Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5830555Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5831190Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.5832027Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5832668Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:53)
+2025-09-27T14:05:08.5833517Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5834499Z 	at io.quarkus.qute.InsertSectionHelper.resolve(InsertSectionHelper.java:28)
+2025-09-27T14:05:08.5835281Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5835937Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5836601Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.5837460Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5838142Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:60)
+2025-09-27T14:05:08.5839003Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5840030Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.5840823Z 	at io.quarkus.qute.Parser$1.resolve(Parser.java:1331)
+2025-09-27T14:05:08.5841426Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5842203Z 	at io.quarkus.qute.IncludeSectionHelper.resolve(IncludeSectionHelper.java:51)
+2025-09-27T14:05:08.5842999Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5843647Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5844316Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.5844948Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5845589Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:53)
+2025-09-27T14:05:08.5846434Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5854901Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.5855741Z 	at io.quarkus.qute.Parser$1.resolve(Parser.java:1331)
+2025-09-27T14:05:08.5856357Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5857221Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5858015Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderData(TemplateImpl.java:283)
+2025-09-27T14:05:08.5859053Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderAsyncNoTimeout(TemplateImpl.java:245)
+2025-09-27T14:05:08.5887627Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderAsync(TemplateImpl.java:218)
+2025-09-27T14:05:08.5889114Z 	at io.quarkus.qute.runtime.TemplateProducer$InjectableTemplate$InjectableTemplateInstanceImpl.renderAsync(TemplateProducer.java:367)
+2025-09-27T14:05:08.5890566Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handlePage(RoqRouteHandler.java:150)
+2025-09-27T14:05:08.5891699Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handle(RoqRouteHandler.java:89)
+2025-09-27T14:05:08.5892949Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handle(RoqRouteHandler.java:39)
+2025-09-27T14:05:08.5894096Z 	at io.vertx.ext.web.impl.BlockingHandlerDecorator.lambda$handle$0(BlockingHandlerDecorator.java:48)
+2025-09-27T14:05:08.5895156Z 	at io.vertx.core.impl.ContextImpl.lambda$executeBlocking$5(ContextImpl.java:205)
+2025-09-27T14:05:08.5896008Z 	at io.vertx.core.impl.ContextInternal.dispatch(ContextInternal.java:270)
+2025-09-27T14:05:08.5897456Z 	at io.vertx.core.impl.ContextImpl$1.execute(ContextImpl.java:221)
+2025-09-27T14:05:08.5898151Z 	at io.vertx.core.impl.WorkerTask.run(WorkerTask.java:56)
+2025-09-27T14:05:08.5898962Z 	at io.quarkus.vertx.core.runtime.VertxCoreRecorder$15.runWith(VertxCoreRecorder.java:645)
+2025-09-27T14:05:08.5899982Z 	at org.jboss.threads.EnhancedQueueExecutor$Task.doRunWith(EnhancedQueueExecutor.java:2651)
+2025-09-27T14:05:08.5900998Z 	at org.jboss.threads.EnhancedQueueExecutor$Task.run(EnhancedQueueExecutor.java:2630)
+2025-09-27T14:05:08.5902250Z 	at org.jboss.threads.EnhancedQueueExecutor.runThreadBody(EnhancedQueueExecutor.java:1622)
+2025-09-27T14:05:08.5903377Z 	at org.jboss.threads.EnhancedQueueExecutor$ThreadBody.run(EnhancedQueueExecutor.java:1589)
+2025-09-27T14:05:08.5904298Z 	at org.jboss.threads.DelegatingRunnable.run(DelegatingRunnable.java:11)
+2025-09-27T14:05:08.5905280Z 	at org.jboss.threads.ThreadLocalResettingRunnable.run(ThreadLocalResettingRunnable.java:11)
+2025-09-27T14:05:08.5906396Z 	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+2025-09-27T14:05:08.5907369Z 	at java.base/java.lang.Thread.run(Thread.java:1583)
+2025-09-27T14:05:08.5907719Z 
+2025-09-27T14:05:08.5908745Z 2025-09-27 14:05:08,582 ERROR [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq request failed /mvx/interpreters/: io.vertx.core.VertxException: Response status code 500 is not equal to 200
+2025-09-27T14:05:08.5909884Z 
+2025-09-27T14:05:08.5927884Z 2025-09-27 14:05:08,592 ERROR [io.qua.roq.fro.run.RoqRouteHandler] (executor-thread-4) Error occurred while rendering the template [interpreters.md]: io.quarkus.qute.TemplateException: Rendering error in template [roq-gen/interpreters.html:127]: Key "VARIABLE_NAME" not found in the template data map with keys [site, now, roqVersion, page, locale, brand] in expression {VARIABLE_NAME}
+2025-09-27T14:05:08.5942775Z 2025-09-27 14:05:08,593 ERROR [io.qua.ver.htt.run.QuarkusErrorHandler] (vert.x-eventloop-thread-2) HTTP Request to /mvx/interpreters/ failed, error id: 9f0b7e05-ef06-4656-856c-159ad6841bc2-7: io.quarkus.qute.TemplateException: Rendering error in template [roq-gen/interpreters.html:127]: Key "VARIABLE_NAME" not found in the template data map with keys [site, now, roqVersion, page, locale, brand] in expression {VARIABLE_NAME}
+2025-09-27T14:05:08.5947068Z 	at io.quarkus.qute.TemplateException$Builder.build(TemplateException.java:173)
+2025-09-27T14:05:08.5949097Z 	at io.quarkus.qute.EvaluatorImpl.propertyNotFound(EvaluatorImpl.java:234)
+2025-09-27T14:05:08.5949902Z 	at io.quarkus.qute.EvaluatorImpl.resolve(EvaluatorImpl.java:204)
+2025-09-27T14:05:08.5950626Z 	at io.quarkus.qute.EvaluatorImpl.resolve(EvaluatorImpl.java:172)
+2025-09-27T14:05:08.5951399Z 	at io.quarkus.qute.EvaluatorImpl.resolveReference(EvaluatorImpl.java:131)
+2025-09-27T14:05:08.5952167Z 	at io.quarkus.qute.EvaluatorImpl.evaluate(EvaluatorImpl.java:85)
+2025-09-27T14:05:08.5953152Z 	at io.quarkus.qute.ResolutionContextImpl$ChildResolutionContext.evaluate(ResolutionContextImpl.java:100)
+2025-09-27T14:05:08.5954568Z 	at io.quarkus.qute.ExpressionNode.resolve(ExpressionNode.java:36)
+2025-09-27T14:05:08.5955239Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:132)
+2025-09-27T14:05:08.5955824Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5956480Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:60)
+2025-09-27T14:05:08.5957675Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5958645Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.5960006Z 	at io.quarkiverse.qute.web.markdown.runtime.MarkdownSectionHelperFactory$MarkdownSectionHelper.resolve(MarkdownSectionHelperFactory.java:65)
+2025-09-27T14:05:08.5961198Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5961817Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5962434Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.5978031Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5978739Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:53)
+2025-09-27T14:05:08.5979591Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5980497Z 	at io.quarkus.qute.InsertSectionHelper.resolve(InsertSectionHelper.java:28)
+2025-09-27T14:05:08.5981259Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5982133Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5982773Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.5983396Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5984038Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:60)
+2025-09-27T14:05:08.5984884Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5985868Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.5986622Z 	at io.quarkus.qute.Parser$1.resolve(Parser.java:1331)
+2025-09-27T14:05:08.5987377Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5988103Z 	at io.quarkus.qute.IncludeSectionHelper.resolve(IncludeSectionHelper.java:51)
+2025-09-27T14:05:08.5988828Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5989421Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5990002Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.5990584Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.5991186Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:53)
+2025-09-27T14:05:08.5991969Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.5992919Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.5993674Z 	at io.quarkus.qute.Parser$1.resolve(Parser.java:1331)
+2025-09-27T14:05:08.5994230Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.5994824Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.5995569Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderData(TemplateImpl.java:283)
+2025-09-27T14:05:08.5996620Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderAsyncNoTimeout(TemplateImpl.java:245)
+2025-09-27T14:05:08.5997877Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderAsync(TemplateImpl.java:218)
+2025-09-27T14:05:08.5999230Z 	at io.quarkus.qute.runtime.TemplateProducer$InjectableTemplate$InjectableTemplateInstanceImpl.renderAsync(TemplateProducer.java:367)
+2025-09-27T14:05:08.6000629Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handlePage(RoqRouteHandler.java:150)
+2025-09-27T14:05:08.6001754Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handle(RoqRouteHandler.java:89)
+2025-09-27T14:05:08.6002795Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handle(RoqRouteHandler.java:39)
+2025-09-27T14:05:08.6003943Z 	at io.vertx.ext.web.impl.BlockingHandlerDecorator.lambda$handle$0(BlockingHandlerDecorator.java:48)
+2025-09-27T14:05:08.6004962Z 	at io.vertx.core.impl.ContextImpl.lambda$executeBlocking$5(ContextImpl.java:205)
+2025-09-27T14:05:08.6005937Z 	at io.vertx.core.impl.ContextInternal.dispatch(ContextInternal.java:270)
+2025-09-27T14:05:08.6006707Z 	at io.vertx.core.impl.ContextImpl$1.execute(ContextImpl.java:221)
+2025-09-27T14:05:08.6007681Z 	at io.vertx.core.impl.WorkerTask.run(WorkerTask.java:56)
+2025-09-27T14:05:08.6008508Z 	at io.quarkus.vertx.core.runtime.VertxCoreRecorder$15.runWith(VertxCoreRecorder.java:645)
+2025-09-27T14:05:08.6009569Z 	at org.jboss.threads.EnhancedQueueExecutor$Task.doRunWith(EnhancedQueueExecutor.java:2651)
+2025-09-27T14:05:08.6010624Z 	at org.jboss.threads.EnhancedQueueExecutor$Task.run(EnhancedQueueExecutor.java:2630)
+2025-09-27T14:05:08.6011949Z 	at org.jboss.threads.EnhancedQueueExecutor.runThreadBody(EnhancedQueueExecutor.java:1622)
+2025-09-27T14:05:08.6013072Z 	at org.jboss.threads.EnhancedQueueExecutor$ThreadBody.run(EnhancedQueueExecutor.java:1589)
+2025-09-27T14:05:08.6014028Z 	at org.jboss.threads.DelegatingRunnable.run(DelegatingRunnable.java:11)
+2025-09-27T14:05:08.6015056Z 	at org.jboss.threads.ThreadLocalResettingRunnable.run(ThreadLocalResettingRunnable.java:11)
+2025-09-27T14:05:08.6016435Z 	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+2025-09-27T14:05:08.6017438Z 	at java.base/java.lang.Thread.run(Thread.java:1583)
+2025-09-27T14:05:08.6017779Z 
+2025-09-27T14:05:08.6018746Z 2025-09-27 14:05:08,595 ERROR [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq request failed /mvx/interpreters/: io.vertx.core.VertxException: Response status code 500 is not equal to 200
+2025-09-27T14:05:08.6019819Z 
+2025-09-27T14:05:08.6045353Z 2025-09-27 14:05:08,603 ERROR [io.qua.roq.fro.run.RoqRouteHandler] (executor-thread-4) Error occurred while rendering the template [interpreters.md]: io.quarkus.qute.TemplateException: Rendering error in template [roq-gen/interpreters.html:127]: Key "VARIABLE_NAME" not found in the template data map with keys [site, now, roqVersion, page, locale, brand] in expression {VARIABLE_NAME}
+2025-09-27T14:05:08.6079734Z 2025-09-27 14:05:08,604 ERROR [io.qua.ver.htt.run.QuarkusErrorHandler] (vert.x-eventloop-thread-2) HTTP Request to /mvx/interpreters/ failed, error id: 9f0b7e05-ef06-4656-856c-159ad6841bc2-8: io.quarkus.qute.TemplateException: Rendering error in template [roq-gen/interpreters.html:127]: Key "VARIABLE_NAME" not found in the template data map with keys [site, now, roqVersion, page, locale, brand] in expression {VARIABLE_NAME}
+2025-09-27T14:05:08.6082899Z 	at io.quarkus.qute.TemplateException$Builder.build(TemplateException.java:173)
+2025-09-27T14:05:08.6097997Z 	at io.quarkus.qute.EvaluatorImpl.propertyNotFound(EvaluatorImpl.java:234)
+2025-09-27T14:05:08.6099226Z 	at io.quarkus.qute.EvaluatorImpl.resolve(EvaluatorImpl.java:204)
+2025-09-27T14:05:08.6100122Z 	at io.quarkus.qute.EvaluatorImpl.resolve(EvaluatorImpl.java:172)
+2025-09-27T14:05:08.6101012Z 	at io.quarkus.qute.EvaluatorImpl.resolveReference(EvaluatorImpl.java:131)
+2025-09-27T14:05:08.6101795Z 	at io.quarkus.qute.EvaluatorImpl.evaluate(EvaluatorImpl.java:85)
+2025-09-27T14:05:08.6102811Z 	at io.quarkus.qute.ResolutionContextImpl$ChildResolutionContext.evaluate(ResolutionContextImpl.java:100)
+2025-09-27T14:05:08.6103924Z 	at io.quarkus.qute.ExpressionNode.resolve(ExpressionNode.java:36)
+2025-09-27T14:05:08.6104662Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:132)
+2025-09-27T14:05:08.6105323Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.6105993Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:60)
+2025-09-27T14:05:08.6107060Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.6108138Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.6109607Z 	at io.quarkiverse.qute.web.markdown.runtime.MarkdownSectionHelperFactory$MarkdownSectionHelper.resolve(MarkdownSectionHelperFactory.java:65)
+2025-09-27T14:05:08.6110921Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.6111624Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.6112257Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.6112929Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.6113578Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:53)
+2025-09-27T14:05:08.6114456Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.6115483Z 	at io.quarkus.qute.InsertSectionHelper.resolve(InsertSectionHelper.java:28)
+2025-09-27T14:05:08.6116302Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.6117582Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.6118304Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.6118971Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.6119633Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:60)
+2025-09-27T14:05:08.6120548Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.6121949Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.6122770Z 	at io.quarkus.qute.Parser$1.resolve(Parser.java:1331)
+2025-09-27T14:05:08.6123415Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.6124252Z 	at io.quarkus.qute.IncludeSectionHelper.resolve(IncludeSectionHelper.java:51)
+2025-09-27T14:05:08.6125077Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.6125765Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.6126451Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.6127326Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.6127981Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:53)
+2025-09-27T14:05:08.6128880Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.6129982Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.6130834Z 	at io.quarkus.qute.Parser$1.resolve(Parser.java:1331)
+2025-09-27T14:05:08.6131470Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.6132161Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.6132985Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderData(TemplateImpl.java:283)
+2025-09-27T14:05:08.6134120Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderAsyncNoTimeout(TemplateImpl.java:245)
+2025-09-27T14:05:08.6135237Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderAsync(TemplateImpl.java:218)
+2025-09-27T14:05:08.6136650Z 	at io.quarkus.qute.runtime.TemplateProducer$InjectableTemplate$InjectableTemplateInstanceImpl.renderAsync(TemplateProducer.java:367)
+2025-09-27T14:05:08.6138272Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handlePage(RoqRouteHandler.java:150)
+2025-09-27T14:05:08.6139412Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handle(RoqRouteHandler.java:89)
+2025-09-27T14:05:08.6140458Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handle(RoqRouteHandler.java:39)
+2025-09-27T14:05:08.6141571Z 	at io.vertx.ext.web.impl.BlockingHandlerDecorator.lambda$handle$0(BlockingHandlerDecorator.java:48)
+2025-09-27T14:05:08.6142592Z 	at io.vertx.core.impl.ContextImpl.lambda$executeBlocking$5(ContextImpl.java:205)
+2025-09-27T14:05:08.6143412Z 	at io.vertx.core.impl.ContextInternal.dispatch(ContextInternal.java:270)
+2025-09-27T14:05:08.6144191Z 	at io.vertx.core.impl.ContextImpl$1.execute(ContextImpl.java:221)
+2025-09-27T14:05:08.6144875Z 	at io.vertx.core.impl.WorkerTask.run(WorkerTask.java:56)
+2025-09-27T14:05:08.6145690Z 	at io.quarkus.vertx.core.runtime.VertxCoreRecorder$15.runWith(VertxCoreRecorder.java:645)
+2025-09-27T14:05:08.6146704Z 	at org.jboss.threads.EnhancedQueueExecutor$Task.doRunWith(EnhancedQueueExecutor.java:2651)
+2025-09-27T14:05:08.6147883Z 	at org.jboss.threads.EnhancedQueueExecutor$Task.run(EnhancedQueueExecutor.java:2630)
+2025-09-27T14:05:08.6148908Z 	at org.jboss.threads.EnhancedQueueExecutor.runThreadBody(EnhancedQueueExecutor.java:1622)
+2025-09-27T14:05:08.6149979Z 	at org.jboss.threads.EnhancedQueueExecutor$ThreadBody.run(EnhancedQueueExecutor.java:1589)
+2025-09-27T14:05:08.6150918Z 	at org.jboss.threads.DelegatingRunnable.run(DelegatingRunnable.java:11)
+2025-09-27T14:05:08.6151921Z 	at org.jboss.threads.ThreadLocalResettingRunnable.run(ThreadLocalResettingRunnable.java:11)
+2025-09-27T14:05:08.6153357Z 	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+2025-09-27T14:05:08.6154195Z 	at java.base/java.lang.Thread.run(Thread.java:1583)
+2025-09-27T14:05:08.6154570Z 
+2025-09-27T14:05:08.6155582Z 2025-09-27 14:05:08,605 ERROR [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq request failed /mvx/interpreters/: io.vertx.core.VertxException: Response status code 500 is not equal to 200
+2025-09-27T14:05:08.6157206Z 
+2025-09-27T14:05:08.6159173Z 2025-09-27 14:05:08,611 ERROR [io.qua.roq.fro.run.RoqRouteHandler] (executor-thread-4) Error occurred while rendering the template [interpreters.md]: io.quarkus.qute.TemplateException: Rendering error in template [roq-gen/interpreters.html:127]: Key "VARIABLE_NAME" not found in the template data map with keys [site, now, roqVersion, page, locale, brand] in expression {VARIABLE_NAME}
+2025-09-27T14:05:08.6164458Z 2025-09-27 14:05:08,611 ERROR [io.qua.ver.htt.run.QuarkusErrorHandler] (vert.x-eventloop-thread-2) HTTP Request to /mvx/interpreters/ failed, error id: 9f0b7e05-ef06-4656-856c-159ad6841bc2-9: io.quarkus.qute.TemplateException: Rendering error in template [roq-gen/interpreters.html:127]: Key "VARIABLE_NAME" not found in the template data map with keys [site, now, roqVersion, page, locale, brand] in expression {VARIABLE_NAME}
+2025-09-27T14:05:08.6167449Z 	at io.quarkus.qute.TemplateException$Builder.build(TemplateException.java:173)
+2025-09-27T14:05:08.6168364Z 	at io.quarkus.qute.EvaluatorImpl.propertyNotFound(EvaluatorImpl.java:234)
+2025-09-27T14:05:08.6169206Z 	at io.quarkus.qute.EvaluatorImpl.resolve(EvaluatorImpl.java:204)
+2025-09-27T14:05:08.6169964Z 	at io.quarkus.qute.EvaluatorImpl.resolve(EvaluatorImpl.java:172)
+2025-09-27T14:05:08.6170764Z 	at io.quarkus.qute.EvaluatorImpl.resolveReference(EvaluatorImpl.java:131)
+2025-09-27T14:05:08.6171579Z 	at io.quarkus.qute.EvaluatorImpl.evaluate(EvaluatorImpl.java:85)
+2025-09-27T14:05:08.6172631Z 	at io.quarkus.qute.ResolutionContextImpl$ChildResolutionContext.evaluate(ResolutionContextImpl.java:100)
+2025-09-27T14:05:08.6173630Z 	at io.quarkus.qute.ExpressionNode.resolve(ExpressionNode.java:36)
+2025-09-27T14:05:08.6174297Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:132)
+2025-09-27T14:05:08.6174896Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.6175539Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:60)
+2025-09-27T14:05:08.6176334Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.6177544Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.6209619Z 	at io.quarkiverse.qute.web.markdown.runtime.MarkdownSectionHelperFactory$MarkdownSectionHelper.resolve(MarkdownSectionHelperFactory.java:65)
+2025-09-27T14:05:08.6211026Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.6211684Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.6212350Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.6212989Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.6213626Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:53)
+2025-09-27T14:05:08.6214491Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.6215436Z 	at io.quarkus.qute.InsertSectionHelper.resolve(InsertSectionHelper.java:28)
+2025-09-27T14:05:08.6216222Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.6217079Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.6217720Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.6218334Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.6218951Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:60)
+2025-09-27T14:05:08.6219790Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.6221199Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.6222044Z 	at io.quarkus.qute.Parser$1.resolve(Parser.java:1331)
+2025-09-27T14:05:08.6222659Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.6223449Z 	at io.quarkus.qute.IncludeSectionHelper.resolve(IncludeSectionHelper.java:51)
+2025-09-27T14:05:08.6224470Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.6225112Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.6225736Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.6226354Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.6227247Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:53)
+2025-09-27T14:05:08.6228097Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.6229147Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.6229960Z 	at io.quarkus.qute.Parser$1.resolve(Parser.java:1331)
+2025-09-27T14:05:08.6230565Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.6231191Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.6232013Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderData(TemplateImpl.java:283)
+2025-09-27T14:05:08.6233123Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderAsyncNoTimeout(TemplateImpl.java:245)
+2025-09-27T14:05:08.6234192Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderAsync(TemplateImpl.java:218)
+2025-09-27T14:05:08.6235548Z 	at io.quarkus.qute.runtime.TemplateProducer$InjectableTemplate$InjectableTemplateInstanceImpl.renderAsync(TemplateProducer.java:367)
+2025-09-27T14:05:08.6237281Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handlePage(RoqRouteHandler.java:150)
+2025-09-27T14:05:08.6238444Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handle(RoqRouteHandler.java:89)
+2025-09-27T14:05:08.6239534Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handle(RoqRouteHandler.java:39)
+2025-09-27T14:05:08.6240671Z 	at io.vertx.ext.web.impl.BlockingHandlerDecorator.lambda$handle$0(BlockingHandlerDecorator.java:48)
+2025-09-27T14:05:08.6241725Z 	at io.vertx.core.impl.ContextImpl.lambda$executeBlocking$5(ContextImpl.java:205)
+2025-09-27T14:05:08.6242602Z 	at io.vertx.core.impl.ContextInternal.dispatch(ContextInternal.java:270)
+2025-09-27T14:05:08.6243366Z 	at io.vertx.core.impl.ContextImpl$1.execute(ContextImpl.java:221)
+2025-09-27T14:05:08.6244064Z 	at io.vertx.core.impl.WorkerTask.run(WorkerTask.java:56)
+2025-09-27T14:05:08.6244891Z 	at io.quarkus.vertx.core.runtime.VertxCoreRecorder$15.runWith(VertxCoreRecorder.java:645)
+2025-09-27T14:05:08.6245937Z 	at org.jboss.threads.EnhancedQueueExecutor$Task.doRunWith(EnhancedQueueExecutor.java:2651)
+2025-09-27T14:05:08.6247124Z 	at org.jboss.threads.EnhancedQueueExecutor$Task.run(EnhancedQueueExecutor.java:2630)
+2025-09-27T14:05:08.6248096Z 	at org.jboss.threads.EnhancedQueueExecutor.runThreadBody(EnhancedQueueExecutor.java:1622)
+2025-09-27T14:05:08.6249082Z 	at org.jboss.threads.EnhancedQueueExecutor$ThreadBody.run(EnhancedQueueExecutor.java:1589)
+2025-09-27T14:05:08.6249942Z 	at org.jboss.threads.DelegatingRunnable.run(DelegatingRunnable.java:11)
+2025-09-27T14:05:08.6250852Z 	at org.jboss.threads.ThreadLocalResettingRunnable.run(ThreadLocalResettingRunnable.java:11)
+2025-09-27T14:05:08.6251850Z 	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+2025-09-27T14:05:08.6252598Z 	at java.base/java.lang.Thread.run(Thread.java:1583)
+2025-09-27T14:05:08.6252927Z 
+2025-09-27T14:05:08.6253833Z 2025-09-27 14:05:08,614 ERROR [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq request failed /mvx/interpreters/: io.vertx.core.VertxException: Response status code 500 is not equal to 200
+2025-09-27T14:05:08.6254966Z 
+2025-09-27T14:05:08.6257418Z 2025-09-27 14:05:08,619 ERROR [io.qua.roq.fro.run.RoqRouteHandler] (executor-thread-4) Error occurred while rendering the template [interpreters.md]: io.quarkus.qute.TemplateException: Rendering error in template [roq-gen/interpreters.html:127]: Key "VARIABLE_NAME" not found in the template data map with keys [site, now, roqVersion, page, locale, brand] in expression {VARIABLE_NAME}
+2025-09-27T14:05:08.6261902Z 2025-09-27 14:05:08,620 ERROR [io.qua.ver.htt.run.QuarkusErrorHandler] (vert.x-eventloop-thread-2) HTTP Request to /mvx/interpreters/ failed, error id: 9f0b7e05-ef06-4656-856c-159ad6841bc2-10: io.quarkus.qute.TemplateException: Rendering error in template [roq-gen/interpreters.html:127]: Key "VARIABLE_NAME" not found in the template data map with keys [site, now, roqVersion, page, locale, brand] in expression {VARIABLE_NAME}
+2025-09-27T14:05:08.6264511Z 	at io.quarkus.qute.TemplateException$Builder.build(TemplateException.java:173)
+2025-09-27T14:05:08.6265391Z 	at io.quarkus.qute.EvaluatorImpl.propertyNotFound(EvaluatorImpl.java:234)
+2025-09-27T14:05:08.6266178Z 	at io.quarkus.qute.EvaluatorImpl.resolve(EvaluatorImpl.java:204)
+2025-09-27T14:05:08.6267039Z 	at io.quarkus.qute.EvaluatorImpl.resolve(EvaluatorImpl.java:172)
+2025-09-27T14:05:08.6267946Z 	at io.quarkus.qute.EvaluatorImpl.resolveReference(EvaluatorImpl.java:131)
+2025-09-27T14:05:08.6268719Z 	at io.quarkus.qute.EvaluatorImpl.evaluate(EvaluatorImpl.java:85)
+2025-09-27T14:05:08.6269701Z 	at io.quarkus.qute.ResolutionContextImpl$ChildResolutionContext.evaluate(ResolutionContextImpl.java:100)
+2025-09-27T14:05:08.6270698Z 	at io.quarkus.qute.ExpressionNode.resolve(ExpressionNode.java:36)
+2025-09-27T14:05:08.6271379Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:132)
+2025-09-27T14:05:08.6272007Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.6272660Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:60)
+2025-09-27T14:05:08.6273509Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.6274543Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.6275966Z 	at io.quarkiverse.qute.web.markdown.runtime.MarkdownSectionHelperFactory$MarkdownSectionHelper.resolve(MarkdownSectionHelperFactory.java:65)
+2025-09-27T14:05:08.6277429Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.6278090Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.6278730Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.6279346Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.6279976Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:53)
+2025-09-27T14:05:08.6280826Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.6281759Z 	at io.quarkus.qute.InsertSectionHelper.resolve(InsertSectionHelper.java:28)
+2025-09-27T14:05:08.6282518Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.6283148Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.6283763Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.6284374Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.6285006Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:60)
+2025-09-27T14:05:08.6285833Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.6286959Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.6287761Z 	at io.quarkus.qute.Parser$1.resolve(Parser.java:1331)
+2025-09-27T14:05:08.6288361Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.6289109Z 	at io.quarkus.qute.IncludeSectionHelper.resolve(IncludeSectionHelper.java:51)
+2025-09-27T14:05:08.6290140Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.6290800Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.6291415Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.6292025Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.6292649Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:53)
+2025-09-27T14:05:08.6293476Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.6294672Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.6295442Z 	at io.quarkus.qute.Parser$1.resolve(Parser.java:1331)
+2025-09-27T14:05:08.6296032Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.6296648Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.6297635Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderData(TemplateImpl.java:283)
+2025-09-27T14:05:08.6298684Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderAsyncNoTimeout(TemplateImpl.java:245)
+2025-09-27T14:05:08.6299732Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderAsync(TemplateImpl.java:218)
+2025-09-27T14:05:08.6300996Z 	at io.quarkus.qute.runtime.TemplateProducer$InjectableTemplate$InjectableTemplateInstanceImpl.renderAsync(TemplateProducer.java:367)
+2025-09-27T14:05:08.6302416Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handlePage(RoqRouteHandler.java:150)
+2025-09-27T14:05:08.6303613Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handle(RoqRouteHandler.java:89)
+2025-09-27T14:05:08.6304682Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handle(RoqRouteHandler.java:39)
+2025-09-27T14:05:08.6305785Z 	at io.vertx.ext.web.impl.BlockingHandlerDecorator.lambda$handle$0(BlockingHandlerDecorator.java:48)
+2025-09-27T14:05:08.6306760Z 	at io.vertx.core.impl.ContextImpl.lambda$executeBlocking$5(ContextImpl.java:205)
+2025-09-27T14:05:08.6307915Z 	at io.vertx.core.impl.ContextInternal.dispatch(ContextInternal.java:270)
+2025-09-27T14:05:08.6308628Z 	at io.vertx.core.impl.ContextImpl$1.execute(ContextImpl.java:221)
+2025-09-27T14:05:08.6309221Z 	at io.vertx.core.impl.WorkerTask.run(WorkerTask.java:56)
+2025-09-27T14:05:08.6309986Z 	at io.quarkus.vertx.core.runtime.VertxCoreRecorder$15.runWith(VertxCoreRecorder.java:645)
+2025-09-27T14:05:08.6310991Z 	at org.jboss.threads.EnhancedQueueExecutor$Task.doRunWith(EnhancedQueueExecutor.java:2651)
+2025-09-27T14:05:08.6311989Z 	at org.jboss.threads.EnhancedQueueExecutor$Task.run(EnhancedQueueExecutor.java:2630)
+2025-09-27T14:05:08.6312949Z 	at org.jboss.threads.EnhancedQueueExecutor.runThreadBody(EnhancedQueueExecutor.java:1622)
+2025-09-27T14:05:08.6313956Z 	at org.jboss.threads.EnhancedQueueExecutor$ThreadBody.run(EnhancedQueueExecutor.java:1589)
+2025-09-27T14:05:08.6314862Z 	at org.jboss.threads.DelegatingRunnable.run(DelegatingRunnable.java:11)
+2025-09-27T14:05:08.6315803Z 	at org.jboss.threads.ThreadLocalResettingRunnable.run(ThreadLocalResettingRunnable.java:11)
+2025-09-27T14:05:08.6317031Z 	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+2025-09-27T14:05:08.6317832Z 	at java.base/java.lang.Thread.run(Thread.java:1583)
+2025-09-27T14:05:08.6318175Z 
+2025-09-27T14:05:08.6319156Z 2025-09-27 14:05:08,621 ERROR [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq request failed /mvx/interpreters/: io.vertx.core.VertxException: Response status code 500 is not equal to 200
+2025-09-27T14:05:08.6320256Z 
+2025-09-27T14:05:08.6322205Z 2025-09-27 14:05:08,626 ERROR [io.qua.roq.fro.run.RoqRouteHandler] (executor-thread-4) Error occurred while rendering the template [interpreters.md]: io.quarkus.qute.TemplateException: Rendering error in template [roq-gen/interpreters.html:127]: Key "VARIABLE_NAME" not found in the template data map with keys [site, now, roqVersion, page, locale, brand] in expression {VARIABLE_NAME}
+2025-09-27T14:05:08.6326729Z 2025-09-27 14:05:08,627 ERROR [io.qua.ver.htt.run.QuarkusErrorHandler] (vert.x-eventloop-thread-2) HTTP Request to /mvx/interpreters/ failed, error id: 9f0b7e05-ef06-4656-856c-159ad6841bc2-11: io.quarkus.qute.TemplateException: Rendering error in template [roq-gen/interpreters.html:127]: Key "VARIABLE_NAME" not found in the template data map with keys [site, now, roqVersion, page, locale, brand] in expression {VARIABLE_NAME}
+2025-09-27T14:05:08.6329536Z 	at io.quarkus.qute.TemplateException$Builder.build(TemplateException.java:173)
+2025-09-27T14:05:08.6330607Z 	at io.quarkus.qute.EvaluatorImpl.propertyNotFound(EvaluatorImpl.java:234)
+2025-09-27T14:05:08.6331407Z 	at io.quarkus.qute.EvaluatorImpl.resolve(EvaluatorImpl.java:204)
+2025-09-27T14:05:08.6332113Z 	at io.quarkus.qute.EvaluatorImpl.resolve(EvaluatorImpl.java:172)
+2025-09-27T14:05:08.6332836Z 	at io.quarkus.qute.EvaluatorImpl.resolveReference(EvaluatorImpl.java:131)
+2025-09-27T14:05:08.6333555Z 	at io.quarkus.qute.EvaluatorImpl.evaluate(EvaluatorImpl.java:85)
+2025-09-27T14:05:08.6334473Z 	at io.quarkus.qute.ResolutionContextImpl$ChildResolutionContext.evaluate(ResolutionContextImpl.java:100)
+2025-09-27T14:05:08.6335402Z 	at io.quarkus.qute.ExpressionNode.resolve(ExpressionNode.java:36)
+2025-09-27T14:05:08.6335991Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:132)
+2025-09-27T14:05:08.6336543Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.6337369Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:60)
+2025-09-27T14:05:08.6338180Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.6339170Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.6340569Z 	at io.quarkiverse.qute.web.markdown.runtime.MarkdownSectionHelperFactory$MarkdownSectionHelper.resolve(MarkdownSectionHelperFactory.java:65)
+2025-09-27T14:05:08.6341816Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.6342462Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.6343110Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.6343662Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.6344291Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:53)
+2025-09-27T14:05:08.6345121Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.6346086Z 	at io.quarkus.qute.InsertSectionHelper.resolve(InsertSectionHelper.java:28)
+2025-09-27T14:05:08.6347025Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.6347671Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.6348297Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.6348934Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.6349558Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:60)
+2025-09-27T14:05:08.6350388Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.6351418Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.6352214Z 	at io.quarkus.qute.Parser$1.resolve(Parser.java:1331)
+2025-09-27T14:05:08.6352817Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.6353571Z 	at io.quarkus.qute.IncludeSectionHelper.resolve(IncludeSectionHelper.java:51)
+2025-09-27T14:05:08.6354371Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.6355025Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.6355665Z 	at io.quarkus.qute.Results.doResolveWith(Results.java:135)
+2025-09-27T14:05:08.6356246Z 	at io.quarkus.qute.Results.resolveWith(Results.java:109)
+2025-09-27T14:05:08.6357002Z 	at io.quarkus.qute.Results.resolveAndProcess(Results.java:53)
+2025-09-27T14:05:08.6358080Z 	at io.quarkus.qute.SectionNode$SectionResolutionContextImpl.execute(SectionNode.java:247)
+2025-09-27T14:05:08.6359056Z 	at io.quarkus.qute.SectionHelper$SectionResolutionContext.execute(SectionHelper.java:66)
+2025-09-27T14:05:08.6359807Z 	at io.quarkus.qute.Parser$1.resolve(Parser.java:1331)
+2025-09-27T14:05:08.6360377Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:56)
+2025-09-27T14:05:08.6360973Z 	at io.quarkus.qute.SectionNode.resolve(SectionNode.java:61)
+2025-09-27T14:05:08.6361740Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderData(TemplateImpl.java:283)
+2025-09-27T14:05:08.6362947Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderAsyncNoTimeout(TemplateImpl.java:245)
+2025-09-27T14:05:08.6363966Z 	at io.quarkus.qute.TemplateImpl$TemplateInstanceImpl.renderAsync(TemplateImpl.java:218)
+2025-09-27T14:05:08.6365223Z 	at io.quarkus.qute.runtime.TemplateProducer$InjectableTemplate$InjectableTemplateInstanceImpl.renderAsync(TemplateProducer.java:367)
+2025-09-27T14:05:08.6366580Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handlePage(RoqRouteHandler.java:150)
+2025-09-27T14:05:08.6367857Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handle(RoqRouteHandler.java:89)
+2025-09-27T14:05:08.6368957Z 	at io.quarkiverse.roq.frontmatter.runtime.RoqRouteHandler.handle(RoqRouteHandler.java:39)
+2025-09-27T14:05:08.6370026Z 	at io.vertx.ext.web.impl.BlockingHandlerDecorator.lambda$handle$0(BlockingHandlerDecorator.java:48)
+2025-09-27T14:05:08.6370981Z 	at io.vertx.core.impl.ContextImpl.lambda$executeBlocking$5(ContextImpl.java:205)
+2025-09-27T14:05:08.6371779Z 	at io.vertx.core.impl.ContextInternal.dispatch(ContextInternal.java:270)
+2025-09-27T14:05:08.6372481Z 	at io.vertx.core.impl.ContextImpl$1.execute(ContextImpl.java:221)
+2025-09-27T14:05:08.6373093Z 	at io.vertx.core.impl.WorkerTask.run(WorkerTask.java:56)
+2025-09-27T14:05:08.6373843Z 	at io.quarkus.vertx.core.runtime.VertxCoreRecorder$15.runWith(VertxCoreRecorder.java:645)
+2025-09-27T14:05:08.6374792Z 	at org.jboss.threads.EnhancedQueueExecutor$Task.doRunWith(EnhancedQueueExecutor.java:2651)
+2025-09-27T14:05:08.6375731Z 	at org.jboss.threads.EnhancedQueueExecutor$Task.run(EnhancedQueueExecutor.java:2630)
+2025-09-27T14:05:08.6376677Z 	at org.jboss.threads.EnhancedQueueExecutor.runThreadBody(EnhancedQueueExecutor.java:1622)
+2025-09-27T14:05:08.6377816Z 	at org.jboss.threads.EnhancedQueueExecutor$ThreadBody.run(EnhancedQueueExecutor.java:1589)
+2025-09-27T14:05:08.6378680Z 	at org.jboss.threads.DelegatingRunnable.run(DelegatingRunnable.java:11)
+2025-09-27T14:05:08.6379582Z 	at org.jboss.threads.ThreadLocalResettingRunnable.run(ThreadLocalResettingRunnable.java:11)
+2025-09-27T14:05:08.6380625Z 	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+2025-09-27T14:05:08.6381432Z 	at java.base/java.lang.Thread.run(Thread.java:1583)
+2025-09-27T14:05:08.6381773Z 
+2025-09-27T14:05:08.6382731Z 2025-09-27 14:05:08,629 ERROR [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq request failed /mvx/interpreters/: io.vertx.core.VertxException: Response status code 500 is not equal to 200
+2025-09-27T14:05:08.6383798Z 
+2025-09-27T14:05:08.6384631Z 2025-09-27 14:05:08,629 ERROR [io.qua.roq.gen.run.RoqGenerator] (vert.x-eventloop-thread-1) Roq generation failed: io.vertx.core.VertxException: Response status code 500 is not equal to 200
+2025-09-27T14:05:08.6385615Z 
+2025-09-27T14:05:08.6681929Z 2025-09-27 14:05:08,667 INFO  [io.quarkus] (main) website stopped in 0.036s
+2025-09-27T14:05:08.7110565Z [INFO] ------------------------------------------------------------------------
+2025-09-27T14:05:08.7112454Z [INFO] BUILD FAILURE
+2025-09-27T14:05:08.7112949Z [INFO] ------------------------------------------------------------------------
+2025-09-27T14:05:08.7121020Z [INFO] Total time:  11.566 s
+2025-09-27T14:05:08.7124162Z [INFO] Finished at: 2025-09-27T14:05:08Z
+2025-09-27T14:05:08.7125533Z [INFO] ------------------------------------------------------------------------
+2025-09-27T14:05:08.7127396Z [WARNING] The requested profile "include-javadocs" could not be activated because it does not exist.
+2025-09-27T14:05:08.7147236Z [ERROR] Failed to execute goal io.quarkus.platform:quarkus-maven-plugin:3.26.4:run (default-cli) on project website: Execution default-cli of goal io.quarkus.platform:quarkus-maven-plugin:3.26.4:run failed: Process exited abnormally (pid 2223) with exit code 1 -> [Help 1]
+2025-09-27T14:05:08.7157097Z [ERROR] 
+2025-09-27T14:05:08.7158420Z [ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+2025-09-27T14:05:08.7159564Z [ERROR] Re-run Maven using the -X switch to enable full debug logging.
+2025-09-27T14:05:08.7160096Z [ERROR] 
+2025-09-27T14:05:08.7160681Z [ERROR] For more information about the errors and possible solutions, please read the following articles:
+2025-09-27T14:05:08.7161660Z [ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/PluginExecutionException
+2025-09-27T14:05:08.7525902Z ##[error]Process completed with exit code 1.
+2025-09-27T14:05:08.7603719Z Post job cleanup.
+2025-09-27T14:05:08.8913885Z (node:2271) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2025-09-27T14:05:08.8914845Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2025-09-27T14:05:08.9055865Z Post job cleanup.
+2025-09-27T14:05:08.9889949Z [command]/usr/bin/git version
+2025-09-27T14:05:08.9933773Z git version 2.51.0
+2025-09-27T14:05:08.9974638Z Temporarily overriding HOME='/home/runner/work/_temp/947822ce-f3bc-4082-8a21-436e9082fd18' before making global git config changes
+2025-09-27T14:05:08.9975928Z Adding repository directory to the temporary git global config as a safe directory
+2025-09-27T14:05:08.9981056Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/mvx/mvx
+2025-09-27T14:05:09.0022207Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2025-09-27T14:05:09.0059143Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2025-09-27T14:05:09.0320546Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2025-09-27T14:05:09.0348602Z http.https://github.com/.extraheader
+2025-09-27T14:05:09.0360694Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2025-09-27T14:05:09.0397743Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2025-09-27T14:05:09.0774893Z Cleaning up orphan processes

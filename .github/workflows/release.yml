@@ -11,8 +11,7 @@ on:
         required: true
         default: 'v0.1.0'
 
-env:
-  GO_VERSION: '1.24'
+
 
 jobs:
   build:
@@ -46,10 +45,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
+      - name: Setup mvx
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/gnodet/mvx/main/install-wrapper.sh | bash
+          ./mvx setup
 
       - name: Get version
         id: version
@@ -71,7 +70,7 @@ jobs:
         run: |
           BINARY_NAME="mvx-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix }}"
 
-          go build \
+          ./mvx go build \
             -ldflags "-s -w -X main.Version=${{ steps.version.outputs.version_no_v }} -X main.Commit=${{ github.sha }} -X main.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             -o "dist/${BINARY_NAME}" \
             .
@@ -137,14 +136,17 @@ jobs:
           # Make sure the changelog script is executable
           chmod +x ./scripts/generate-changelog.sh
 
-          # Get the previous tag for changelog generation
-          # Use the latest tag that exists (since current tag hasn't been created yet)
-          PREVIOUS_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          # Get the current tag being released
+          CURRENT_TAG="${{ steps.version.outputs.version }}"
+
+          # Get the previous tag (excluding the current one)
+          # Sort tags by version and get the one before current
+          PREVIOUS_TAG=$(git tag -l 'v*' --sort=-version:refname | grep -v "^${CURRENT_TAG}$" | head -n 1)
 
           # Generate the changelog section
           if [ -n "$PREVIOUS_TAG" ]; then
-            echo "Generating changelog from $PREVIOUS_TAG to HEAD"
-            CHANGELOG=$(./scripts/generate-changelog.sh "$PREVIOUS_TAG" "HEAD")
+            echo "Generating changelog from $PREVIOUS_TAG to $CURRENT_TAG"
+            CHANGELOG=$(./scripts/generate-changelog.sh "$PREVIOUS_TAG" "$CURRENT_TAG")
           else
             echo "No previous tag found, using generic changelog"
             CHANGELOG="## 🚀 What's New
