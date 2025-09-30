@@ -156,7 +156,7 @@ func (n *NodeTool) fetchNodeLTSVersions() ([]string, error) {
 // GetDownloadOptions returns download options specific to Node.js
 func (n *NodeTool) GetDownloadOptions() DownloadOptions {
 	return DownloadOptions{
-		FileExtension: ExtTarXz,
+		FileExtension: ExtTarGz,
 	}
 }
 
@@ -334,11 +334,11 @@ func (n *NodeTool) getNodeFilename(version string) string {
 		platform = "win-x64"
 	}
 
-	// Windows uses zip, others tar.xz
+	// Windows uses zip, others tar.gz
 	if runtime.GOOS == "windows" {
 		return fmt.Sprintf("node-v%s-%s.zip", version, platform)
 	}
-	return fmt.Sprintf("node-v%s-%s.tar.xz", version, platform)
+	return fmt.Sprintf("node-v%s-%s.tar.gz", version, platform)
 }
 
 // GetDownloadURL implements URLProvider interface for Node.js

@@ -957,7 +957,16 @@ func findMavenExecutable(installDir string) string {
 }
 
 func findNodeExecutable(installDir string) string {
-	// Node typically extracts to node-v{version}-{platform}/
+	// Try new extraction format first (post-strip-components)
+	nodeExe := filepath.Join(installDir, "bin", "node")
+	if runtime.GOOS == "windows" {
+		nodeExe += ".exe"
+	}
+	if _, err := os.Stat(nodeExe); err == nil {
+		return nodeExe
+	}
+
+	// Fallback to legacy extraction format: node-v{version}-{platform}/
 	if entries, err := os.ReadDir(installDir); err == nil {
 		for _, entry := range entries {
 			if entry.IsDir() && strings.HasPrefix(entry.Name(), "node-v") {
