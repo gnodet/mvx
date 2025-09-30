@@ -253,6 +253,17 @@ func (j *JavaTool) getDownloadURLWithChecksum(version, distribution string) (str
 
 // IsInstalled checks if the specified version is installed
 func (j *JavaTool) IsInstalled(version string, cfg config.ToolConfig) bool {
+	if UseSystemTool(j.toolName) {
+		// Try primary binary name in PATH
+		if _, err := exec.LookPath(j.GetBinaryName()); err == nil {
+			logVerbose("System %s is available in PATH (MVX_USE_SYSTEM_%s=true)", j.toolName, strings.ToUpper(j.toolName))
+			return true
+		}
+
+		logVerbose("System %s not available: not found in environment variables or PATH", j.toolName)
+		return false
+	}
+
 	// Resolve the full version string
 	distribution := cfg.Distribution
 	if distribution == "" {
@@ -371,7 +382,11 @@ func (j *JavaTool) GetPath(version string, cfg config.ToolConfig) (string, error
 
 // getInstalledPath returns the bin directory path for an installed Java version
 func (j *JavaTool) getInstalledPath(version string, cfg config.ToolConfig) (string, error) {
-	installDir := j.manager.GetToolVersionDir(ToolJava, version, "")
+	distribution := cfg.Distribution
+	if distribution == "" {
+		distribution = "temurin" // Default distribution
+	}
+	installDir := j.manager.GetToolVersionDir(ToolJava, version, distribution)
 	pathResolver := NewPathResolver(j.manager.GetToolsDir())
 	binDir, err := pathResolver.FindBinaryParentDir(installDir, j.GetBinaryName())
 	if err != nil {

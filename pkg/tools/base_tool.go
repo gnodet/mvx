@@ -6,10 +6,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 
 	"github.com/gnodet/mvx/pkg/config"
+	"github.com/gnodet/mvx/pkg/version"
 )
 
 // getUserFriendlyURL converts long redirect URLs to user-friendly display URLs
@@ -287,30 +289,15 @@ type DownloadOptions struct {
 // extractFile extracts an archive file based on its type
 func (b *BaseTool) extractFile(src, dest, archiveType string) error {
 	switch archiveType {
-	case "zip":
-		return b.extractZip(src, dest)
-	case "tar.gz":
-		return b.extractTarGz(src, dest)
-	case "tar.xz":
-		return b.extractTarXz(src, dest)
+	case ArchiveTypeZip:
+		return extractZipFile(src, dest)
+	case ArchiveTypeTarGz:
+		return extractTarGzFile(src, dest)
+	case ArchiveTypeTarXz:
+		return extractTarXzFile(src, dest)
 	default:
 		return fmt.Errorf("unsupported archive type: %s", archiveType)
 	}
-}
-
-// extractZip extracts a zip file to the destination directory
-func (b *BaseTool) extractZip(src, dest string) error {
-	return extractZipFile(src, dest)
-}
-
-// extractTarGz extracts a tar.gz file to the destination directory
-func (b *BaseTool) extractTarGz(src, dest string) error {
-	return extractTarGzFile(src, dest)
-}
-
-// extractTarXz extracts a tar.xz file to the destination directory
-func (b *BaseTool) extractTarXz(src, dest string) error {
-	return extractTarXzFile(src, dest)
 }
 
 // VerifyBinary runs a binary with version flag and checks the output
@@ -374,8 +361,8 @@ func (b *BaseTool) printVerificationDebugInfo(version string, cfg config.ToolCon
 }
 
 // IsInstalled checks if a binary exists at the expected path
-func (b *BaseTool) IsInstalled(binPath, binaryName string) bool {
-	exe := b.getPlatformBinaryPath(binPath, binaryName)
+func (b *BaseTool) IsInstalled(binPath string) bool {
+	exe := b.getPlatformBinaryPath(binPath, b.GetBinaryName())
 	_, err := os.Stat(exe)
 	return err == nil
 }
@@ -504,11 +491,49 @@ func (b *BaseTool) StandardVerifyWithConfig(version string, cfg config.ToolConfi
 	return b.VerifyWithConfig(version, cfg, verifyConfig)
 }
 
+// InstalledVersion holds info about an installed tool version
+type InstalledVersion struct {
+	Version      string
+	Distribution string
+	Path         string
+}
+
+// ListInstalledVersions returns all installed versions for this tool and distribution.
+// If distribution is empty, returns all distributions.
+func (b *BaseTool) ListInstalledVersions(distribution string) []InstalledVersion {
+	toolsDir := b.manager.GetToolsDir()
+	toolDir := filepath.Join(toolsDir, b.toolName)
+	entries, err := os.ReadDir(toolDir)
+	if err != nil {
+		return nil
+	}
+
+	var installed []InstalledVersion
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		versionPart, distPart, hasDistribution := strings.Cut(name, "@")
+		if !hasDistribution {
+			versionPart = name
+			distPart = ""
+		}
+		if distribution != "" && distPart != distribution {
+			continue
+		}
+		installed = append(installed, InstalledVersion{
+			Version:      versionPart,
+			Distribution: distPart,
+			Path:         filepath.Join(toolDir, name),
+		})
+	}
+	return installed
+}
+
 // StandardIsInstalled provides standard installation check for tools
-func (b *BaseTool) StandardIsInstalled(version string, cfg config.ToolConfig, getPath func(string, config.ToolConfig) (string, error)) bool {
-	// Check if we should use system tool instead of mvx-managed tool
+func (b *BaseTool) StandardIsInstalled(versionSpec string, cfg config.ToolConfig, getPath func(string, config.ToolConfig) (string, error)) bool {
 	if UseSystemTool(b.toolName) {
-		// Try primary binary name in PATH
 		if _, err := exec.LookPath(b.GetBinaryName()); err == nil {
 			logVerbose("System %s is available in PATH (MVX_USE_SYSTEM_%s=true)", b.toolName, strings.ToUpper(b.toolName))
 			return true
@@ -518,13 +543,136 @@ func (b *BaseTool) StandardIsInstalled(version string, cfg config.ToolConfig, ge
 		return false
 	}
 
-	binPath, err := getPath(version, cfg)
+	tool, err := b.manager.GetTool(b.toolName)
 	if err != nil {
-		logVerbose("Failed to get %s binary path: %v", b.toolName, err)
+		logVerbose("Failed to get tool %s: %v", b.toolName, err)
 		return false
 	}
-	logVerbose("Checking for %s binary at: %s", b.toolName, binPath)
-	return b.IsInstalled(binPath, b.GetBinaryName())
+
+	spec, err := version.ParseSpec(versionSpec)
+	if err != nil {
+		logVerbose("Failed to parse version spec %q: %v", versionSpec, err)
+		return false
+	}
+
+	targetVersion, resolveErr := b.resolveTargetVersion(tool, spec, versionSpec, cfg)
+	if resolveErr != nil {
+		logVerbose("Failed to resolve target version for %s %s: %v", b.toolName, versionSpec, resolveErr)
+	}
+
+	installed := b.ListInstalledVersions(cfg.Distribution)
+	type installedCandidate struct {
+		info   InstalledVersion
+		parsed *version.Version
+	}
+
+	var candidates []installedCandidate
+	for _, inst := range installed {
+		logVerbose("   Checking installed version: %s (%s) at %s", inst.Version, inst.Distribution, inst.Path)
+		parsed, err := version.ParseVersion(inst.Version)
+		if err != nil {
+			logVerbose("Failed to parse installed version %s: %v", inst.Version, err)
+			continue
+		}
+		if spec.Matches(parsed) {
+			if spec.Constraint == "latest" && resolveErr == nil && targetVersion != "" && inst.Version != targetVersion {
+				continue
+			}
+			candidates = append(candidates, installedCandidate{info: inst, parsed: parsed})
+		}
+	}
+
+	sort.Slice(candidates, func(i, j int) bool {
+		return candidates[i].parsed.Compare(candidates[j].parsed) > 0
+	})
+
+	for _, candidate := range candidates {
+		candidateCfg := cfg
+		candidateCfg.Version = candidate.info.Version
+		if candidate.info.Distribution != "" {
+			candidateCfg.Distribution = candidate.info.Distribution
+		}
+
+		// Use the actual installation path from ListInstalledVersions instead of recomputing
+		// This ensures we check the correct directory, especially for distributions
+		binPath, err := getPath(candidate.info.Version, candidateCfg)
+		if err != nil {
+			logVerbose("Failed to compute binary path for %s %s: %v", b.toolName, candidate.info.Version, err)
+			continue
+		}
+
+		if !b.IsInstalled(binPath) {
+			logVerbose("Binary for %s %s not found at %s", b.toolName, candidate.info.Version, binPath)
+			continue
+		}
+
+		if err := tool.Verify(candidate.info.Version, candidateCfg); err != nil {
+			logVerbose("Verification failed for installed %s %s: %v", b.toolName, candidate.info.Version, err)
+			continue
+		}
+
+		logVerbose("Using previously installed %s %s (%s)", b.toolName, candidate.info.Version, candidate.info.Distribution)
+		return true
+	}
+
+	if resolveErr != nil {
+		return false
+	}
+
+	if targetVersion == "" {
+		logVerbose("Resolved target version for %s %s is empty", b.toolName, versionSpec)
+		return false
+	}
+
+	installCfg := cfg
+	installCfg.Version = targetVersion
+
+	logVerbose("%s version %s not installed, attempting automatic installation", b.toolName, targetVersion)
+	if err := tool.Install(targetVersion, installCfg); err != nil {
+		logVerbose("Automatic installation of %s %s failed: %v", b.toolName, targetVersion, err)
+		return false
+	}
+
+	if err := tool.Verify(targetVersion, installCfg); err != nil {
+		logVerbose("Verification after installing %s %s failed: %v", b.toolName, targetVersion, err)
+		return false
+	}
+
+	b.clearPathCache()
+	logVerbose("Successfully installed %s %s on demand", b.toolName, targetVersion)
+	return true
+}
+
+func (b *BaseTool) resolveTargetVersion(tool Tool, spec *version.Spec, versionSpec string, cfg config.ToolConfig) (string, error) {
+	resolveCfg := cfg
+	resolveCfg.Version = versionSpec
+
+	if resolved, err := b.manager.ResolveVersion(b.toolName, resolveCfg); err == nil && resolved != "" {
+		if parsed, parseErr := version.ParseVersion(resolved); parseErr == nil {
+			if spec.Constraint == "latest" || spec.Matches(parsed) {
+				return resolved, nil
+			}
+		} else {
+			return resolved, nil
+		}
+	}
+
+	available, err := tool.ListVersions()
+	if err != nil {
+		return "", err
+	}
+
+	resolved, err := spec.Resolve(available)
+	if err != nil {
+		return "", err
+	}
+
+	return resolved, nil
+}
+
+// StandardGetPath provides standard path resolution with system tool support
+func (b *BaseTool) GetPath(version string, cfg config.ToolConfig, getInstalledPath func(string, config.ToolConfig) (string, error)) (string, error) {
+	return b.StandardGetPath(version, cfg, getInstalledPath)
 }
 
 // StandardGetPath provides standard path resolution with system tool support

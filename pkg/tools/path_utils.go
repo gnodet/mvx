@@ -78,7 +78,7 @@ func NewInstallationPathManager(toolsDir string) *InstallationPathManager {
 func (ipm *InstallationPathManager) CreateToolInstallDir(toolName, version, distribution string) (string, error) {
 	var installDir string
 	if distribution != "" {
-		installDir = filepath.Join(ipm.toolsDir, toolName, version+"-"+distribution)
+		installDir = filepath.Join(ipm.toolsDir, toolName, version+"@"+distribution)
 	} else {
 		installDir = filepath.Join(ipm.toolsDir, toolName, version)
 	}

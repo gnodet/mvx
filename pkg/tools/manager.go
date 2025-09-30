@@ -541,7 +541,7 @@ func (m *Manager) GetToolDir(toolName string) string {
 func (m *Manager) GetToolVersionDir(toolName, version string, distribution string) string {
 	versionDir := version
 	if distribution != "" {
-		versionDir = fmt.Sprintf("%s-%s", version, distribution)
+		versionDir = fmt.Sprintf("%s@%s", version, distribution)
 	}
 	return filepath.Join(m.GetToolDir(toolName), versionDir)
 }
