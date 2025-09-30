@@ -555,7 +555,7 @@ func (m *Manager) EnsureTools(cfg *config.Config, maxConcurrent int) error {
 			} else {
 				mu.Lock()
 				completed++
-				fmt.Printf("  ✅ Progress: %d/%d tools ready\n", completed, len(cfg.Tools))
+				fmt.Printf("  ✅ %s is ready (%d/%d tools)\n", name, completed, len(cfg.Tools))
 				mu.Unlock()
 			}
 		}(toolName, toolConfig)

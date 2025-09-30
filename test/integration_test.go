@@ -928,6 +928,17 @@ func findJavaExecutable(installDir string) string {
 }
 
 func findMavenExecutable(installDir string) string {
+	// Try new extraction format first (post-strip-components)
+	// Maven files are directly in the version directory
+	mvnExe := filepath.Join(installDir, "bin", "mvn")
+	if runtime.GOOS == "windows" {
+		mvnExe += ".cmd"
+	}
+	if _, err := os.Stat(mvnExe); err == nil {
+		return mvnExe
+	}
+
+	// Fallback to legacy extraction format
 	// Maven typically extracts to apache-maven-{version}/
 	if entries, err := os.ReadDir(installDir); err == nil {
 		for _, entry := range entries {
