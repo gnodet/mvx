@@ -201,8 +201,10 @@ func (j *JavaTool) installWithDistribution(version string, cfg config.ToolConfig
 		return InstallError(j.toolName, version, err)
 	}
 
-	// Verify installation
-	if err := j.Verify(version, cfg); err != nil {
+	// Verify installation - ensure distribution is set in config
+	verifyConfig := cfg
+	verifyConfig.Distribution = distribution
+	if err := j.Verify(version, verifyConfig); err != nil {
 		// Clean up failed installation
 		if removeErr := os.RemoveAll(installDir); removeErr != nil {
 			logVerbose("Failed to clean up installation directory %s: %v", installDir, removeErr)
