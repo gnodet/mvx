@@ -15,20 +15,22 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout
       uses: actions/checkout@v5
       with:
         fetch-depth: 0 # Fetch all history for proper git info
-    
-    - name: Setup mvx
-      run: ./mvx setup
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: maven
 
     - name: Build website
       shell: bash
-      env:
-        MVX_JAVA_VERSION: "21"
       run: |
         # Fetch GitHub Pages URL
         OWNER=$(echo "$GITHUB_REPOSITORY" | cut -d '/' -f 1)
@@ -39,7 +41,7 @@ jobs:
         echo "SITE_PATH=$SITE_PATH" >> $GITHUB_ENV
         echo "GITHUB_REPOSITORY=$GITHUB_REPOSITORY SITE_DIR=$SITE_DIR SITE_URL=$SITE_URL SITE_PATH=$SITE_PATH"
         cd website
-        QUARKUS_ROQ_GENERATOR_BATCH=true ../mvx mvn clean package quarkus:run -DskipTests --no-transfer-progress \
+        QUARKUS_ROQ_GENERATOR_BATCH=true mvn clean package quarkus:run -DskipTests --no-transfer-progress \
             -Dquarkus.http.root-path=$SITE_PATH \
             -Dsite.url=$SITE_URL
     
