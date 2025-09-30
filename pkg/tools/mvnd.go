@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gnodet/mvx/pkg/config"
+	"github.com/gnodet/mvx/pkg/version"
 )
 
 // Compile-time interface validation
@@ -136,9 +137,23 @@ func (m *MvndTool) getPlatformString() string {
 }
 
 // ResolveVersion resolves a Mvnd version specification to a concrete version
-func (m *MvndTool) ResolveVersion(version, distribution string) (string, error) {
-	registry := m.manager.GetRegistry()
-	return registry.ResolveMvndVersion(version)
+func (m *MvndTool) ResolveVersion(versionSpec, distribution string) (string, error) {
+	availableVersions, err := m.ListVersions()
+	if err != nil {
+		return "", err
+	}
+
+	spec, err := version.ParseSpec(versionSpec)
+	if err != nil {
+		return "", fmt.Errorf("invalid version specification %s: %w", versionSpec, err)
+	}
+
+	resolved, err := spec.Resolve(availableVersions)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve mvnd version %s: %w", versionSpec, err)
+	}
+
+	return resolved, nil
 }
 
 // GetDownloadURL implements Tool interface for Maven Daemon

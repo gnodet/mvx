@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gnodet/mvx/pkg/config"
+	"github.com/gnodet/mvx/pkg/version"
 )
 
 // Compile-time interface validation
@@ -129,9 +130,35 @@ func (n *NodeTool) getDownloadURL(version string) string {
 }
 
 // ResolveVersion resolves a Node version specification to a concrete version
-func (n *NodeTool) ResolveVersion(version, distribution string) (string, error) {
-	registry := n.manager.GetRegistry()
-	return registry.ResolveNodeVersion(version)
+func (n *NodeTool) ResolveVersion(versionSpec, distribution string) (string, error) {
+	// Special handling for "lts"
+	if versionSpec == "lts" {
+		registry := n.manager.GetRegistry()
+		lts, err := registry.FetchNodeLTSVersions()
+		if err != nil || len(lts) == 0 {
+			return "", fmt.Errorf("failed to resolve Node LTS version")
+		}
+		// Return highest LTS (first element since SortVersions returns descending order)
+		sorted := version.SortVersions(lts)
+		return sorted[0], nil
+	}
+
+	availableVersions, err := n.ListVersions()
+	if err != nil {
+		return "", err
+	}
+
+	spec, err := version.ParseSpec(versionSpec)
+	if err != nil {
+		return "", fmt.Errorf("invalid version specification %s: %w", versionSpec, err)
+	}
+
+	resolved, err := spec.Resolve(availableVersions)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve Node version %s: %w", versionSpec, err)
+	}
+
+	return resolved, nil
 }
 
 // GetChecksum implements ChecksumProvider interface for Node.js

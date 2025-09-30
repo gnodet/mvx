@@ -347,7 +347,7 @@ func (r *ToolRegistry) getFallbackGoVersions() []string {
 	}
 }
 
-// ResolveGoVersion resolves a Go version specification to a concrete version
+// ResolveGoVersion is deprecated - use GoTool.ResolveVersion instead
 func (r *ToolRegistry) ResolveGoVersion(versionSpec string) (string, error) {
 	availableVersions, err := r.GetGoVersions()
 	if err != nil {
@@ -393,7 +393,7 @@ func (r *ToolRegistry) getFallbackMvndVersions() []string {
 	}
 }
 
-// ResolveMvndVersion resolves a mvnd version specification to a concrete version
+// ResolveMvndVersion is deprecated - use MvndTool.ResolveVersion instead
 func (r *ToolRegistry) ResolveMvndVersion(versionSpec string) (string, error) {
 	availableVersions, err := r.GetMvndVersions()
 	if err != nil {
@@ -423,10 +423,10 @@ func (r *ToolRegistry) GetNodeVersions() ([]string, error) {
 	return version.SortVersions(versions), nil
 }
 
-// ResolveNodeVersion resolves a Node version specification
+// ResolveNodeVersion is deprecated - use NodeTool.ResolveVersion instead
 func (r *ToolRegistry) ResolveNodeVersion(versionSpec string) (string, error) {
 	if versionSpec == "lts" {
-		lts, err := r.fetchNodeLTSVersions()
+		lts, err := r.FetchNodeLTSVersions()
 		if err != nil || len(lts) == 0 {
 			return "", fmt.Errorf("failed to resolve Node LTS version")
 		}
@@ -462,7 +462,8 @@ func (r *ToolRegistry) fetchNodeVersions() ([]string, error) {
 	return versions, nil
 }
 
-func (r *ToolRegistry) fetchNodeLTSVersions() ([]string, error) {
+// FetchNodeLTSVersions fetches available Node.js LTS versions
+func (r *ToolRegistry) FetchNodeLTSVersions() ([]string, error) {
 	entries, err := r.fetchNodeIndex()
 	if err != nil {
 		return nil, err
@@ -504,7 +505,7 @@ func (r *ToolRegistry) fetchNodeIndex() ([]nodeIndexEntry, error) {
 	return entries, nil
 }
 
-// ResolveJavaVersion resolves a Java version specification to a concrete version
+// ResolveJavaVersion is deprecated - use JavaTool.ResolveVersion instead
 func (r *ToolRegistry) ResolveJavaVersion(versionSpec, distribution string) (string, error) {
 	if distribution == "" {
 		distribution = "temurin" // Default distribution
@@ -528,7 +529,7 @@ func (r *ToolRegistry) ResolveJavaVersion(versionSpec, distribution string) (str
 	return resolved, nil
 }
 
-// ResolveMavenVersion resolves a Maven version specification to a concrete version
+// ResolveMavenVersion is deprecated - use MavenTool.ResolveVersion instead
 func (r *ToolRegistry) ResolveMavenVersion(versionSpec string) (string, error) {
 	availableVersions, err := r.GetMavenVersions()
 	if err != nil {

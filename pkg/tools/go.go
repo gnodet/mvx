@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gnodet/mvx/pkg/config"
+	"github.com/gnodet/mvx/pkg/version"
 )
 
 // Compile-time interface validation
@@ -116,9 +117,23 @@ func (g *GoTool) getDownloadURL(version string) string {
 }
 
 // ResolveVersion resolves a Go version specification to a concrete version
-func (g *GoTool) ResolveVersion(version, distribution string) (string, error) {
-	registry := g.manager.GetRegistry()
-	return registry.ResolveGoVersion(version)
+func (g *GoTool) ResolveVersion(versionSpec, distribution string) (string, error) {
+	availableVersions, err := g.ListVersions()
+	if err != nil {
+		return "", err
+	}
+
+	spec, err := version.ParseSpec(versionSpec)
+	if err != nil {
+		return "", fmt.Errorf("invalid version specification %s: %w", versionSpec, err)
+	}
+
+	resolved, err := spec.Resolve(availableVersions)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve Go version %s: %w", versionSpec, err)
+	}
+
+	return resolved, nil
 }
 
 // GetChecksum implements ChecksumProvider interface for Go

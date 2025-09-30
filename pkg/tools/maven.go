@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gnodet/mvx/pkg/config"
+	"github.com/gnodet/mvx/pkg/version"
 )
 
 // Compile-time interface validation
@@ -155,9 +156,23 @@ func (m *MavenTool) getArchiveDownloadURL(version string) string {
 }
 
 // ResolveVersion resolves a Maven version specification to a concrete version
-func (m *MavenTool) ResolveVersion(version, distribution string) (string, error) {
-	registry := m.manager.GetRegistry()
-	return registry.ResolveMavenVersion(version)
+func (m *MavenTool) ResolveVersion(versionSpec, distribution string) (string, error) {
+	availableVersions, err := m.ListVersions()
+	if err != nil {
+		return "", err
+	}
+
+	spec, err := version.ParseSpec(versionSpec)
+	if err != nil {
+		return "", fmt.Errorf("invalid version specification %s: %w", versionSpec, err)
+	}
+
+	resolved, err := spec.Resolve(availableVersions)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve Maven version %s: %w", versionSpec, err)
+	}
+
+	return resolved, nil
 }
 
 // GetDownloadURL implements URLProvider interface for Maven

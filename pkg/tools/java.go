@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gnodet/mvx/pkg/config"
+	"github.com/gnodet/mvx/pkg/version"
 )
 
 // Compile-time interface validation
@@ -743,9 +744,28 @@ func (j *JavaTool) GetChecksum(version, filename string) (ChecksumInfo, error) {
 }
 
 // ResolveVersion resolves a Java version specification to a concrete version
-func (j *JavaTool) ResolveVersion(version, distribution string) (string, error) {
+func (j *JavaTool) ResolveVersion(versionSpec, distribution string) (string, error) {
+	if distribution == "" {
+		distribution = "temurin" // Default distribution
+	}
+
 	registry := j.manager.GetRegistry()
-	return registry.ResolveJavaVersion(version, distribution)
+	availableVersions, err := registry.GetJavaVersions(distribution)
+	if err != nil {
+		return "", err
+	}
+
+	spec, err := version.ParseSpec(versionSpec)
+	if err != nil {
+		return "", fmt.Errorf("invalid version specification %s: %w", versionSpec, err)
+	}
+
+	resolved, err := spec.Resolve(availableVersions)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve Java %s version %s: %w", distribution, versionSpec, err)
+	}
+
+	return resolved, nil
 }
 
 // GetDownloadURL implements Tool interface for Java
