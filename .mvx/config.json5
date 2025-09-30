@@ -44,8 +44,7 @@
 
     build: {
       description: "Build mvx binary with platform-optimized settings",
-      script: "go build -o mvx-dev . && echo 'Installing global development binary...' && mkdir -p ~/.mvx/dev && cp mvx-dev ~/.mvx/dev/mvx && chmod +x ~/.mvx/dev/mvx && echo '✅ Global development binary installed at ~/.mvx/dev/mvx' && echo '   All projects using mvxVersion=dev will now use this binary automatically'",
-      override: true
+      script: "go build -o mvx-dev . && echo 'Installing global development binary...' && mkdir -p ~/.mvx/dev && cp mvx-dev ~/.mvx/dev/mvx && chmod +x ~/.mvx/dev/mvx && echo '✅ Global development binary installed at ~/.mvx/dev/mvx' && echo '   All projects using mvxVersion=dev will now use this binary automatically'"
     },
 
     fmt: {
@@ -60,8 +59,7 @@
 
     test: {
       description: "Run all tests",
-      script: "go test -v ./...",
-      override: true
+      script: "go test -v ./..."
     },
 
     "test-integration": {
@@ -69,16 +67,14 @@
       script: "cd test && go test -v -timeout=5m ./..."
     },
 
-    "website build": {
+    "website-build": {
       description: "Build the website using ROQ",
-      script: "cd website && QUARKUS_ROQ_GENERATOR_BATCH=true mvn clean package quarkus:run -DskipTests --no-transfer-progress",
-      override: true
+      script: "cd website && QUARKUS_ROQ_GENERATOR_BATCH=true mvn clean package quarkus:run -DskipTests --no-transfer-progress"
     },
 
-    "website serve": {
+    "website-serve": {
       description: "Serve the website using ROQ dev mode",
-      script: "cd website && mvn quarkus:dev -Dquarkus.http.port=8081 --no-transfer-progress",
-      override: true
+      script: "cd website && mvn quarkus:dev -Dquarkus.http.port=8081 --no-transfer-progress"
     },
 
     "build-all": {
@@ -93,8 +89,7 @@
 
     clean: {
       description: "Clean build artifacts",
-      script: "rm -f mvx-dev && rm -rf dist/ && rm -f ~/.mvx/dev/mvx && echo '🧹 Cleaned local and global dev binaries'",
-      override: true
+      script: "rm -f mvx-dev && rm -rf dist/ && rm -f ~/.mvx/dev/mvx && echo '🧹 Cleaned local and global dev binaries'"
     },
 
     changelog: {

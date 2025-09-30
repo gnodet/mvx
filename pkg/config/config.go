@@ -52,12 +52,9 @@ type CommandConfig struct {
 	Environment map[string]string  `json:"environment,omitempty" yaml:"environment,omitempty"`
 	Interpreter string             `json:"interpreter,omitempty" yaml:"interpreter,omitempty"` // "native" (default), "mvx-shell"
 
-	// Hooks for built-in commands
-	Pre  interface{} `json:"pre,omitempty" yaml:"pre,omitempty"`   // Script to run before built-in command (string or PlatformScript)
-	Post interface{} `json:"post,omitempty" yaml:"post,omitempty"` // Script to run after built-in command (string or PlatformScript)
-
-	// Override built-in command behavior
-	Override bool `json:"override,omitempty" yaml:"override,omitempty"` // If true, replace built-in command entirely
+	// Hooks (deprecated - kept for backward compatibility but not used)
+	Pre  interface{} `json:"pre,omitempty" yaml:"pre,omitempty"`   // Deprecated: no longer used
+	Post interface{} `json:"post,omitempty" yaml:"post,omitempty"` // Deprecated: no longer used
 }
 
 // PlatformScript represents platform-specific script definitions
@@ -177,17 +174,9 @@ func (c *Config) Validate() error {
 
 	// Validate command configurations
 	for cmdName, cmdConfig := range c.Commands {
-		// For override commands or custom commands, script is required
-		if cmdConfig.Override || !isBuiltinCommand(cmdName) {
-			if !HasValidScript(cmdConfig.Script) {
-				return fmt.Errorf("command %s: script is required", cmdName)
-			}
-		}
-		// For built-in commands with hooks, at least one of pre/post/script should be present
-		if isBuiltinCommand(cmdName) && !cmdConfig.Override {
-			if !HasValidScript(cmdConfig.Script) && !HasValidScript(cmdConfig.Pre) && !HasValidScript(cmdConfig.Post) {
-				return fmt.Errorf("command %s: at least one of script, pre, or post is required for built-in command hooks", cmdName)
-			}
+		// All commands require a script
+		if !HasValidScript(cmdConfig.Script) {
+			return fmt.Errorf("command %s: script is required", cmdName)
 		}
 
 		// Validate interpreter field
@@ -197,23 +186,6 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
-}
-
-// isBuiltinCommand checks if a command name is a built-in mvx command
-func isBuiltinCommand(commandName string) bool {
-	builtinCommands := map[string]bool{
-		"build":            true,
-		"test":             true,
-		"setup":            true,
-		"init":             true,
-		"tools":            true,
-		"version":          true,
-		"help":             true,
-		"completion":       true,
-		"info":             true,
-		"update-bootstrap": true,
-	}
-	return builtinCommands[commandName]
 }
 
 // GetRequiredTools returns a list of tools required for a specific command
@@ -234,22 +206,6 @@ func (c *Config) GetRequiredTools(commandName string) []string {
 func (c *Config) GetToolConfig(toolName string) (ToolConfig, bool) {
 	config, exists := c.Tools[toolName]
 	return config, exists
-}
-
-// HasCommandOverride checks if a built-in command is overridden
-func (c *Config) HasCommandOverride(commandName string) bool {
-	if cmd, exists := c.Commands[commandName]; exists {
-		return cmd.Override && isBuiltinCommand(commandName)
-	}
-	return false
-}
-
-// HasCommandHooks checks if a built-in command has pre/post hooks
-func (c *Config) HasCommandHooks(commandName string) bool {
-	if cmd, exists := c.Commands[commandName]; exists {
-		return isBuiltinCommand(commandName) && !cmd.Override && (HasValidScript(cmd.Pre) || HasValidScript(cmd.Post))
-	}
-	return false
 }
 
 // GetCommandConfig returns the configuration for a specific command

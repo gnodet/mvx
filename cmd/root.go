@@ -92,8 +92,6 @@ func init() {
 	// Add subcommands
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(setupCmd)
-	rootCmd.AddCommand(buildCmd)
-	rootCmd.AddCommand(testCmd)
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(updateBootstrapCmd)
 }
@@ -355,11 +353,6 @@ func addCustomCommands() error {
 			continue
 		}
 
-		// Skip built-in commands unless they have override flag
-		if isBuiltinCommand(cmdName) && !cmdConfig.Override {
-			continue
-		}
-
 		// Create a new cobra command for this custom command
 		customCmd := createCustomCommand(cmdName, cmdConfig, exec)
 		rootCmd.AddCommand(customCmd)
@@ -470,22 +463,4 @@ Examples:
 			}
 		},
 	}
-}
-
-// isBuiltinCommand checks if a command name is a built-in mvx command
-func isBuiltinCommand(commandName string) bool {
-	builtinCommands := map[string]bool{
-		"build":            true,
-		"test":             true,
-		"setup":            true,
-		"init":             true,
-		"tools":            true,
-		"version":          true,
-		"help":             true,
-		"completion":       true,
-		"info":             true,
-		"update-bootstrap": true,
-		"run":              true, // Don't override the run command itself
-	}
-	return builtinCommands[commandName]
 }
