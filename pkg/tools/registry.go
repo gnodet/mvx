@@ -347,26 +347,6 @@ func (r *ToolRegistry) getFallbackGoVersions() []string {
 	}
 }
 
-// ResolveGoVersion is deprecated - use GoTool.ResolveVersion instead
-func (r *ToolRegistry) ResolveGoVersion(versionSpec string) (string, error) {
-	availableVersions, err := r.GetGoVersions()
-	if err != nil {
-		return "", err
-	}
-
-	spec, err := version.ParseSpec(versionSpec)
-	if err != nil {
-		return "", fmt.Errorf("invalid version specification %s: %w", versionSpec, err)
-	}
-
-	resolved, err := spec.Resolve(availableVersions)
-	if err != nil {
-		return "", fmt.Errorf("failed to resolve Go version %s: %w", versionSpec, err)
-	}
-
-	return resolved, nil
-}
-
 // fetchMvndVersionsFromApache fetches mvnd versions from Apache archive
 func (r *ToolRegistry) fetchMvndVersionsFromApache() ([]string, error) {
 	// Fetch mvnd versions from archive
@@ -393,26 +373,6 @@ func (r *ToolRegistry) getFallbackMvndVersions() []string {
 	}
 }
 
-// ResolveMvndVersion is deprecated - use MvndTool.ResolveVersion instead
-func (r *ToolRegistry) ResolveMvndVersion(versionSpec string) (string, error) {
-	availableVersions, err := r.GetMvndVersions()
-	if err != nil {
-		return "", err
-	}
-
-	spec, err := version.ParseSpec(versionSpec)
-	if err != nil {
-		return "", fmt.Errorf("invalid version specification %s: %w", versionSpec, err)
-	}
-
-	resolved, err := spec.Resolve(availableVersions)
-	if err != nil {
-		return "", fmt.Errorf("failed to resolve mvnd version %s: %w", versionSpec, err)
-	}
-
-	return resolved, nil
-}
-
 // GetNodeVersions returns available Node.js versions
 func (r *ToolRegistry) GetNodeVersions() ([]string, error) {
 	versions, err := r.fetchNodeVersions()
@@ -421,32 +381,6 @@ func (r *ToolRegistry) GetNodeVersions() ([]string, error) {
 		return []string{"22.5.1", "22.4.1", "20.15.0", "18.20.4"}, nil
 	}
 	return version.SortVersions(versions), nil
-}
-
-// ResolveNodeVersion is deprecated - use NodeTool.ResolveVersion instead
-func (r *ToolRegistry) ResolveNodeVersion(versionSpec string) (string, error) {
-	if versionSpec == "lts" {
-		lts, err := r.FetchNodeLTSVersions()
-		if err != nil || len(lts) == 0 {
-			return "", fmt.Errorf("failed to resolve Node LTS version")
-		}
-		// Return highest LTS (first element since SortVersions returns descending order)
-		sorted := version.SortVersions(lts)
-		return sorted[0], nil
-	}
-	available, err := r.GetNodeVersions()
-	if err != nil {
-		return "", err
-	}
-	spec, err := version.ParseSpec(versionSpec)
-	if err != nil {
-		return "", fmt.Errorf("invalid version specification %s: %w", versionSpec, err)
-	}
-	resolved, err := spec.Resolve(available)
-	if err != nil {
-		return "", fmt.Errorf("failed to resolve Node version %s: %w", versionSpec, err)
-	}
-	return resolved, nil
 }
 
 func (r *ToolRegistry) fetchNodeVersions() ([]string, error) {
@@ -503,48 +437,4 @@ func (r *ToolRegistry) fetchNodeIndex() ([]nodeIndexEntry, error) {
 		return nil, err
 	}
 	return entries, nil
-}
-
-// ResolveJavaVersion is deprecated - use JavaTool.ResolveVersion instead
-func (r *ToolRegistry) ResolveJavaVersion(versionSpec, distribution string) (string, error) {
-	if distribution == "" {
-		distribution = "temurin" // Default distribution
-	}
-
-	availableVersions, err := r.GetJavaVersions(distribution)
-	if err != nil {
-		return "", err
-	}
-
-	spec, err := version.ParseSpec(versionSpec)
-	if err != nil {
-		return "", fmt.Errorf("invalid version specification %s: %w", versionSpec, err)
-	}
-
-	resolved, err := spec.Resolve(availableVersions)
-	if err != nil {
-		return "", fmt.Errorf("failed to resolve Java %s version %s: %w", distribution, versionSpec, err)
-	}
-
-	return resolved, nil
-}
-
-// ResolveMavenVersion is deprecated - use MavenTool.ResolveVersion instead
-func (r *ToolRegistry) ResolveMavenVersion(versionSpec string) (string, error) {
-	availableVersions, err := r.GetMavenVersions()
-	if err != nil {
-		return "", err
-	}
-
-	spec, err := version.ParseSpec(versionSpec)
-	if err != nil {
-		return "", fmt.Errorf("invalid version specification %s: %w", versionSpec, err)
-	}
-
-	resolved, err := spec.Resolve(availableVersions)
-	if err != nil {
-		return "", fmt.Errorf("failed to resolve Maven version %s: %w", versionSpec, err)
-	}
-
-	return resolved, nil
 }
