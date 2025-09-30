@@ -243,9 +243,11 @@ func TestExecutor_ValidateCommand(t *testing.T) {
 	}
 
 	// Test command with missing tool requirement
+	// Note: ValidateCommand is now deprecated and only checks command existence
+	// Tools are auto-installed via EnsureTool, so this should NOT error
 	err = executor.ValidateCommand("requires-missing")
-	if err == nil {
-		t.Error("Expected error for command requiring missing tool")
+	if err != nil {
+		t.Errorf("ValidateCommand() error = %v (should not error for missing tools, they are auto-installed)", err)
 	}
 
 	// Test non-existent command

@@ -176,12 +176,12 @@ func TestJavaToolWithSystemJava(t *testing.T) {
 	os.Unsetenv("JAVA_HOME")
 
 	cfg := config.ToolConfig{
-		Version:      "11", // Use version 11 which won't be installed
+		Version:      "99", // Use version 99 which definitely won't be installed
 		Distribution: "temurin",
 	}
 
 	// IsInstalled should return false when no Java is installed and MVX_USE_SYSTEM_JAVA is not set
-	if javaTool.IsInstalled("11", cfg) {
+	if javaTool.IsInstalled("99", cfg) {
 		t.Error("IsInstalled should return false when no Java is installed")
 	}
 
