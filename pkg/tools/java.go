@@ -413,6 +413,18 @@ func (j *JavaTool) ListVersions() ([]string, error) {
 	return registry.GetJavaVersions("temurin") // Default to Temurin
 }
 
+// GetDistributions returns available Java distributions
+func (j *JavaTool) GetDistributions() []JavaDistribution {
+	registry := j.manager.GetRegistry()
+	return registry.GetJavaDistributions()
+}
+
+// GetVersionsForDistribution returns available versions for a specific distribution
+func (j *JavaTool) GetVersionsForDistribution(distribution string) ([]string, error) {
+	registry := j.manager.GetRegistry()
+	return registry.GetJavaVersions(distribution)
+}
+
 // GetDownloadOptions returns download options specific to Java
 func (j *JavaTool) GetDownloadOptions() DownloadOptions {
 	return DownloadOptions{

@@ -90,17 +90,16 @@ func listTools() error {
 		return fmt.Errorf("failed to create tool manager: %w", err)
 	}
 
-	registry := manager.GetRegistry()
-
 	printInfo("🛠️  Available Tools")
 	printInfo("")
 
 	// Java
 	printInfo("📦 Java Development Kit")
-	distributions := registry.GetJavaDistributions()
+	javaTool := tools.NewJavaTool(manager)
+	distributions := javaTool.GetDistributions()
 	for _, dist := range distributions {
 		printInfo("  %s - %s", dist.Name, dist.DisplayName)
-		if versions, err := registry.GetJavaVersions(dist.Name); err == nil && len(versions) > 0 {
+		if versions, err := javaTool.GetVersionsForDistribution(dist.Name); err == nil && len(versions) > 0 {
 			// Show first few versions
 			shown := versions
 			if len(versions) > 5 {
@@ -116,7 +115,8 @@ func listTools() error {
 
 	// Maven
 	printInfo("📦 Apache Maven")
-	if versions, err := registry.GetMavenVersions(); err == nil && len(versions) > 0 {
+	mavenTool := tools.NewMavenTool(manager)
+	if versions, err := mavenTool.ListVersions(); err == nil && len(versions) > 0 {
 		// Show first few versions
 		shown := versions
 		if len(versions) > 8 {
@@ -131,7 +131,8 @@ func listTools() error {
 
 	// Maven Daemon
 	printInfo("🚀 Maven Daemon (mvnd)")
-	if versions, err := registry.GetMvndVersions(); err == nil && len(versions) > 0 {
+	mvndTool := tools.NewMvndTool(manager)
+	if versions, err := mvndTool.ListVersions(); err == nil && len(versions) > 0 {
 		shown := versions
 		if len(versions) > 8 {
 			shown = versions[:8]
@@ -144,7 +145,8 @@ func listTools() error {
 
 	// Node.js
 	printInfo("📦 Node.js")
-	if versions, err := registry.GetNodeVersions(); err == nil && len(versions) > 0 {
+	nodeTool := tools.NewNodeTool(manager)
+	if versions, err := nodeTool.ListVersions(); err == nil && len(versions) > 0 {
 		shown := versions
 		if len(versions) > 8 {
 			shown = versions[:8]
@@ -157,7 +159,8 @@ func listTools() error {
 
 	// Go
 	printInfo("🐹 Go Programming Language")
-	if versions, err := registry.GetGoVersions(); err == nil && len(versions) > 0 {
+	goTool := tools.NewGoTool(manager)
+	if versions, err := goTool.ListVersions(); err == nil && len(versions) > 0 {
 		shown := versions
 		if len(versions) > 8 {
 			shown = versions[:8]
