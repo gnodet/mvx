@@ -26,6 +26,11 @@ func NewToolRegistry() *ToolRegistry {
 	}
 }
 
+// GetHTTPClient returns the HTTP client for making API requests
+func (r *ToolRegistry) GetHTTPClient() *http.Client {
+	return r.httpClient
+}
+
 // JavaDistribution represents a Java distribution
 type JavaDistribution struct {
 	Name        string
@@ -169,13 +174,13 @@ func (r *ToolRegistry) fetchMavenVersionsFromApache() ([]string, error) {
 	var allVersions []string
 
 	// Fetch Maven 3.x versions from archive
-	maven3Versions, err := r.fetchVersionsFromApacheRepo(ApacheMavenBase + "/maven-3/")
+	maven3Versions, err := r.FetchVersionsFromApacheRepo(ApacheMavenBase + "/maven-3/")
 	if err == nil {
 		allVersions = append(allVersions, maven3Versions...)
 	}
 
 	// Fetch Maven 4.x versions from archive
-	maven4Versions, err := r.fetchVersionsFromApacheRepo(ApacheMavenBase + "/maven-4/")
+	maven4Versions, err := r.FetchVersionsFromApacheRepo(ApacheMavenBase + "/maven-4/")
 	if err == nil {
 		allVersions = append(allVersions, maven4Versions...)
 	}
@@ -206,8 +211,8 @@ func (r *ToolRegistry) getFallbackMavenVersions() []string {
 	}
 }
 
-// fetchVersionsFromApacheRepo fetches version directories from Apache repository
-func (r *ToolRegistry) fetchVersionsFromApacheRepo(repoURL string) ([]string, error) {
+// FetchVersionsFromApacheRepo fetches version directories from Apache repository
+func (r *ToolRegistry) FetchVersionsFromApacheRepo(repoURL string) ([]string, error) {
 	resp, err := r.httpClient.Get(repoURL)
 	if err != nil {
 		return nil, err
@@ -350,7 +355,7 @@ func (r *ToolRegistry) getFallbackGoVersions() []string {
 // fetchMvndVersionsFromApache fetches mvnd versions from Apache archive
 func (r *ToolRegistry) fetchMvndVersionsFromApache() ([]string, error) {
 	// Fetch mvnd versions from archive
-	mvndVersions, err := r.fetchVersionsFromApacheRepo(ApacheMavenBase + "/mvnd/")
+	mvndVersions, err := r.FetchVersionsFromApacheRepo(ApacheMavenBase + "/mvnd/")
 	if err != nil {
 		return nil, fmt.Errorf("no mvnd versions found from Apache archive: %w", err)
 	}
@@ -374,67 +379,8 @@ func (r *ToolRegistry) getFallbackMvndVersions() []string {
 }
 
 // GetNodeVersions returns available Node.js versions
+// Deprecated: Use NodeTool.ListVersions() instead
 func (r *ToolRegistry) GetNodeVersions() ([]string, error) {
-	versions, err := r.fetchNodeVersions()
-	if err != nil {
-		// minimal fallback
-		return []string{"22.5.1", "22.4.1", "20.15.0", "18.20.4"}, nil
-	}
-	return version.SortVersions(versions), nil
-}
-
-func (r *ToolRegistry) fetchNodeVersions() ([]string, error) {
-	entries, err := r.fetchNodeIndex()
-	if err != nil {
-		return nil, err
-	}
-	var versions []string
-	for _, e := range entries {
-		v := strings.TrimPrefix(e.Version, "v")
-		versions = append(versions, v)
-	}
-	return versions, nil
-}
-
-// FetchNodeLTSVersions fetches available Node.js LTS versions
-func (r *ToolRegistry) FetchNodeLTSVersions() ([]string, error) {
-	entries, err := r.fetchNodeIndex()
-	if err != nil {
-		return nil, err
-	}
-	var versions []string
-	for _, e := range entries {
-		// LTS can be false (not LTS), true (LTS but no codename), or a string (LTS with codename)
-		if e.LTS != nil && e.LTS != false {
-			// Check if it's a boolean true or a string (both indicate LTS)
-			if ltsValue, ok := e.LTS.(bool); ok && ltsValue {
-				versions = append(versions, strings.TrimPrefix(e.Version, "v"))
-			} else if ltsString, ok := e.LTS.(string); ok && ltsString != "" {
-				versions = append(versions, strings.TrimPrefix(e.Version, "v"))
-			}
-		}
-	}
-	return versions, nil
-}
-
-type nodeIndexEntry struct {
-	Version string      `json:"version"`
-	LTS     interface{} `json:"lts"`
-}
-
-func (r *ToolRegistry) fetchNodeIndex() ([]nodeIndexEntry, error) {
-	resp, err := r.httpClient.Get(NodeJSDistBase + "/index.json")
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("node index fetch failed: %d", resp.StatusCode)
-	}
-	var entries []nodeIndexEntry
-	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(&entries); err != nil {
-		return nil, err
-	}
-	return entries, nil
+	// minimal fallback
+	return []string{"22.5.1", "22.4.1", "20.15.0", "18.20.4"}, nil
 }

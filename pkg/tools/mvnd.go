@@ -80,8 +80,40 @@ func (m *MvndTool) Verify(version string, cfg config.ToolConfig) error {
 
 // ListVersions returns available mvnd versions
 func (m *MvndTool) ListVersions() ([]string, error) {
+	// Try to fetch versions from Apache archive
+	versions, err := m.fetchMvndVersionsFromApache()
+	if err != nil {
+		// Fallback to known versions if API is unavailable
+		return m.getFallbackMvndVersions(), nil
+	}
+	return version.SortVersions(versions), nil
+}
+
+// fetchMvndVersionsFromApache fetches mvnd versions from Apache archive
+func (m *MvndTool) fetchMvndVersionsFromApache() ([]string, error) {
 	registry := m.manager.GetRegistry()
-	return registry.GetMvndVersions()
+	// Fetch mvnd versions from archive
+	mvndVersions, err := registry.FetchVersionsFromApacheRepo(ApacheMavenBase + "/mvnd/")
+	if err != nil {
+		return nil, fmt.Errorf("no mvnd versions found from Apache archive: %w", err)
+	}
+
+	return mvndVersions, nil
+}
+
+// getFallbackMvndVersions returns known mvnd versions as fallback
+func (m *MvndTool) getFallbackMvndVersions() []string {
+	return []string{
+		// Maven Daemon 2.x
+		"2.0.0", "2.0.0-beta-1", "2.0.0-alpha-1",
+
+		// Maven Daemon 1.x
+		"1.0.2", "1.0.1", "1.0.0", "1.0.0-m8", "1.0.0-m7", "1.0.0-m6", "1.0.0-m5",
+		"1.0.0-m4", "1.0.0-m3", "1.0.0-m2", "1.0.0-m1",
+
+		// Maven Daemon 0.x
+		"0.9.0", "0.8.2", "0.8.1", "0.8.0", "0.7.1", "0.7.0", "0.6.0", "0.5.2", "0.5.1", "0.5.0",
+	}
 }
 
 // GetDownloadOptions returns download options specific to Maven Daemon

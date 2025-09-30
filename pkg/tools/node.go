@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -78,8 +79,69 @@ func (n *NodeTool) Verify(version string, cfg config.ToolConfig) error {
 }
 
 func (n *NodeTool) ListVersions() ([]string, error) {
+	versions, err := n.fetchNodeVersions()
+	if err != nil {
+		// minimal fallback
+		return []string{"22.5.1", "22.4.1", "20.15.0", "18.20.4"}, nil
+	}
+	return version.SortVersions(versions), nil
+}
+
+func (n *NodeTool) fetchNodeVersions() ([]string, error) {
+	entries, err := n.fetchNodeIndex()
+	if err != nil {
+		return nil, err
+	}
+	var versions []string
+	for _, e := range entries {
+		v := strings.TrimPrefix(e.Version, "v")
+		versions = append(versions, v)
+	}
+	return versions, nil
+}
+
+type nodeIndexEntry struct {
+	Version string      `json:"version"`
+	LTS     interface{} `json:"lts"`
+}
+
+func (n *NodeTool) fetchNodeIndex() ([]nodeIndexEntry, error) {
 	registry := n.manager.GetRegistry()
-	return registry.GetNodeVersions()
+	resp, err := registry.GetHTTPClient().Get(NodeJSDistBase + "/index.json")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("node index fetch failed: %d", resp.StatusCode)
+	}
+	var entries []nodeIndexEntry
+	dec := json.NewDecoder(resp.Body)
+	if err := dec.Decode(&entries); err != nil {
+		return nil, err
+	}
+	return entries, nil
+}
+
+// fetchNodeLTSVersions fetches available Node.js LTS versions
+func (n *NodeTool) fetchNodeLTSVersions() ([]string, error) {
+	entries, err := n.fetchNodeIndex()
+	if err != nil {
+		return nil, err
+	}
+	var versions []string
+	for _, e := range entries {
+		// LTS can be false (not LTS), true (LTS but no codename), or a string (LTS with codename)
+		if e.LTS != nil && e.LTS != false {
+			// Check if it's a boolean true or a string (both indicate LTS)
+			if ltsValue, ok := e.LTS.(bool); ok && ltsValue {
+				versions = append(versions, strings.TrimPrefix(e.Version, "v"))
+			} else if ltsString, ok := e.LTS.(string); ok && ltsString != "" {
+				versions = append(versions, strings.TrimPrefix(e.Version, "v"))
+			}
+		}
+	}
+	return versions, nil
 }
 
 // GetDownloadOptions returns download options specific to Node.js
@@ -133,8 +195,7 @@ func (n *NodeTool) getDownloadURL(version string) string {
 func (n *NodeTool) ResolveVersion(versionSpec, distribution string) (string, error) {
 	// Special handling for "lts"
 	if versionSpec == "lts" {
-		registry := n.manager.GetRegistry()
-		lts, err := registry.FetchNodeLTSVersions()
+		lts, err := n.fetchNodeLTSVersions()
 		if err != nil || len(lts) == 0 {
 			return "", fmt.Errorf("failed to resolve Node LTS version")
 		}

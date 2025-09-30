@@ -116,8 +116,61 @@ func (m *MavenTool) Verify(version string, cfg config.ToolConfig) error {
 
 // ListVersions returns available versions for installation
 func (m *MavenTool) ListVersions() ([]string, error) {
+	// Try to fetch versions from Apache distribution repos
+	versions, err := m.fetchMavenVersionsFromApache()
+	if err != nil {
+		// Fallback to known versions if API is unavailable
+		return m.getFallbackMavenVersions(), nil
+	}
+	return version.SortVersions(versions), nil
+}
+
+// fetchMavenVersionsFromApache fetches Maven versions from Apache archive repositories
+func (m *MavenTool) fetchMavenVersionsFromApache() ([]string, error) {
+	var allVersions []string
+
+	// Fetch Maven 3.x versions from archive
+	maven3Versions, err := m.fetchVersionsFromApacheRepo(ApacheMavenBase + "/maven-3/")
+	if err == nil {
+		allVersions = append(allVersions, maven3Versions...)
+	}
+
+	// Fetch Maven 4.x versions from archive
+	maven4Versions, err := m.fetchVersionsFromApacheRepo(ApacheMavenBase + "/maven-4/")
+	if err == nil {
+		allVersions = append(allVersions, maven4Versions...)
+	}
+
+	if len(allVersions) == 0 {
+		return nil, fmt.Errorf("no versions found from Apache repositories")
+	}
+
+	return allVersions, nil
+}
+
+// getFallbackMavenVersions returns known Maven versions as fallback
+func (m *MavenTool) getFallbackMavenVersions() []string {
+	return []string{
+		// Maven 4.x (pre-release versions)
+		"4.0.0", "4.0.0-rc-4", "4.0.0-rc-3", "4.0.0-rc-2", "4.0.0-rc-1",
+		"4.0.0-beta-5", "4.0.0-beta-4", "4.0.0-beta-3", "4.0.0-beta-2", "4.0.0-beta-1",
+		"4.0.0-alpha-13", "4.0.0-alpha-12", "4.0.0-alpha-11", "4.0.0-alpha-10",
+
+		// Maven 3.9.x (latest stable)
+		"3.9.11", "3.9.10", "3.9.9", "3.9.8", "3.9.7", "3.9.6", "3.9.5", "3.9.4", "3.9.3", "3.9.2", "3.9.1", "3.9.0",
+
+		// Maven 3.8.x (previous stable)
+		"3.8.8", "3.8.7", "3.8.6", "3.8.5", "3.8.4", "3.8.3", "3.8.2", "3.8.1",
+
+		// Maven 3.6.x (older stable)
+		"3.6.3", "3.6.2", "3.6.1", "3.6.0",
+	}
+}
+
+// fetchVersionsFromApacheRepo fetches version directories from Apache repository
+func (m *MavenTool) fetchVersionsFromApacheRepo(repoURL string) ([]string, error) {
 	registry := m.manager.GetRegistry()
-	return registry.GetMavenVersions()
+	return registry.FetchVersionsFromApacheRepo(repoURL)
 }
 
 // GetDownloadOptions returns download options specific to Maven

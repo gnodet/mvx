@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gnodet/mvx/pkg/config"
@@ -80,8 +81,68 @@ func (g *GoTool) Verify(version string, cfg config.ToolConfig) error {
 
 // ListVersions returns available versions for installation
 func (g *GoTool) ListVersions() ([]string, error) {
+	// Try to fetch versions from Go releases API
+	versions, err := g.fetchGoVersions()
+	if err != nil {
+		// Fallback to known versions if API is unavailable
+		return g.getFallbackGoVersions(), nil
+	}
+
+	// If API returned empty results, use fallback
+	if len(versions) == 0 {
+		return g.getFallbackGoVersions(), nil
+	}
+
+	return version.SortVersions(versions), nil
+}
+
+// fetchGoVersions fetches Go versions from GitHub releases API
+func (g *GoTool) fetchGoVersions() ([]string, error) {
 	registry := g.manager.GetRegistry()
-	return registry.GetGoVersions()
+	resp, err := registry.GetHTTPClient().Get(GoGithubAPIBase + "/tags?per_page=100")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("failed to fetch Go versions: status %d", resp.StatusCode)
+	}
+
+	var tags []struct {
+		Name string `json:"name"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&tags); err != nil {
+		return nil, err
+	}
+
+	var versions []string
+	for _, tag := range tags {
+		// Go tags are like "go1.21.0", "go1.20.5", etc.
+		if strings.HasPrefix(tag.Name, "go") && g.isValidGoVersion(tag.Name[2:]) {
+			versions = append(versions, tag.Name[2:]) // Remove "go" prefix
+		}
+	}
+
+	return versions, nil
+}
+
+// isValidGoVersion checks if a version string looks like a valid Go version
+func (g *GoTool) isValidGoVersion(version string) bool {
+	// Simple validation: should contain dots and numbers
+	return strings.Contains(version, ".") && len(version) > 2
+}
+
+// getFallbackGoVersions returns known Go versions as fallback
+func (g *GoTool) getFallbackGoVersions() []string {
+	return []string{
+		"1.24.2", "1.24.1", "1.24.0",
+		"1.23.4", "1.23.3", "1.23.2", "1.23.1", "1.23.0",
+		"1.22.10", "1.22.9", "1.22.8", "1.22.7", "1.22.6", "1.22.5", "1.22.4", "1.22.3", "1.22.2", "1.22.1", "1.22.0",
+		"1.21.13", "1.21.12", "1.21.11", "1.21.10", "1.21.9", "1.21.8", "1.21.7", "1.21.6", "1.21.5", "1.21.4", "1.21.3", "1.21.2", "1.21.1", "1.21.0",
+		"1.20.14", "1.20.13", "1.20.12", "1.20.11", "1.20.10", "1.20.9", "1.20.8", "1.20.7", "1.20.6", "1.20.5", "1.20.4", "1.20.3", "1.20.2", "1.20.1", "1.20.0",
+	}
 }
 
 // GetDownloadOptions returns download options specific to Go
