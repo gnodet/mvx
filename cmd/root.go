@@ -349,6 +349,12 @@ func addCustomCommands() error {
 
 	// Add each custom command as a top-level command
 	for cmdName, cmdConfig := range cfg.Commands {
+		// Skip commands with spaces (they're subcommands, handled by their parent command)
+		if strings.Contains(cmdName, " ") {
+			printVerbose("Skipping custom command with space: %s (handled by parent command)", cmdName)
+			continue
+		}
+
 		// Skip built-in commands unless they have override flag
 		if isBuiltinCommand(cmdName) && !cmdConfig.Override {
 			continue

@@ -57,17 +57,14 @@ func runWebsiteCommand(subcommand string, args []string) error {
 
 	exec := executor.NewExecutor(cfg, manager, projectRoot)
 
-	// Check for override command (e.g., "website build", "website serve")
-	overrideCommandName := fmt.Sprintf("website %s", subcommand)
-	if cmdConfig, exists := cfg.Commands[overrideCommandName]; exists && cmdConfig.Override {
-		printInfo("🔨 Running overridden website %s command", subcommand)
-		if cmdConfig.Description != "" {
-			printInfo("   %s", cmdConfig.Description)
-		}
-		return exec.ExecuteCommand(overrideCommandName, args)
+	// Check for custom command (e.g., "website build", "website serve")
+	customCommandName := fmt.Sprintf("website %s", subcommand)
+	if _, exists := cfg.Commands[customCommandName]; exists {
+		printInfo("🔨 Running custom website %s command", subcommand)
+		return exec.ExecuteCommand(customCommandName, args)
 	}
 
-	// No override found, use default behavior
+	// No custom command found, use default npm behavior
 	return runWebsiteNpm(subcommand)
 }
 
