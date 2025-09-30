@@ -22,7 +22,11 @@ import (
 type VersionCacheEntry struct {
 	ResolvedVersion string    `json:"resolved_version"`
 	Timestamp       time.Time `json:"timestamp"`
+	CacheVersion    int       `json:"cache_version"` // Version of cache format/logic
 }
+
+// Current cache version - increment when resolution logic changes
+const versionCacheVersion = 2
 
 // HTTPCacheEntry represents a cached HTTP response (in-memory only)
 type HTTPCacheEntry struct {
@@ -970,9 +974,13 @@ func (m *Manager) loadVersionCache() {
 		return
 	}
 
-	// Filter out expired entries (older than 24 hours)
+	// Filter out expired entries (older than 24 hours) and old cache versions
 	now := time.Now()
 	for key, entry := range cache {
+		// Skip entries with old cache version or expired entries
+		if entry.CacheVersion != versionCacheVersion {
+			continue
+		}
 		if now.Sub(entry.Timestamp) < 24*time.Hour {
 			m.versionCache[key] = entry
 		}
@@ -1021,6 +1029,7 @@ func (m *Manager) setCachedVersion(toolName, versionSpec, distribution, resolved
 	m.versionCache[key] = VersionCacheEntry{
 		ResolvedVersion: resolvedVersion,
 		Timestamp:       time.Now(),
+		CacheVersion:    versionCacheVersion,
 	}
 
 	// Save cache to disk asynchronously
