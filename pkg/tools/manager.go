@@ -328,7 +328,8 @@ func (m *Manager) ValidateToolVersion(toolName, version, distribution string) er
 	return fmt.Errorf("version %s (resolved to %s) not found for tool %s", version, resolvedVersion, toolName)
 }
 
-// InstallTool installs a specific tool version with version resolution
+// InstallTool is deprecated - use EnsureTool instead
+// This method always installs, even if already installed. Use EnsureTool for smarter behavior.
 func (m *Manager) InstallTool(name string, toolConfig config.ToolConfig) error {
 	tool, err := m.GetTool(name)
 	if err != nil {
@@ -346,9 +347,6 @@ func (m *Manager) InstallTool(name string, toolConfig config.ToolConfig) error {
 	// Update config with resolved version for installation
 	resolvedConfig := toolConfig
 	resolvedConfig.Version = resolvedVersion
-
-	// Skip installation check here since GetToolsNeedingInstallation already checked
-	// This avoids double-checking and redundant verbose output
 
 	fmt.Printf("Installing %s %s", name, resolvedVersion)
 	if toolConfig.Distribution != "" {
@@ -379,53 +377,40 @@ func GetDefaultConcurrency() int {
 	return 3 // Default to 3 concurrent downloads
 }
 
-// InstallTools installs all tools from configuration
-func (m *Manager) InstallTools(cfg *config.Config) error {
-	return m.InstallToolsParallel(cfg, GetDefaultConcurrency())
-}
-
-// InstallToolsParallel installs all tools from configuration with parallel downloads
-func (m *Manager) InstallToolsParallel(cfg *config.Config, maxConcurrent int) error {
+// EnsureTools ensures all tools from configuration are installed (with parallel downloads)
+// This replaces InstallTools and uses EnsureTool for automatic installation
+func (m *Manager) EnsureTools(cfg *config.Config, maxConcurrent int) error {
 	if len(cfg.Tools) == 0 {
 		return nil
 	}
 
-	// Get tools that actually need installation
-	toolsToInstall, err := m.GetToolsNeedingInstallation(cfg)
-	if err != nil {
-		return err
+	if maxConcurrent <= 0 {
+		maxConcurrent = GetDefaultConcurrency()
 	}
 
-	// If no tools need installation
-	if len(toolsToInstall) == 0 {
-		fmt.Printf("✅ All %d tools already installed\n", len(cfg.Tools))
+	// If only one tool, use sequential
+	if len(cfg.Tools) == 1 {
+		for toolName, toolConfig := range cfg.Tools {
+			_, err := m.EnsureTool(toolName, toolConfig)
+			if err != nil {
+				return fmt.Errorf("failed to ensure %s is installed: %w", toolName, err)
+			}
+			fmt.Printf("✅ %s is ready\n", toolName)
+		}
 		return nil
 	}
 
-	// Show what's already installed vs what needs installation
-	alreadyInstalled := len(cfg.Tools) - len(toolsToInstall)
-	if alreadyInstalled > 0 {
-		fmt.Printf("✅ %d tool(s) already installed\n", alreadyInstalled)
-	}
+	fmt.Printf("📦 Ensuring %d tools are installed (max %d concurrent)...\n", len(cfg.Tools), maxConcurrent)
 
-	// If only one tool needs installation, use sequential installation
-	if len(toolsToInstall) == 1 {
-		for toolName, toolConfig := range toolsToInstall {
-			return m.InstallTool(toolName, toolConfig)
-		}
-	}
-
-	fmt.Printf("📦 Installing %d tools in parallel (max %d concurrent)...\n", len(toolsToInstall), maxConcurrent)
-
-	// Create a semaphore to limit concurrent downloads
+	// Create a semaphore to limit concurrent operations
 	semaphore := make(chan struct{}, maxConcurrent)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	var errors []error
 	var completed int
 
-	// Install tools in parallel
-	for toolName, toolConfig := range toolsToInstall {
+	// Ensure tools in parallel
+	for toolName, toolConfig := range cfg.Tools {
 		wg.Add(1)
 		go func(name string, config config.ToolConfig) {
 			defer wg.Done()
@@ -434,36 +419,41 @@ func (m *Manager) InstallToolsParallel(cfg *config.Config, maxConcurrent int) er
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
 
-			if err := m.InstallTool(name, config); err != nil {
+			if _, err := m.EnsureTool(name, config); err != nil {
 				mu.Lock()
 				errors = append(errors, fmt.Errorf("%s: %w", name, err))
 				mu.Unlock()
 			} else {
 				mu.Lock()
 				completed++
-				fmt.Printf("  ✅ Progress: %d/%d tools completed\n", completed, len(toolsToInstall))
+				fmt.Printf("  ✅ Progress: %d/%d tools ready\n", completed, len(cfg.Tools))
 				mu.Unlock()
 			}
 		}(toolName, toolConfig)
 	}
 
-	// Wait for all installations to complete
+	// Wait for all tools to complete
 	wg.Wait()
 
-	// Check for errors
 	if len(errors) > 0 {
-		fmt.Printf("❌ %d tool installation(s) failed:\n", len(errors))
-		for _, err := range errors {
-			fmt.Printf("  • %v\n", err)
-		}
-		return fmt.Errorf("failed to install %d tool(s)", len(errors))
+		return fmt.Errorf("failed to ensure tools: %v", errors)
 	}
 
-	fmt.Printf("✅ All %d tools installed successfully\n", len(toolsToInstall))
+	fmt.Printf("✅ All %d tools are ready\n", len(cfg.Tools))
 	return nil
 }
 
-// InstallToolsWithOptions installs all tools from configuration with custom options
+// InstallTools is deprecated - use EnsureTools instead
+func (m *Manager) InstallTools(cfg *config.Config) error {
+	return m.EnsureTools(cfg, GetDefaultConcurrency())
+}
+
+// InstallToolsParallel is deprecated - use EnsureTools instead
+func (m *Manager) InstallToolsParallel(cfg *config.Config, maxConcurrent int) error {
+	return m.EnsureTools(cfg, maxConcurrent)
+}
+
+// InstallToolsWithOptions is deprecated - use EnsureTools instead
 func (m *Manager) InstallToolsWithOptions(cfg *config.Config, opts *InstallOptions) error {
 	if opts == nil {
 		opts = &InstallOptions{
@@ -478,24 +468,13 @@ func (m *Manager) InstallToolsWithOptions(cfg *config.Config, opts *InstallOptio
 		opts.MaxConcurrent = 3
 	}
 
-	if len(cfg.Tools) == 0 {
-		return nil
+	// Use sequential (maxConcurrent=1) if parallel is disabled
+	maxConcurrent := opts.MaxConcurrent
+	if !opts.Parallel {
+		maxConcurrent = 1
 	}
 
-	// Use sequential installation if parallel is disabled or only one tool
-	if !opts.Parallel || len(cfg.Tools) == 1 {
-		if opts.Verbose {
-			fmt.Printf("📦 Installing %d tool(s) sequentially...\n", len(cfg.Tools))
-		}
-		for toolName, toolConfig := range cfg.Tools {
-			if err := m.InstallTool(toolName, toolConfig); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	return m.InstallToolsParallel(cfg, opts.MaxConcurrent)
+	return m.EnsureTools(cfg, maxConcurrent)
 }
 
 // GetToolsNeedingInstallation returns a map of tools that need to be installed
@@ -637,40 +616,6 @@ func (m *Manager) EnsureTool(toolName string, cfg config.ToolConfig) (string, er
 	m.cacheMutex.Lock()
 	m.pathCache[cacheKey] = path
 	m.installedCache[cacheKey] = true
-	m.cacheMutex.Unlock()
-
-	return path, nil
-}
-
-// GetToolPath gets the tool path (with caching)
-// Deprecated: Use EnsureTool instead
-func (m *Manager) GetToolPath(toolName, version string, cfg config.ToolConfig) (string, error) {
-	cacheKey := m.getCacheKey(toolName, version, cfg.Distribution)
-
-	m.cacheMutex.RLock()
-	if path, found := m.pathCache[cacheKey]; found {
-		m.cacheMutex.RUnlock()
-		return path, nil
-	}
-	m.cacheMutex.RUnlock()
-
-	tool, err := m.GetTool(toolName)
-	if err != nil {
-		return "", err
-	}
-
-	// Check if installed first
-	if !tool.IsInstalled(version, cfg) {
-		return "", fmt.Errorf("tool %s version %s is not installed", toolName, version)
-	}
-
-	path, err := tool.GetPath(version, cfg)
-	if err != nil {
-		return "", err
-	}
-
-	m.cacheMutex.Lock()
-	m.pathCache[cacheKey] = path
 	m.cacheMutex.Unlock()
 
 	return path, nil
