@@ -14,6 +14,7 @@ import (
 
 // Compile-time interface validation
 var _ Tool = (*NodeTool)(nil)
+var _ ToolMetadataProvider = (*NodeTool)(nil)
 
 // NodeTool manages Node.js
 // Downloads from https://nodejs.org/dist/
@@ -86,6 +87,16 @@ func (n *NodeTool) ListVersions() ([]string, error) {
 	return version.SortVersions(versions), nil
 }
 
+// GetDisplayName returns the human-readable name for Node.js (implements ToolMetadataProvider)
+func (n *NodeTool) GetDisplayName() string {
+	return "Node.js"
+}
+
+// GetEmoji returns the emoji icon for Node.js (implements ToolMetadataProvider)
+func (n *NodeTool) GetEmoji() string {
+	return "📦"
+}
+
 func (n *NodeTool) fetchNodeVersions() ([]string, error) {
 	entries, err := n.fetchNodeIndex()
 	if err != nil {
@@ -147,11 +158,6 @@ func (n *NodeTool) GetDownloadOptions() DownloadOptions {
 	return DownloadOptions{
 		FileExtension: ExtTarXz,
 	}
-}
-
-// GetDisplayName returns the display name for Node.js
-func (n *NodeTool) GetDisplayName() string {
-	return "Node.js"
 }
 
 func (n *NodeTool) getDownloadURL(version string) string {

@@ -13,6 +13,7 @@ import (
 
 // Compile-time interface validation
 var _ Tool = (*MvndTool)(nil)
+var _ ToolMetadataProvider = (*MvndTool)(nil)
 
 // MvndTool implements Tool interface for Maven Daemon management
 type MvndTool struct {
@@ -89,6 +90,16 @@ func (m *MvndTool) ListVersions() ([]string, error) {
 	return version.SortVersions(versions), nil
 }
 
+// GetDisplayName returns the human-readable name for Mvnd (implements ToolMetadataProvider)
+func (m *MvndTool) GetDisplayName() string {
+	return "Maven Daemon (mvnd)"
+}
+
+// GetEmoji returns the emoji icon for Mvnd (implements ToolMetadataProvider)
+func (m *MvndTool) GetEmoji() string {
+	return "🚀"
+}
+
 // fetchMvndVersionsFromApache fetches mvnd versions from Apache archive
 func (m *MvndTool) fetchMvndVersionsFromApache() ([]string, error) {
 	registry := m.manager.GetRegistry()
@@ -121,11 +132,6 @@ func (m *MvndTool) GetDownloadOptions() DownloadOptions {
 	return DownloadOptions{
 		FileExtension: ".zip",
 	}
-}
-
-// GetDisplayName returns the display name for Maven Daemon
-func (m *MvndTool) GetDisplayName() string {
-	return "Maven Daemon"
 }
 
 // getDownloadURL returns the download URL for the specified version

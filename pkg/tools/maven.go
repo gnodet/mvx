@@ -13,6 +13,7 @@ import (
 
 // Compile-time interface validation
 var _ Tool = (*MavenTool)(nil)
+var _ ToolMetadataProvider = (*MavenTool)(nil)
 
 // MavenTool implements Tool interface for Maven management
 type MavenTool struct {
@@ -125,6 +126,16 @@ func (m *MavenTool) ListVersions() ([]string, error) {
 	return version.SortVersions(versions), nil
 }
 
+// GetDisplayName returns the human-readable name for Maven (implements ToolMetadataProvider)
+func (m *MavenTool) GetDisplayName() string {
+	return "Apache Maven"
+}
+
+// GetEmoji returns the emoji icon for Maven (implements ToolMetadataProvider)
+func (m *MavenTool) GetEmoji() string {
+	return "📦"
+}
+
 // fetchMavenVersionsFromApache fetches Maven versions from Apache archive repositories
 func (m *MavenTool) fetchMavenVersionsFromApache() ([]string, error) {
 	var allVersions []string
@@ -178,11 +189,6 @@ func (m *MavenTool) GetDownloadOptions() DownloadOptions {
 	return DownloadOptions{
 		FileExtension: ExtZip,
 	}
-}
-
-// GetDisplayName returns the display name for Maven
-func (m *MavenTool) GetDisplayName() string {
-	return "Maven"
 }
 
 // getDownloadURL returns the download URL for the specified version

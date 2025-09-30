@@ -17,12 +17,9 @@ import (
 
 // Compile-time interface validation
 var _ Tool = (*JavaTool)(nil)
-
-// JavaDistribution represents a Java distribution
-type JavaDistribution struct {
-	Name        string
-	DisplayName string
-}
+var _ DistributionProvider = (*JavaTool)(nil)
+var _ DistributionVersionProvider = (*JavaTool)(nil)
+var _ ToolMetadataProvider = (*JavaTool)(nil)
 
 // DiscoDistribution represents a Java distribution from Disco API
 type DiscoDistribution struct {
@@ -425,15 +422,15 @@ func (j *JavaTool) ListVersions() ([]string, error) {
 	return j.getDiscoVersions("temurin") // Default to Temurin
 }
 
-// GetDistributions returns available Java distributions
-func (j *JavaTool) GetDistributions() []JavaDistribution {
+// GetDistributions returns available Java distributions (implements DistributionProvider)
+func (j *JavaTool) GetDistributions() []Distribution {
 	// Try to get distributions from Disco API
 	if distributions, err := j.getDiscoDistributions(); err == nil {
 		return distributions
 	}
 
 	// Fallback to known distributions
-	return []JavaDistribution{
+	return []Distribution{
 		{
 			Name:        "temurin",
 			DisplayName: "Eclipse Temurin (OpenJDK)",
@@ -466,7 +463,7 @@ func (j *JavaTool) GetDistributions() []JavaDistribution {
 }
 
 // getDiscoDistributions fetches available distributions from Disco API
-func (j *JavaTool) getDiscoDistributions() ([]JavaDistribution, error) {
+func (j *JavaTool) getDiscoDistributions() ([]Distribution, error) {
 	resp, err := j.manager.Get(FoojayDiscoAPIBase + "/distributions")
 	if err != nil {
 		return nil, err
@@ -478,10 +475,10 @@ func (j *JavaTool) getDiscoDistributions() ([]JavaDistribution, error) {
 		return nil, err
 	}
 
-	var distributions []JavaDistribution
+	var distributions []Distribution
 	for _, dist := range discoDistributions {
 		if dist.Available && dist.Maintained {
-			distributions = append(distributions, JavaDistribution{
+			distributions = append(distributions, Distribution{
 				Name:        dist.APIParameter,
 				DisplayName: dist.Name,
 			})
@@ -491,9 +488,19 @@ func (j *JavaTool) getDiscoDistributions() ([]JavaDistribution, error) {
 	return distributions, nil
 }
 
-// GetVersionsForDistribution returns available versions for a specific distribution
-func (j *JavaTool) GetVersionsForDistribution(distribution string) ([]string, error) {
+// ListVersionsForDistribution returns available versions for a specific distribution (implements DistributionVersionProvider)
+func (j *JavaTool) ListVersionsForDistribution(distribution string) ([]string, error) {
 	return j.getDiscoVersions(distribution)
+}
+
+// GetDisplayName returns the human-readable name for Java (implements ToolMetadataProvider)
+func (j *JavaTool) GetDisplayName() string {
+	return "Java Development Kit"
+}
+
+// GetEmoji returns the emoji icon for Java (implements ToolMetadataProvider)
+func (j *JavaTool) GetEmoji() string {
+	return "📦"
 }
 
 // DiscoMajorVersion represents a major version entry from Disco API
@@ -550,11 +557,6 @@ func (j *JavaTool) GetDownloadOptions() DownloadOptions {
 	return DownloadOptions{
 		FileExtension: ExtTarGz,
 	}
-}
-
-// GetDisplayName returns the display name for Java
-func (j *JavaTool) GetDisplayName() string {
-	return "Java"
 }
 
 // getDownloadURL returns the download URL for the specified version and distribution using Disco API

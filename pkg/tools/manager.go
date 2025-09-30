@@ -119,6 +119,32 @@ type VersionResolver interface {
 	ResolveVersion(version, distribution string) (string, error)
 }
 
+// DistributionProvider is an optional interface for tools that support multiple distributions
+type DistributionProvider interface {
+	// GetDistributions returns available distributions for this tool
+	GetDistributions() []Distribution
+}
+
+// DistributionVersionProvider is an optional interface for tools that can list versions per distribution
+type DistributionVersionProvider interface {
+	// ListVersionsForDistribution returns available versions for a specific distribution
+	ListVersionsForDistribution(distribution string) ([]string, error)
+}
+
+// ToolMetadataProvider is an optional interface for tools that can provide display metadata
+type ToolMetadataProvider interface {
+	// GetDisplayName returns the human-readable name for the tool
+	GetDisplayName() string
+	// GetEmoji returns the emoji icon for the tool
+	GetEmoji() string
+}
+
+// Distribution represents a tool distribution (e.g., Java distributions like Temurin, Zulu)
+type Distribution struct {
+	Name        string
+	DisplayName string
+}
+
 // NewManager creates a new tool manager (singleton pattern)
 func NewManager() (*Manager, error) {
 	managerMutex.Lock()
@@ -329,11 +355,11 @@ type ToolFactory func(*Manager) Tool
 // toolFactories contains all available tool factories for auto-discovery
 // This registry allows tools to be registered dynamically, following the Open/Closed Principle
 var toolFactories = map[string]ToolFactory{
-	"java":  func(m *Manager) Tool { return NewJavaTool(m) },
-	"maven": func(m *Manager) Tool { return NewMavenTool(m) },
-	"mvnd":  func(m *Manager) Tool { return NewMvndTool(m) },
-	"node":  func(m *Manager) Tool { return NewNodeTool(m) },
-	"go":    func(m *Manager) Tool { return NewGoTool(m) },
+	ToolJava:  func(m *Manager) Tool { return NewJavaTool(m) },
+	ToolMaven: func(m *Manager) Tool { return NewMavenTool(m) },
+	ToolMvnd:  func(m *Manager) Tool { return NewMvndTool(m) },
+	ToolNode:  func(m *Manager) Tool { return NewNodeTool(m) },
+	ToolGo:    func(m *Manager) Tool { return NewGoTool(m) },
 }
 
 // discoverAndRegisterTools automatically discovers and registers all available tools

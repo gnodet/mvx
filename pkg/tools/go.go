@@ -12,6 +12,7 @@ import (
 
 // Compile-time interface validation
 var _ Tool = (*GoTool)(nil)
+var _ ToolMetadataProvider = (*GoTool)(nil)
 
 // GoTool implements Tool interface for Go toolchain management
 type GoTool struct {
@@ -95,6 +96,16 @@ func (g *GoTool) ListVersions() ([]string, error) {
 	return version.SortVersions(versions), nil
 }
 
+// GetDisplayName returns the human-readable name for Go (implements ToolMetadataProvider)
+func (g *GoTool) GetDisplayName() string {
+	return "Go Programming Language"
+}
+
+// GetEmoji returns the emoji icon for Go (implements ToolMetadataProvider)
+func (g *GoTool) GetEmoji() string {
+	return "🐹"
+}
+
 // fetchGoVersions fetches Go versions from GitHub releases API
 func (g *GoTool) fetchGoVersions() ([]string, error) {
 	resp, err := g.manager.Get(GoGithubAPIBase + "/tags?per_page=100")
@@ -148,11 +159,6 @@ func (g *GoTool) GetDownloadOptions() DownloadOptions {
 	return DownloadOptions{
 		FileExtension: ExtTarGz,
 	}
-}
-
-// GetDisplayName returns the display name for Go
-func (g *GoTool) GetDisplayName() string {
-	return "Go"
 }
 
 // getDownloadURL returns the download URL for the specified version
