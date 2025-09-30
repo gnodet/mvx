@@ -467,8 +467,7 @@ func (j *JavaTool) GetDistributions() []JavaDistribution {
 
 // getDiscoDistributions fetches available distributions from Disco API
 func (j *JavaTool) getDiscoDistributions() ([]JavaDistribution, error) {
-	registry := j.manager.GetRegistry()
-	resp, err := registry.Get(FoojayDiscoAPIBase + "/distributions")
+	resp, err := j.manager.Get(FoojayDiscoAPIBase + "/distributions")
 	if err != nil {
 		return nil, err
 	}
@@ -514,8 +513,7 @@ func (j *JavaTool) getDiscoVersions(distribution string) ([]string, error) {
 
 	// Fetch ALL major versions (without distribution filter) - this will be cached
 	// This is more efficient than making separate requests per distribution
-	registry := j.manager.GetRegistry()
-	resp, err := registry.Get(FoojayDiscoAPIBase + "/major_versions?maintained=true")
+	resp, err := j.manager.Get(FoojayDiscoAPIBase + "/major_versions?maintained=true")
 	if err != nil {
 		// Fallback to known versions if API is unavailable
 		return []string{"8", "11", "17", "21", "22", "23", "24", "25"}, nil

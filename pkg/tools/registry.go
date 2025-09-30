@@ -3,7 +3,6 @@ package tools
 import (
 	"fmt"
 	"io"
-	"net/http"
 	"strings"
 )
 
@@ -19,14 +18,9 @@ func NewToolRegistry(manager *Manager) *ToolRegistry {
 	}
 }
 
-// Get performs a GET request to the specified URL using the manager's HTTP client
-func (r *ToolRegistry) Get(url string) (*http.Response, error) {
-	return r.manager.Get(url)
-}
-
 // FetchVersionsFromApacheRepo fetches version directories from Apache repository
 func (r *ToolRegistry) FetchVersionsFromApacheRepo(repoURL string) ([]string, error) {
-	resp, err := r.Get(repoURL)
+	resp, err := r.manager.Get(repoURL)
 	if err != nil {
 		return nil, err
 	}

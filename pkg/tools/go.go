@@ -97,8 +97,7 @@ func (g *GoTool) ListVersions() ([]string, error) {
 
 // fetchGoVersions fetches Go versions from GitHub releases API
 func (g *GoTool) fetchGoVersions() ([]string, error) {
-	registry := g.manager.GetRegistry()
-	resp, err := registry.Get(GoGithubAPIBase + "/tags?per_page=100")
+	resp, err := g.manager.Get(GoGithubAPIBase + "/tags?per_page=100")
 	if err != nil {
 		return nil, err
 	}

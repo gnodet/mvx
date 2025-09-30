@@ -105,8 +105,7 @@ type nodeIndexEntry struct {
 }
 
 func (n *NodeTool) fetchNodeIndex() ([]nodeIndexEntry, error) {
-	registry := n.manager.GetRegistry()
-	resp, err := registry.Get(NodeJSDistBase + "/index.json")
+	resp, err := n.manager.Get(NodeJSDistBase + "/index.json")
 	if err != nil {
 		return nil, err
 	}

@@ -2,6 +2,7 @@ package tools
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -23,10 +24,17 @@ type VersionCacheEntry struct {
 	Timestamp       time.Time `json:"timestamp"`
 }
 
-// HTTPCacheEntry represents a cached HTTP response
+// HTTPCacheEntry represents a cached HTTP response (in-memory only)
 type HTTPCacheEntry struct {
 	Body      []byte
 	Timestamp time.Time
+}
+
+// DiskCacheEntry represents a cached API response on disk
+type DiskCacheEntry struct {
+	URL       string    `json:"url"`
+	Body      string    `json:"body"` // Base64 encoded for JSON safety
+	Timestamp time.Time `json:"timestamp"`
 }
 
 // Manager handles tool installation and management
@@ -168,18 +176,22 @@ func ResetManager() {
 	globalManager = nil
 }
 
-// Get performs an HTTP GET request with verbose logging and in-memory caching
+// Get performs an HTTP GET request with verbose logging and multi-level caching
 // This centralizes all HTTP requests and provides visibility into API calls
-// Responses are cached in memory for 5 minutes to avoid redundant requests
+// Caching strategy:
+// 1. In-memory cache (5 minutes) - for same execution
+// 2. Disk cache (24 hours) - for all metadata APIs, persists across executions
+// 3. Network request - if not cached
+// Set MVX_FORCE_REFRESH=true to bypass disk cache and force fresh requests
 func (m *Manager) Get(url string) (*http.Response, error) {
-	// Check cache first
+	// Check in-memory cache first (fastest)
 	m.cacheMutex.RLock()
 	if cached, ok := m.httpCache[url]; ok {
 		// Cache valid for 5 minutes
 		if time.Since(cached.Timestamp) < 5*time.Minute {
 			m.cacheMutex.RUnlock()
 			if os.Getenv("MVX_VERBOSE") == "true" {
-				fmt.Printf("💾 HTTP GET (cached): %s\n", url)
+				fmt.Printf("💾 HTTP GET (memory cache): %s\n", url)
 			}
 			// Return a fake response with cached body
 			return &http.Response{
@@ -190,6 +202,29 @@ func (m *Manager) Get(url string) (*http.Response, error) {
 		}
 	}
 	m.cacheMutex.RUnlock()
+
+	// Check disk cache (24 hours, unless MVX_FORCE_REFRESH is set)
+	// Cache all metadata API responses (Foojay, GitHub, Node.js, Apache)
+	if os.Getenv("MVX_FORCE_REFRESH") != "true" {
+		if body, found := m.getDiskCachedResponse(url); found {
+			if os.Getenv("MVX_VERBOSE") == "true" {
+				fmt.Printf("💾 HTTP GET (disk cache): %s\n", url)
+			}
+			// Also store in memory cache for faster subsequent access
+			m.cacheMutex.Lock()
+			m.httpCache[url] = HTTPCacheEntry{
+				Body:      body,
+				Timestamp: time.Now(),
+			}
+			m.cacheMutex.Unlock()
+
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewReader(body)),
+				Header:     make(http.Header),
+			}, nil
+		}
+	}
 
 	// Log the request if verbose mode is enabled
 	if os.Getenv("MVX_VERBOSE") == "true" {
@@ -217,13 +252,17 @@ func (m *Manager) Get(url string) (*http.Response, error) {
 			return nil, err
 		}
 
-		// Store in cache
+		// Store in memory cache
 		m.cacheMutex.Lock()
 		m.httpCache[url] = HTTPCacheEntry{
 			Body:      body,
 			Timestamp: time.Now(),
 		}
 		m.cacheMutex.Unlock()
+
+		// Store all metadata API responses in disk cache (24 hours)
+		// This includes: Foojay, GitHub, Node.js, Apache, etc.
+		m.setDiskCachedResponse(url, body)
 
 		// Return a new response with the body
 		return &http.Response{
@@ -1029,4 +1068,61 @@ func (m *Manager) EnsureToolInstalled(cfg *config.Config, toolName string) error
 	}
 
 	return m.InstallTool(toolName, toolConfig)
+}
+
+// getDiskCachedResponse retrieves a cached HTTP response from disk
+// Returns the response body and true if found and valid (less than 24 hours old)
+func (m *Manager) getDiskCachedResponse(url string) ([]byte, bool) {
+	cacheFile := m.getDiskCacheFilePath(url)
+
+	data, err := os.ReadFile(cacheFile)
+	if err != nil {
+		return nil, false
+	}
+
+	var entry DiskCacheEntry
+	if err := json.Unmarshal(data, &entry); err != nil {
+		return nil, false
+	}
+
+	// Check if cache is still valid (less than 24 hours old)
+	if time.Since(entry.Timestamp) > 24*time.Hour {
+		// Clean up expired cache file
+		os.Remove(cacheFile)
+		return nil, false
+	}
+
+	// Decode base64 body
+	body := []byte(entry.Body)
+	return body, true
+}
+
+// setDiskCachedResponse stores an HTTP response in disk cache
+func (m *Manager) setDiskCachedResponse(url string, body []byte) {
+	cacheFile := m.getDiskCacheFilePath(url)
+
+	entry := DiskCacheEntry{
+		URL:       url,
+		Body:      string(body), // Store as string for JSON
+		Timestamp: time.Now(),
+	}
+
+	data, err := json.MarshalIndent(entry, "", "  ")
+	if err != nil {
+		return // Silently fail on cache save errors
+	}
+
+	// Ensure cache directory exists
+	cacheDir := filepath.Dir(cacheFile)
+	os.MkdirAll(cacheDir, 0755)
+
+	os.WriteFile(cacheFile, data, 0644)
+}
+
+// getDiskCacheFilePath returns the file path for a cached URL
+func (m *Manager) getDiskCacheFilePath(url string) string {
+	// Create a safe filename from the URL using SHA256 hash
+	// This avoids filesystem issues with special characters and ensures uniqueness
+	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(url)))
+	return filepath.Join(m.cacheDir, "http_cache", hash+".json")
 }
