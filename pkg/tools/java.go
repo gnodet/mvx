@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/gnodet/mvx/pkg/config"
 	"github.com/gnodet/mvx/pkg/version"
@@ -469,7 +468,7 @@ func (j *JavaTool) GetDistributions() []JavaDistribution {
 // getDiscoDistributions fetches available distributions from Disco API
 func (j *JavaTool) getDiscoDistributions() ([]JavaDistribution, error) {
 	registry := j.manager.GetRegistry()
-	resp, err := registry.GetHTTPClient().Get(FoojayDiscoAPIBase + "/distributions")
+	resp, err := registry.Get(FoojayDiscoAPIBase + "/distributions")
 	if err != nil {
 		return nil, err
 	}
@@ -506,8 +505,7 @@ func (j *JavaTool) getDiscoVersions(distribution string) ([]string, error) {
 
 	registry := j.manager.GetRegistry()
 	// Get major versions available for this distribution
-	url := fmt.Sprintf(FoojayDiscoAPIBase+"/major_versions?distribution=%s&maintained=true", distribution)
-	resp, err := registry.GetHTTPClient().Get(url)
+	resp, err := registry.Get(FoojayDiscoAPIBase + "/major_versions?maintained=true&distribution=" + distribution)
 	if err != nil {
 		// Fallback to known versions if API is unavailable
 		return []string{"8", "11", "17", "21", "22", "23", "24", "25"}, nil
@@ -637,10 +635,7 @@ func (j *JavaTool) tryDiscoDistributionWithChecksum(version, distribution, osNam
 		version, distribution, osName, arch, releaseStatus)
 
 	// Get package information
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-	}
-	resp, err := client.Get(url)
+	resp, err := j.manager.Get(url)
 	if err != nil {
 		logVerbose("HTTP request failed: %v", err)
 		return DiscoveryResult{}, fmt.Errorf("failed to query Disco API: %w", err)
@@ -802,11 +797,7 @@ func (j *JavaTool) getChecksumFromDiscoAPI(packageID string) (ChecksumInfo, erro
 
 	logVerbose("Fetching checksum from Disco API: %s", url)
 
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-	}
-
-	resp, err := client.Get(url)
+	resp, err := j.manager.Get(url)
 	if err != nil {
 		return ChecksumInfo{}, fmt.Errorf("failed to fetch package info: %w", err)
 	}

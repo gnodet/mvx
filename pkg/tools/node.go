@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/gnodet/mvx/pkg/config"
 	"github.com/gnodet/mvx/pkg/version"
@@ -107,7 +106,7 @@ type nodeIndexEntry struct {
 
 func (n *NodeTool) fetchNodeIndex() ([]nodeIndexEntry, error) {
 	registry := n.manager.GetRegistry()
-	resp, err := registry.GetHTTPClient().Get(NodeJSDistBase + "/index.json")
+	resp, err := registry.Get(NodeJSDistBase + "/index.json")
 	if err != nil {
 		return nil, err
 	}
@@ -243,11 +242,7 @@ func (n *NodeTool) GetChecksum(version, filename string) (ChecksumInfo, error) {
 func (n *NodeTool) fetchNodeChecksum(version, filename string) (string, error) {
 	url := fmt.Sprintf("%s/v%s/SHASUMS256.txt", NodeJSDistBase, version)
 
-	client := &http.Client{
-		Timeout: 120 * time.Second, // 2 minutes for slow servers
-	}
-
-	resp, err := client.Get(url)
+	resp, err := n.manager.Get(url)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch Node.js checksums: %w", err)
 	}

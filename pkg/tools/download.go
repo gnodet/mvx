@@ -459,7 +459,7 @@ func verifyChecksum(filePath string, config *DownloadConfig) error {
 	isRequired := config.Config.Checksum != nil && config.Config.Checksum.Required
 
 	// Create checksum verifier
-	verifier := NewChecksumVerifier()
+	verifier := NewChecksumVerifier(config.Tool.GetManager())
 
 	if isRequired {
 		// Strict verification - fail on error

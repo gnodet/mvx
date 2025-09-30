@@ -3,6 +3,7 @@ package tools
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -29,6 +30,7 @@ type Manager struct {
 	installedCache map[string]bool   // Cache for IsInstalled checks
 	pathCache      map[string]string // Cache for GetPath results
 	cacheMutex     sync.RWMutex
+	httpClient     *http.Client
 }
 
 var (
@@ -77,6 +79,9 @@ type Tool interface {
 
 	// GetBinaryName returns the binary name for the tool
 	GetBinaryName() string
+
+	// GetManager returns the manager instance
+	GetManager() *Manager
 }
 
 // ToolInfoProvider is an optional interface for tools that can provide detailed information
@@ -122,11 +127,16 @@ func NewManager() (*Manager, error) {
 	manager := &Manager{
 		cacheDir:       cacheDir,
 		tools:          make(map[string]Tool),
-		registry:       NewToolRegistry(),
 		versionCache:   make(map[string]VersionCacheEntry),
 		installedCache: make(map[string]bool),
 		pathCache:      make(map[string]string),
+		httpClient: &http.Client{
+			Timeout: getTimeoutFromEnv("MVX_HTTP_TIMEOUT", 120*time.Second), // Default: 2 minutes for slow servers
+		},
 	}
+
+	// Create registry after manager is initialized (to avoid circular dependency)
+	manager.registry = NewToolRegistry(manager)
 
 	// Load version cache from disk
 	manager.loadVersionCache()
@@ -146,6 +156,29 @@ func ResetManager() {
 	managerMutex.Lock()
 	defer managerMutex.Unlock()
 	globalManager = nil
+}
+
+// Get performs an HTTP GET request with verbose logging
+// This centralizes all HTTP requests and provides visibility into API calls
+func (m *Manager) Get(url string) (*http.Response, error) {
+	// Log the request if verbose mode is enabled
+	if os.Getenv("MVX_VERBOSE") == "true" {
+		fmt.Printf("🌐 HTTP GET: %s\n", url)
+	}
+
+	resp, err := m.httpClient.Get(url)
+	if err != nil {
+		if os.Getenv("MVX_VERBOSE") == "true" {
+			fmt.Printf("❌ HTTP GET failed: %s - %v\n", url, err)
+		}
+		return nil, err
+	}
+
+	if os.Getenv("MVX_VERBOSE") == "true" {
+		fmt.Printf("✅ HTTP GET %d: %s\n", resp.StatusCode, url)
+	}
+
+	return resp, nil
 }
 
 // CacheManager interface for tools that support cache management

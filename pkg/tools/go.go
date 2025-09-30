@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/gnodet/mvx/pkg/config"
 	"github.com/gnodet/mvx/pkg/version"
@@ -99,7 +98,7 @@ func (g *GoTool) ListVersions() ([]string, error) {
 // fetchGoVersions fetches Go versions from GitHub releases API
 func (g *GoTool) fetchGoVersions() ([]string, error) {
 	registry := g.manager.GetRegistry()
-	resp, err := registry.GetHTTPClient().Get(GoGithubAPIBase + "/tags?per_page=100")
+	resp, err := registry.Get(GoGithubAPIBase + "/tags?per_page=100")
 	if err != nil {
 		return nil, err
 	}
@@ -236,11 +235,7 @@ type GoFile struct {
 func (g *GoTool) fetchGoChecksum(version, filename string) (string, error) {
 	url := GoDevAPIBase + "/?mode=json&include=all"
 
-	client := &http.Client{
-		Timeout: 120 * time.Second, // 2 minutes for slow servers
-	}
-
-	resp, err := client.Get(url)
+	resp, err := g.manager.Get(url)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch Go checksums: %w", err)
 	}

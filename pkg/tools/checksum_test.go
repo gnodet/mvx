@@ -23,7 +23,12 @@ func TestChecksumVerifier_VerifyFile(t *testing.T) {
 	hasher.Write([]byte(testContent))
 	expectedChecksum := hex.EncodeToString(hasher.Sum(nil))
 
-	verifier := NewChecksumVerifier()
+	manager, err := NewManager()
+	if err != nil {
+		t.Fatalf("Failed to create manager: %v", err)
+	}
+
+	verifier := NewChecksumVerifier(manager)
 
 	tests := []struct {
 		name        string
@@ -79,7 +84,12 @@ func TestChecksumVerifier_calculateChecksum(t *testing.T) {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
-	verifier := NewChecksumVerifier()
+	manager, err := NewManager()
+	if err != nil {
+		t.Fatalf("Failed to create manager: %v", err)
+	}
+
+	verifier := NewChecksumVerifier(manager)
 
 	// Calculate checksum
 	checksum, err := verifier.calculateChecksum(testFile, SHA256)
@@ -98,7 +108,12 @@ func TestChecksumVerifier_calculateChecksum(t *testing.T) {
 }
 
 func TestChecksumVerifier_parseChecksumFile(t *testing.T) {
-	verifier := NewChecksumVerifier()
+	manager, err := NewManager()
+	if err != nil {
+		t.Fatalf("Failed to create manager: %v", err)
+	}
+
+	verifier := NewChecksumVerifier(manager)
 
 	tests := []struct {
 		name        string

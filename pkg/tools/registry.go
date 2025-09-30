@@ -5,31 +5,28 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 )
 
 // ToolRegistry provides version discovery for tools
 type ToolRegistry struct {
-	httpClient *http.Client
+	manager *Manager
 }
 
 // NewToolRegistry creates a new tool registry
-func NewToolRegistry() *ToolRegistry {
+func NewToolRegistry(manager *Manager) *ToolRegistry {
 	return &ToolRegistry{
-		httpClient: &http.Client{
-			Timeout: getTimeoutFromEnv("MVX_REGISTRY_TIMEOUT", 120*time.Second), // Default: 2 minutes for slow Apache servers
-		},
+		manager: manager,
 	}
 }
 
-// GetHTTPClient returns the HTTP client for making API requests
-func (r *ToolRegistry) GetHTTPClient() *http.Client {
-	return r.httpClient
+// Get performs a GET request to the specified URL using the manager's HTTP client
+func (r *ToolRegistry) Get(url string) (*http.Response, error) {
+	return r.manager.Get(url)
 }
 
 // FetchVersionsFromApacheRepo fetches version directories from Apache repository
 func (r *ToolRegistry) FetchVersionsFromApacheRepo(repoURL string) ([]string, error) {
-	resp, err := r.httpClient.Get(repoURL)
+	resp, err := r.Get(repoURL)
 	if err != nil {
 		return nil, err
 	}
