@@ -20,6 +20,7 @@ var _ Tool = (*JavaTool)(nil)
 var _ DistributionProvider = (*JavaTool)(nil)
 var _ DistributionVersionProvider = (*JavaTool)(nil)
 var _ ToolMetadataProvider = (*JavaTool)(nil)
+var _ VersionValidator = (*JavaTool)(nil)
 
 // DiscoDistribution represents a Java distribution from Disco API
 type DiscoDistribution struct {
@@ -533,7 +534,7 @@ func (j *JavaTool) getDiscoVersions(distribution string) ([]string, error) {
 	}
 
 	// Note: The API returns all major versions regardless of distribution
-	// All maintained distributions support the same major versions (8, 11, 17, 21, etc.)
+	// All maintained distributions support the same major versions (8, "11", 17, 21, etc.)
 	// So we don't need to filter by distribution here
 	var versions []string
 	for _, mv := range majorVersions {
@@ -542,6 +543,75 @@ func (j *JavaTool) getDiscoVersions(distribution string) ([]string, error) {
 		} else {
 			versions = append(versions, fmt.Sprintf("%d", mv.MajorVersion))
 		}
+	}
+
+	// Sort in descending order (newest first)
+	sort.Slice(versions, func(i, j int) bool {
+		return versions[i] > versions[j]
+	})
+
+	return versions, nil
+}
+
+// getDetailedVersionsForMajor fetches detailed versions (e.g., "17.0.16") for a specific major version and distribution
+func (j *JavaTool) getDetailedVersionsForMajor(majorVersion, distribution string) ([]string, error) {
+	if distribution == "" {
+		distribution = "temurin"
+	}
+
+	platformMapper := NewPlatformMapper()
+
+	// Map Go arch to Disco API arch
+	archMapping := map[string]string{
+		"amd64": "x64",
+		"arm64": "aarch64",
+	}
+	arch := platformMapper.MapArchitecture(archMapping)
+
+	// Map OS names to Disco API format
+	osMapping := map[string]string{
+		"darwin": "macos",
+	}
+	osName := platformMapper.MapOS(osMapping)
+
+	// Query packages for this major version and distribution
+	url := fmt.Sprintf("%s/packages?version=%s&distribution=%s&operating_system=%s&architecture=%s&package_type=jdk&release_status=ga&latest=available",
+		FoojayDiscoAPIBase, majorVersion, distribution, osName, arch)
+
+	logVerbose("Fetching detailed versions for Java %s (%s) from: %s", majorVersion, distribution, url)
+
+	resp, err := j.manager.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch detailed versions: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Result []struct {
+			JavaVersion string `json:"java_version"`
+		} `json:"result"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to parse detailed versions: %w", err)
+	}
+
+	// Extract unique versions
+	versionSet := make(map[string]bool)
+	for _, pkg := range result.Result {
+		if pkg.JavaVersion != "" {
+			// Extract just the version number (e.g., "17.0.16" from "17.0.16+8")
+			parts := strings.Split(pkg.JavaVersion, "+")
+			if len(parts) > 0 {
+				versionSet[parts[0]] = true
+			}
+		}
+	}
+
+	// Convert to sorted slice
+	var versions []string
+	for v := range versionSet {
+		versions = append(versions, v)
 	}
 
 	// Sort in descending order (newest first)
@@ -870,28 +940,65 @@ func (j *JavaTool) GetChecksum(version, filename string) (ChecksumInfo, error) {
 	return ChecksumInfo{}, fmt.Errorf("Java checksums should be provided via configuration")
 }
 
+// ValidateVersion validates that a Java version exists (implements VersionValidator)
+func (j *JavaTool) ValidateVersion(versionSpec, distribution string) error {
+	if distribution == "" {
+		distribution = "temurin"
+	}
+
+	// Try to resolve the version - if it resolves successfully, it's valid
+	_, err := j.ResolveVersion(versionSpec, distribution)
+	if err != nil {
+		return fmt.Errorf("invalid Java version %s for distribution %s: %w", versionSpec, distribution, err)
+	}
+
+	return nil
+}
+
 // ResolveVersion resolves a Java version specification to a concrete version
 func (j *JavaTool) ResolveVersion(versionSpec, distribution string) (string, error) {
 	if distribution == "" {
 		distribution = "temurin" // Default distribution
 	}
 
-	availableVersions, err := j.getDiscoVersions(distribution)
-	if err != nil {
-		return "", err
+	// If the version is already a concrete version (e.g., "17.0.16"), return it as-is
+	if strings.Contains(versionSpec, ".") {
+		return versionSpec, nil
 	}
 
+	// Parse the version spec to determine if we need detailed versions
 	spec, err := version.ParseSpec(versionSpec)
 	if err != nil {
 		return "", fmt.Errorf("invalid version specification %s: %w", versionSpec, err)
 	}
 
-	resolved, err := spec.Resolve(availableVersions)
+	// First, try to resolve against major versions to find the major version
+	majorVersions, err := j.getDiscoVersions(distribution)
+	if err != nil {
+		return "", err
+	}
+
+	majorResolved, err := spec.Resolve(majorVersions)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve Java %s version %s: %w", distribution, versionSpec, err)
 	}
 
-	return resolved, nil
+	// If the resolved version is a major version (e.g., "17"), fetch detailed versions
+	// and resolve to the latest patch version (e.g., "17.0.16")
+	if !strings.Contains(majorResolved, ".") {
+		detailedVersions, err := j.getDetailedVersionsForMajor(majorResolved, distribution)
+		if err != nil {
+			logVerbose("Failed to fetch detailed versions for Java %s: %v, using major version", majorResolved, err)
+			return majorResolved, nil // Fallback to major version
+		}
+
+		if len(detailedVersions) > 0 {
+			// Return the latest (first) detailed version
+			return detailedVersions[0], nil
+		}
+	}
+
+	return majorResolved, nil
 }
 
 // GetDownloadURL implements Tool interface for Java
