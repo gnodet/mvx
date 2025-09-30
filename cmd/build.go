@@ -81,10 +81,7 @@ func buildProject(args []string) error {
 
 	// Execute build command with hooks/overrides support
 	return exec.ExecuteBuiltinCommand("build", args, func(args []string) error {
-		// Default built-in build behavior
-		if err := exec.ValidateCommand("build"); err != nil {
-			return err
-		}
+		// Default built-in build behavior (tools are auto-installed via EnsureTool)
 		return exec.ExecuteCommand("build", args)
 	})
 }

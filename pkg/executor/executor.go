@@ -362,31 +362,15 @@ func (e *Executor) executeNativeScript(script, workDir string, env []string) err
 	return cmd.Run()
 }
 
-// ValidateCommand checks if a command can be executed
+// ValidateCommand is deprecated - tools are now auto-installed via EnsureTool
+// This method is kept for backward compatibility but does nothing
 func (e *Executor) ValidateCommand(commandName string) error {
-	cmdConfig, exists := e.config.Commands[commandName]
+	// Just check if command exists
+	_, exists := e.config.Commands[commandName]
 	if !exists {
 		return fmt.Errorf("unknown command: %s", commandName)
 	}
-
-	// Check if required tools are installed
-	for _, toolName := range cmdConfig.Requires {
-		toolConfig, exists := e.config.Tools[toolName]
-		if !exists {
-			return fmt.Errorf("command %s requires tool %s, but it's not configured", commandName, toolName)
-		}
-
-		tool, err := e.toolManager.GetTool(toolName)
-		if err != nil {
-			return fmt.Errorf("unknown tool %s required by command %s", toolName, commandName)
-		}
-
-		if !tool.IsInstalled(toolConfig.Version, toolConfig) {
-			return fmt.Errorf("tool %s %s is required by command %s but not installed. Run 'mvx setup' first",
-				toolName, toolConfig.Version, commandName)
-		}
-	}
-
+	// Note: Tool installation checks removed - EnsureTool handles automatic installation
 	return nil
 }
 

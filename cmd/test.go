@@ -87,10 +87,7 @@ func runTests(args []string) error {
 
 	// Execute test command with hooks/overrides support
 	return exec.ExecuteBuiltinCommand(commandName, args, func(args []string) error {
-		// Default built-in test behavior
-		if err := exec.ValidateCommand(commandName); err != nil {
-			return err
-		}
+		// Default built-in test behavior (tools are auto-installed via EnsureTool)
 		return exec.ExecuteCommand(commandName, args)
 	})
 }
