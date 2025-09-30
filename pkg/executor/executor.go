@@ -282,12 +282,6 @@ func (e *Executor) setupEnvironment(cmdConfig config.CommandConfig) ([]string, e
 	// Add tool bin directories to PATH
 	for _, toolName := range requiredTools {
 		if toolConfig, exists := e.config.Tools[toolName]; exists {
-			tool, err := e.toolManager.GetTool(toolName)
-			if err != nil {
-				logVerbose("Skipping tool %s: %v", toolName, err)
-				continue // Skip unknown tools
-			}
-
 			// Resolve version to handle any overrides
 			resolvedVersion, err := e.toolManager.ResolveVersion(toolName, toolConfig)
 			if err != nil {
@@ -299,16 +293,16 @@ func (e *Executor) setupEnvironment(cmdConfig config.CommandConfig) ([]string, e
 			resolvedConfig := toolConfig
 			resolvedConfig.Version = resolvedVersion
 
-			if tool.IsInstalled(resolvedVersion, resolvedConfig) {
-				binPath, err := tool.GetPath(resolvedVersion, resolvedConfig)
-				if err != nil {
-					logVerbose("Skipping tool %s: failed to get bin path: %v", toolName, err)
-					continue
-				}
+			// Use cached path lookup - this internally checks if installed
+			binPath, err := e.toolManager.GetToolPath(toolName, resolvedVersion, resolvedConfig)
+			if err != nil {
+				logVerbose("Skipping tool %s: %v", toolName, err)
+				continue
+			}
+
+			if binPath != "" {
 				logVerbose("Adding %s bin path to PATH: %s", toolName, binPath)
 				pathDirs = append(pathDirs, binPath)
-			} else {
-				logVerbose("Tool %s version %s is not installed", toolName, resolvedVersion)
 			}
 		}
 	}

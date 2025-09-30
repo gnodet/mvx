@@ -27,6 +27,8 @@ type Manager struct {
 	registry         *ToolRegistry
 	checksumRegistry *ChecksumRegistry
 	versionCache     map[string]VersionCacheEntry
+	installedCache   map[string]bool   // Cache for IsInstalled checks
+	pathCache        map[string]string // Cache for GetPath results
 	cacheMutex       sync.RWMutex
 }
 
@@ -121,6 +123,8 @@ func NewManager() (*Manager, error) {
 		registry:         NewToolRegistry(),
 		checksumRegistry: NewChecksumRegistry(),
 		versionCache:     make(map[string]VersionCacheEntry),
+		installedCache:   make(map[string]bool),
+		pathCache:        make(map[string]string),
 	}
 
 	// Load version cache from disk
@@ -546,6 +550,69 @@ func (m *Manager) GetToolVersionDir(toolName, version string, distribution strin
 	return filepath.Join(m.GetToolDir(toolName), versionDir)
 }
 
+// getCacheKey generates a cache key for tool operations
+func (m *Manager) getCacheKey(toolName, version, distribution string) string {
+	return fmt.Sprintf("%s:%s:%s", toolName, version, distribution)
+}
+
+// isToolInstalled checks if a tool is installed (with caching)
+func (m *Manager) isToolInstalled(toolName, version string, cfg config.ToolConfig) bool {
+	cacheKey := m.getCacheKey(toolName, version, cfg.Distribution)
+
+	m.cacheMutex.RLock()
+	if installed, found := m.installedCache[cacheKey]; found {
+		m.cacheMutex.RUnlock()
+		return installed
+	}
+	m.cacheMutex.RUnlock()
+
+	tool, err := m.GetTool(toolName)
+	if err != nil {
+		return false
+	}
+
+	installed := tool.IsInstalled(version, cfg)
+
+	m.cacheMutex.Lock()
+	m.installedCache[cacheKey] = installed
+	m.cacheMutex.Unlock()
+
+	return installed
+}
+
+// GetToolPath gets the tool path (with caching)
+func (m *Manager) GetToolPath(toolName, version string, cfg config.ToolConfig) (string, error) {
+	cacheKey := m.getCacheKey(toolName, version, cfg.Distribution)
+
+	m.cacheMutex.RLock()
+	if path, found := m.pathCache[cacheKey]; found {
+		m.cacheMutex.RUnlock()
+		return path, nil
+	}
+	m.cacheMutex.RUnlock()
+
+	tool, err := m.GetTool(toolName)
+	if err != nil {
+		return "", err
+	}
+
+	// Check if installed first
+	if !tool.IsInstalled(version, cfg) {
+		return "", fmt.Errorf("tool %s version %s is not installed", toolName, version)
+	}
+
+	path, err := tool.GetPath(version, cfg)
+	if err != nil {
+		return "", err
+	}
+
+	m.cacheMutex.Lock()
+	m.pathCache[cacheKey] = path
+	m.cacheMutex.Unlock()
+
+	return path, nil
+}
+
 // SetupEnvironment sets up environment variables for installed tools
 func (m *Manager) SetupEnvironment(cfg *config.Config) (map[string]string, error) {
 	env := make(map[string]string)
@@ -557,11 +624,6 @@ func (m *Manager) SetupEnvironment(cfg *config.Config) (map[string]string, error
 
 	// Add tool-specific environment variables
 	for toolName, toolConfig := range cfg.Tools {
-		tool, err := m.GetTool(toolName)
-		if err != nil {
-			continue // Skip unknown tools
-		}
-
 		// Resolve version to check installation status
 		resolvedVersion, err := m.resolveVersion(toolName, toolConfig)
 		if err != nil {
@@ -571,12 +633,12 @@ func (m *Manager) SetupEnvironment(cfg *config.Config) (map[string]string, error
 		resolvedConfig := toolConfig
 		resolvedConfig.Version = resolvedVersion
 
-		if !tool.IsInstalled(resolvedVersion, resolvedConfig) {
+		if !m.isToolInstalled(toolName, resolvedVersion, resolvedConfig) {
 			continue // Skip uninstalled tools
 		}
 
 		// Get tool path
-		toolPath, err := tool.GetPath(resolvedVersion, resolvedConfig)
+		toolPath, err := m.GetToolPath(toolName, resolvedVersion, resolvedConfig)
 		if err != nil {
 			continue
 		}
@@ -585,6 +647,7 @@ func (m *Manager) SetupEnvironment(cfg *config.Config) (map[string]string, error
 		switch toolName {
 		case "java":
 			// For Java, we need JAVA_HOME to point to the Java installation directory, not the bin directory
+			tool, _ := m.GetTool(toolName)
 			if javaTool, ok := tool.(*JavaTool); ok {
 				if javaHome, err := javaTool.GetJavaHome(resolvedVersion, resolvedConfig); err == nil {
 					env["JAVA_HOME"] = javaHome

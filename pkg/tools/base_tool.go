@@ -568,7 +568,6 @@ func (b *BaseTool) StandardIsInstalled(versionSpec string, cfg config.ToolConfig
 
 	var candidates []installedCandidate
 	for _, inst := range installed {
-		logVerbose("   Checking installed version: %s (%s) at %s", inst.Version, inst.Distribution, inst.Path)
 		parsed, err := version.ParseVersion(inst.Version)
 		if err != nil {
 			logVerbose("Failed to parse installed version %s: %v", inst.Version, err)
@@ -582,19 +581,21 @@ func (b *BaseTool) StandardIsInstalled(versionSpec string, cfg config.ToolConfig
 		}
 	}
 
+	// Sort in descending order (newest first) to check best matches first
 	sort.Slice(candidates, func(i, j int) bool {
 		return candidates[i].parsed.Compare(candidates[j].parsed) > 0
 	})
 
+	// Check candidates in order, return immediately on first valid installation
 	for _, candidate := range candidates {
+		logVerbose("   Checking installed version: %s (%s) at %s", candidate.info.Version, candidate.info.Distribution, candidate.info.Path)
+
 		candidateCfg := cfg
 		candidateCfg.Version = candidate.info.Version
 		if candidate.info.Distribution != "" {
 			candidateCfg.Distribution = candidate.info.Distribution
 		}
 
-		// Use the actual installation path from ListInstalledVersions instead of recomputing
-		// This ensures we check the correct directory, especially for distributions
 		binPath, err := getPath(candidate.info.Version, candidateCfg)
 		if err != nil {
 			logVerbose("Failed to compute binary path for %s %s: %v", b.toolName, candidate.info.Version, err)
@@ -611,6 +612,7 @@ func (b *BaseTool) StandardIsInstalled(versionSpec string, cfg config.ToolConfig
 			continue
 		}
 
+		// Found a valid installation - return immediately
 		logVerbose("Using previously installed %s %s (%s)", b.toolName, candidate.info.Version, candidate.info.Distribution)
 		return true
 	}
