@@ -580,7 +580,70 @@ func (m *Manager) isToolInstalled(toolName, version string, cfg config.ToolConfi
 	return installed
 }
 
+// EnsureTool ensures a tool is installed and returns its binary path.
+// This is the main entry point for tool management - it handles:
+// - Version resolution (with caching)
+// - Installation check (with caching)
+// - Auto-installation if needed
+// - Path retrieval (with caching)
+// All in one atomic, cached operation.
+func (m *Manager) EnsureTool(toolName string, cfg config.ToolConfig) (string, error) {
+	// Resolve version
+	resolvedVersion, err := m.resolveVersion(toolName, cfg)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve version for %s: %w", toolName, err)
+	}
+
+	resolvedConfig := cfg
+	resolvedConfig.Version = resolvedVersion
+
+	cacheKey := m.getCacheKey(toolName, resolvedVersion, cfg.Distribution)
+
+	// Check cache first
+	m.cacheMutex.RLock()
+	if path, found := m.pathCache[cacheKey]; found {
+		m.cacheMutex.RUnlock()
+		return path, nil
+	}
+	m.cacheMutex.RUnlock()
+
+	// Get tool instance
+	tool, err := m.GetTool(toolName)
+	if err != nil {
+		return "", err
+	}
+
+	// Check if installed
+	if !tool.IsInstalled(resolvedVersion, resolvedConfig) {
+		// Auto-install
+		logVerbose("Auto-installing %s %s...", toolName, resolvedVersion)
+		if err := tool.Install(resolvedVersion, resolvedConfig); err != nil {
+			return "", fmt.Errorf("failed to install %s %s: %w", toolName, resolvedVersion, err)
+		}
+
+		// Verify installation
+		if err := tool.Verify(resolvedVersion, resolvedConfig); err != nil {
+			return "", fmt.Errorf("failed to verify %s %s: %w", toolName, resolvedVersion, err)
+		}
+	}
+
+	// Get path
+	path, err := tool.GetPath(resolvedVersion, resolvedConfig)
+	if err != nil {
+		return "", fmt.Errorf("failed to get path for %s %s: %w", toolName, resolvedVersion, err)
+	}
+
+	// Cache the result
+	m.cacheMutex.Lock()
+	m.pathCache[cacheKey] = path
+	m.installedCache[cacheKey] = true
+	m.cacheMutex.Unlock()
+
+	return path, nil
+}
+
 // GetToolPath gets the tool path (with caching)
+// Deprecated: Use EnsureTool instead
 func (m *Manager) GetToolPath(toolName, version string, cfg config.ToolConfig) (string, error) {
 	cacheKey := m.getCacheKey(toolName, version, cfg.Distribution)
 
@@ -624,7 +687,8 @@ func (m *Manager) SetupEnvironment(cfg *config.Config) (map[string]string, error
 
 	// Add tool-specific environment variables
 	for toolName, toolConfig := range cfg.Tools {
-		// Resolve version to check installation status
+		// EnsureTool handles version resolution and checks if installed
+		// It only returns a path if the tool is installed (doesn't auto-install here)
 		resolvedVersion, err := m.resolveVersion(toolName, toolConfig)
 		if err != nil {
 			continue // Skip tools with resolution errors
@@ -633,14 +697,30 @@ func (m *Manager) SetupEnvironment(cfg *config.Config) (map[string]string, error
 		resolvedConfig := toolConfig
 		resolvedConfig.Version = resolvedVersion
 
+		// Check if installed (using cache)
 		if !m.isToolInstalled(toolName, resolvedVersion, resolvedConfig) {
 			continue // Skip uninstalled tools
 		}
 
-		// Get tool path
-		toolPath, err := m.GetToolPath(toolName, resolvedVersion, resolvedConfig)
-		if err != nil {
-			continue
+		// Get tool path (using cache)
+		cacheKey := m.getCacheKey(toolName, resolvedVersion, resolvedConfig.Distribution)
+		m.cacheMutex.RLock()
+		toolPath, found := m.pathCache[cacheKey]
+		m.cacheMutex.RUnlock()
+
+		if !found {
+			// Not in cache, get it
+			tool, err := m.GetTool(toolName)
+			if err != nil {
+				continue
+			}
+			toolPath, err = tool.GetPath(resolvedVersion, resolvedConfig)
+			if err != nil {
+				continue
+			}
+			m.cacheMutex.Lock()
+			m.pathCache[cacheKey] = toolPath
+			m.cacheMutex.Unlock()
 		}
 
 		// Set tool-specific environment variables

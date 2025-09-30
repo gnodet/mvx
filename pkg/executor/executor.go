@@ -82,30 +82,10 @@ func (e *Executor) ExecuteTool(toolName string, args []string) error {
 		return fmt.Errorf("tool %s is not configured in this project", toolName)
 	}
 
-	// Get the tool instance
-	tool, err := e.toolManager.GetTool(toolName)
+	// EnsureTool handles everything: resolve, check, install, get path
+	toolBinPath, err := e.toolManager.EnsureTool(toolName, toolConfig)
 	if err != nil {
-		return fmt.Errorf("failed to get tool %s: %w", toolName, err)
-	}
-
-	// Resolve tool version using the manager
-	resolvedVersion, err := e.toolManager.ResolveVersion(toolName, toolConfig)
-	if err != nil {
-		return fmt.Errorf("failed to resolve %s version %s: %w", toolName, toolConfig.Version, err)
-	}
-
-	// Check if tool is installed, auto-install if needed
-	if !tool.IsInstalled(resolvedVersion, toolConfig) {
-		fmt.Printf("🔧 Auto-installing %s %s...\n", toolName, resolvedVersion)
-		if err := tool.Install(resolvedVersion, toolConfig); err != nil {
-			return fmt.Errorf("failed to install %s %s: %w", toolName, resolvedVersion, err)
-		}
-	}
-
-	// Get tool binary path
-	toolBinPath, err := tool.GetPath(resolvedVersion, toolConfig)
-	if err != nil {
-		return fmt.Errorf("failed to get %s binary path: %w", toolName, err)
+		return fmt.Errorf("failed to ensure %s is installed: %w", toolName, err)
 	}
 
 	// Setup environment with tool paths
@@ -282,28 +262,15 @@ func (e *Executor) setupEnvironment(cmdConfig config.CommandConfig) ([]string, e
 	// Add tool bin directories to PATH
 	for _, toolName := range requiredTools {
 		if toolConfig, exists := e.config.Tools[toolName]; exists {
-			// Resolve version to handle any overrides
-			resolvedVersion, err := e.toolManager.ResolveVersion(toolName, toolConfig)
-			if err != nil {
-				logVerbose("Skipping tool %s: version resolution failed: %v", toolName, err)
-				continue // Skip tools with resolution errors
-			}
-
-			// Create resolved config
-			resolvedConfig := toolConfig
-			resolvedConfig.Version = resolvedVersion
-
-			// Use cached path lookup - this internally checks if installed
-			binPath, err := e.toolManager.GetToolPath(toolName, resolvedVersion, resolvedConfig)
+			// EnsureTool handles version resolution, installation check, auto-install, and path retrieval
+			binPath, err := e.toolManager.EnsureTool(toolName, toolConfig)
 			if err != nil {
 				logVerbose("Skipping tool %s: %v", toolName, err)
 				continue
 			}
 
-			if binPath != "" {
-				logVerbose("Adding %s bin path to PATH: %s", toolName, binPath)
-				pathDirs = append(pathDirs, binPath)
-			}
+			logVerbose("Adding %s bin path to PATH: %s", toolName, binPath)
+			pathDirs = append(pathDirs, binPath)
 		}
 	}
 
@@ -329,17 +296,6 @@ func (e *Executor) setupEnvironment(cmdConfig config.CommandConfig) ([]string, e
 	return env, nil
 }
 
-// processScript processes the script, handling platform-specific scripts and arguments
-func (e *Executor) processScript(script interface{}, args []string) (string, error) {
-	// Resolve platform-specific script
-	resolvedScript, err := config.ResolvePlatformScript(script)
-	if err != nil {
-		return "", err
-	}
-
-	return e.processScriptString(resolvedScript, args), nil
-}
-
 // processScriptString processes a script string with arguments
 func (e *Executor) processScriptString(script string, args []string) string {
 	// If there are arguments, append them to the script
@@ -350,12 +306,6 @@ func (e *Executor) processScriptString(script string, args []string) string {
 	}
 
 	return script
-}
-
-// executeScript executes a script in the specified working directory with environment
-// This method is kept for backward compatibility
-func (e *Executor) executeScript(script, workDir string, env []string) error {
-	return e.executeScriptWithInterpreter(script, workDir, env, "")
 }
 
 // executeScriptWithInterpreter executes a script using the specified interpreter
