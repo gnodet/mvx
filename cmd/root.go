@@ -94,6 +94,7 @@ func init() {
 	rootCmd.AddCommand(setupCmd)
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(updateBootstrapCmd)
+	rootCmd.AddCommand(configCmd)
 }
 
 // Helper functions for output
