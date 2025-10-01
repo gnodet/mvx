@@ -15,6 +15,7 @@ import (
 // Compile-time interface validation
 var _ Tool = (*NodeTool)(nil)
 var _ ToolMetadataProvider = (*NodeTool)(nil)
+var _ EnvironmentProvider = (*NodeTool)(nil)
 
 // NodeTool manages Node.js
 // Downloads from https://nodejs.org/dist/
@@ -95,6 +96,11 @@ func (n *NodeTool) GetDisplayName() string {
 // GetEmoji returns the emoji icon for Node.js (implements ToolMetadataProvider)
 func (n *NodeTool) GetEmoji() string {
 	return "📦"
+}
+
+// SetupEnvironment sets up Node.js-specific environment variables (implements EnvironmentProvider)
+func (n *NodeTool) SetupEnvironment(version string, cfg config.ToolConfig, envVars map[string]string) error {
+	return n.SetupHomeEnvironment(version, cfg, envVars, EnvNodeHome, n.GetPath)
 }
 
 func (n *NodeTool) fetchNodeVersions() ([]string, error) {

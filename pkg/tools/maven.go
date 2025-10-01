@@ -14,6 +14,8 @@ import (
 // Compile-time interface validation
 var _ Tool = (*MavenTool)(nil)
 var _ ToolMetadataProvider = (*MavenTool)(nil)
+var _ DependencyProvider = (*MavenTool)(nil)
+var _ EnvironmentProvider = (*MavenTool)(nil)
 
 // MavenTool implements Tool interface for Maven management
 type MavenTool struct {
@@ -134,6 +136,16 @@ func (m *MavenTool) GetDisplayName() string {
 // GetEmoji returns the emoji icon for Maven (implements ToolMetadataProvider)
 func (m *MavenTool) GetEmoji() string {
 	return "📦"
+}
+
+// GetDependencies returns the list of tools that Maven depends on (implements DependencyProvider)
+func (m *MavenTool) GetDependencies() []string {
+	return []string{ToolJava}
+}
+
+// SetupEnvironment sets up Maven-specific environment variables (implements EnvironmentProvider)
+func (m *MavenTool) SetupEnvironment(version string, cfg config.ToolConfig, envVars map[string]string) error {
+	return m.SetupHomeEnvironment(version, cfg, envVars, EnvMavenHome, m.GetPath)
 }
 
 // fetchMavenVersionsFromApache fetches Maven versions from Apache archive repositories

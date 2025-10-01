@@ -143,6 +143,19 @@ type ToolMetadataProvider interface {
 	GetEmoji() string
 }
 
+// DependencyProvider is an optional interface for tools that depend on other tools
+type DependencyProvider interface {
+	// GetDependencies returns a list of tool names that this tool depends on
+	GetDependencies() []string
+}
+
+// EnvironmentProvider is an optional interface for tools that need custom environment setup
+type EnvironmentProvider interface {
+	// SetupEnvironment sets up tool-specific environment variables
+	// The envVars map should be modified in-place to add/override environment variables
+	SetupEnvironment(version string, cfg config.ToolConfig, envVars map[string]string) error
+}
+
 // Distribution represents a tool distribution (e.g., Java distributions like Temurin, Zulu)
 type Distribution struct {
 	Name        string
@@ -547,59 +560,112 @@ func (m *Manager) EnsureTools(cfg *config.Config, maxConcurrent int) error {
 		maxConcurrent = GetDefaultConcurrency()
 	}
 
+	// Resolve dependency order
+	orderedTools, err := m.resolveDependencyOrder(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to resolve tool dependencies: %w", err)
+	}
+
 	// If only one tool, use sequential
-	if len(cfg.Tools) == 1 {
-		for toolName, toolConfig := range cfg.Tools {
-			_, err := m.EnsureTool(toolName, toolConfig)
-			if err != nil {
-				return fmt.Errorf("failed to ensure %s is installed: %w", toolName, err)
-			}
-			fmt.Printf("✅ %s is ready\n", toolName)
+	if len(orderedTools) == 1 {
+		toolName := orderedTools[0]
+		toolConfig := cfg.Tools[toolName]
+		_, err := m.EnsureTool(toolName, toolConfig)
+		if err != nil {
+			return fmt.Errorf("failed to ensure %s is installed: %w", toolName, err)
 		}
+		fmt.Printf("✅ %s is ready\n", toolName)
 		return nil
 	}
 
 	fmt.Printf("📦 Ensuring %d tools are installed (max %d concurrent)...\n", len(cfg.Tools), maxConcurrent)
 
-	// Create a semaphore to limit concurrent operations
-	semaphore := make(chan struct{}, maxConcurrent)
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-	var errors []error
-	var completed int
+	// Install tools in dependency order
+	// Tools with dependencies must be installed sequentially, but independent tools can be parallel
+	completed := 0
+	for _, toolName := range orderedTools {
+		toolConfig := cfg.Tools[toolName]
 
-	// Ensure tools in parallel
-	for toolName, toolConfig := range cfg.Tools {
-		wg.Add(1)
-		go func(name string, config config.ToolConfig) {
-			defer wg.Done()
+		if _, err := m.EnsureTool(toolName, toolConfig); err != nil {
+			return fmt.Errorf("failed to ensure %s is installed: %w", toolName, err)
+		}
 
-			// Acquire semaphore
-			semaphore <- struct{}{}
-			defer func() { <-semaphore }()
-
-			if _, err := m.EnsureTool(name, config); err != nil {
-				mu.Lock()
-				errors = append(errors, fmt.Errorf("%s: %w", name, err))
-				mu.Unlock()
-			} else {
-				mu.Lock()
-				completed++
-				fmt.Printf("  ✅ %s is ready (%d/%d tools)\n", name, completed, len(cfg.Tools))
-				mu.Unlock()
-			}
-		}(toolName, toolConfig)
-	}
-
-	// Wait for all tools to complete
-	wg.Wait()
-
-	if len(errors) > 0 {
-		return fmt.Errorf("failed to ensure tools: %v", errors)
+		completed++
+		fmt.Printf("  ✅ %s is ready (%d/%d tools)\n", toolName, completed, len(cfg.Tools))
 	}
 
 	fmt.Printf("✅ All %d tools are ready\n", len(cfg.Tools))
 	return nil
+}
+
+// resolveDependencyOrder resolves the installation order for tools based on their dependencies
+// Uses a simple topological sort with Kahn's algorithm
+func (m *Manager) resolveDependencyOrder(cfg *config.Config) ([]string, error) {
+	// Build dependency map: tool -> list of dependencies
+	deps := make(map[string][]string)
+	for toolName := range cfg.Tools {
+		deps[toolName] = m.getToolDependencies(toolName, cfg)
+	}
+
+	// Topological sort: process tools with no remaining dependencies first
+	var result []string
+	processed := make(map[string]bool)
+
+	for len(result) < len(cfg.Tools) {
+		// Find a tool with all dependencies already processed
+		found := false
+		for toolName := range cfg.Tools {
+			if processed[toolName] {
+				continue
+			}
+
+			// Check if all dependencies are processed
+			allDepsProcessed := true
+			for _, dep := range deps[toolName] {
+				if !processed[dep] {
+					allDepsProcessed = false
+					break
+				}
+			}
+
+			if allDepsProcessed {
+				result = append(result, toolName)
+				processed[toolName] = true
+				found = true
+				break
+			}
+		}
+
+		// If no tool can be processed, we have a circular dependency
+		if !found {
+			return nil, fmt.Errorf("circular dependency detected among tools")
+		}
+	}
+
+	return result, nil
+}
+
+// getToolDependencies returns the list of dependencies for a tool that are configured in this project
+func (m *Manager) getToolDependencies(toolName string, cfg *config.Config) []string {
+	tool, err := m.GetTool(toolName)
+	if err != nil {
+		return nil
+	}
+
+	depProvider, ok := tool.(DependencyProvider)
+	if !ok {
+		return nil
+	}
+
+	// Filter dependencies to only include those configured in this project
+	var configuredDeps []string
+	for _, dep := range depProvider.GetDependencies() {
+		if _, exists := cfg.Tools[dep]; exists {
+			configuredDeps = append(configuredDeps, dep)
+		}
+	}
+
+	return configuredDeps
 }
 
 // InstallTools is deprecated - use EnsureTools instead
@@ -827,22 +893,14 @@ func (m *Manager) SetupEnvironment(cfg *config.Config) (map[string]string, error
 			m.cacheMutex.Unlock()
 		}
 
-		// Set tool-specific environment variables
-		switch toolName {
-		case "java":
-			// For Java, we need JAVA_HOME to point to the Java installation directory, not the bin directory
-			tool, _ := m.GetTool(toolName)
-			if javaTool, ok := tool.(*JavaTool); ok {
-				if javaHome, err := javaTool.GetJavaHome(resolvedVersion, resolvedConfig); err == nil {
-					env["JAVA_HOME"] = javaHome
-				} else {
-					logVerbose("Failed to get JAVA_HOME for Java %s: %v", resolvedVersion, err)
+		// Set tool-specific environment variables using virtual method
+		tool, err := m.GetTool(toolName)
+		if err == nil {
+			if envProvider, ok := tool.(EnvironmentProvider); ok {
+				if err := envProvider.SetupEnvironment(resolvedVersion, resolvedConfig, env); err != nil {
+					logVerbose("Failed to setup environment for %s %s: %v", toolName, resolvedVersion, err)
 				}
 			}
-		case "maven":
-			env["MAVEN_HOME"] = toolPath
-		case "node":
-			env["NODE_HOME"] = toolPath
 		}
 	}
 
