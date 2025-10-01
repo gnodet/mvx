@@ -258,12 +258,123 @@ func (b *BaseTool) VerifyWithConfig(version string, cfg config.ToolConfig, verif
 		return VerifyError(b.toolName, version, fmt.Errorf("failed to get binary path: %w", err))
 	}
 
+	// Set up environment for verification (needed for tools like Maven that depend on Java)
+	env, err := b.setupVerificationEnvironment(cfg)
+	if err != nil {
+		logVerbose("Failed to setup verification environment: %v", err)
+		env = nil // Fall back to default environment
+	}
+
 	// Verify binary exists and works
-	if err := b.VerifyBinaryWithConfig(binDir, verifyConfig); err != nil {
+	if err := b.VerifyBinaryWithConfig(binDir, verifyConfig, env); err != nil {
 		return VerifyError(b.toolName, version, err)
 	}
 
 	return nil
+}
+
+// setupVerificationEnvironment sets up environment variables needed for tool verification
+func (b *BaseTool) setupVerificationEnvironment(cfg config.ToolConfig) ([]string, error) {
+	// Create a minimal config that includes this tool and its dependencies
+	tempConfig := &config.Config{
+		Tools: make(map[string]config.ToolConfig),
+	}
+
+	// Add this tool to the config
+	tempConfig.Tools[b.toolName] = cfg
+
+	// Add dependencies if this tool has any
+	if tool, err := b.manager.GetTool(b.toolName); err == nil {
+		if depProvider, ok := tool.(DependencyProvider); ok {
+			dependencies := depProvider.GetDependencies()
+			logVerbose("Setting up dependencies for %s verification: %v", b.toolName, dependencies)
+
+			// Add dependencies to the temporary config
+			for _, depName := range dependencies {
+				if depTool, err := b.manager.GetTool(depName); err == nil {
+					// Try to find an installed version of the dependency
+					if installedVersions := b.getInstalledVersionsForTool(depTool, depName); len(installedVersions) > 0 {
+						// Use the first available installed version
+						depConfig := config.ToolConfig{
+							Version:      installedVersions[0].Version,
+							Distribution: installedVersions[0].Distribution,
+						}
+						tempConfig.Tools[depName] = depConfig
+						logVerbose("Added dependency %s %s to verification environment", depName, installedVersions[0].Version)
+					}
+				}
+			}
+		}
+	}
+
+	// Use the standard environment setup
+	envMap, err := b.manager.SetupEnvironment(tempConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to setup verification environment: %w", err)
+	}
+
+	// Start with current environment
+	envVars := make(map[string]string)
+	for _, envVar := range os.Environ() {
+		parts := strings.SplitN(envVar, "=", 2)
+		if len(parts) == 2 {
+			envVars[parts[0]] = parts[1]
+		}
+	}
+
+	// Override with tool environment
+	for key, value := range envMap {
+		envVars[key] = value
+	}
+
+	// Convert to environment slice format
+	envSlice := make([]string, 0, len(envVars))
+	for key, value := range envVars {
+		envSlice = append(envSlice, fmt.Sprintf("%s=%s", key, value))
+	}
+
+	return envSlice, nil
+}
+
+// SetupHomeEnvironment is a generic helper for setting up *_HOME environment variables
+// It gets the tool's bin path and sets envVarName to the parent directory
+// The getPath function should return the bin directory path for the tool
+func (b *BaseTool) SetupHomeEnvironment(version string, cfg config.ToolConfig, envVars map[string]string, envVarName string, getPath func(string, config.ToolConfig) (string, error)) error {
+	binPath, err := getPath(version, cfg)
+	if err != nil {
+		logVerbose("Could not determine %s for %s %s: %v", envVarName, b.toolName, version, err)
+		return nil
+	}
+
+	// *_HOME should point to the installation directory, not the bin directory
+	if strings.HasSuffix(binPath, "/bin") {
+		homeDir := strings.TrimSuffix(binPath, "/bin")
+		envVars[envVarName] = homeDir
+		logVerbose("Set %s=%s for %s %s", envVarName, homeDir, b.toolName, version)
+	}
+
+	return nil
+}
+
+// getInstalledVersionsForTool gets installed versions for a tool (helper for verification environment)
+func (b *BaseTool) getInstalledVersionsForTool(tool Tool, toolName string) []InstalledVersion {
+	// Try to get installed versions if the tool supports it
+	switch t := tool.(type) {
+	case *JavaTool:
+		versions := t.ListInstalledVersions("")
+		// Filter out versions with empty distribution to avoid path issues
+		var validVersions []InstalledVersion
+		for _, v := range versions {
+			if v.Distribution != "" {
+				validVersions = append(validVersions, v)
+			}
+		}
+		return validVersions
+	default:
+		// For other tools, we could implement a generic way to find installed versions
+		// For now, return empty slice
+		return []InstalledVersion{}
+	}
 }
 
 // DownloadAndExtract performs a robust download with checksum verification and extraction
@@ -334,8 +445,8 @@ func (b *BaseTool) VerifyBinary(binPath, binaryName, version string, versionArgs
 	return nil
 }
 
-// VerifyBinaryWithConfig runs a binary with configuration and checks the output
-func (b *BaseTool) VerifyBinaryWithConfig(binPath string, verifyConfig VerificationConfig) error {
+// VerifyBinaryWithConfig runs a binary with configuration and environment and checks the output
+func (b *BaseTool) VerifyBinaryWithConfig(binPath string, verifyConfig VerificationConfig, env []string) error {
 	exe := b.getPlatformBinaryPath(binPath, verifyConfig.BinaryName)
 
 	// Check if binary exists
@@ -345,6 +456,9 @@ func (b *BaseTool) VerifyBinaryWithConfig(binPath string, verifyConfig Verificat
 
 	// Run version command
 	cmd := exec.Command(exe, verifyConfig.VersionArgs...)
+	if env != nil {
+		cmd.Env = env
+	}
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%s verification failed: %w\nOutput: %s", b.toolName, err, output)

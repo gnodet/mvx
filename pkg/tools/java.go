@@ -21,6 +21,7 @@ var _ DistributionProvider = (*JavaTool)(nil)
 var _ DistributionVersionProvider = (*JavaTool)(nil)
 var _ ToolMetadataProvider = (*JavaTool)(nil)
 var _ VersionValidator = (*JavaTool)(nil)
+var _ EnvironmentProvider = (*JavaTool)(nil)
 
 // DiscoDistribution represents a Java distribution from Disco API
 type DiscoDistribution struct {
@@ -32,9 +33,9 @@ type DiscoDistribution struct {
 
 // getSystemJavaHome returns the system JAVA_HOME if available and valid
 func getSystemJavaHome() (string, error) {
-	javaHome := os.Getenv("JAVA_HOME")
+	javaHome := os.Getenv(EnvJavaHome)
 	if javaHome == "" {
-		return "", SystemToolError(ToolJava, fmt.Errorf("JAVA_HOME environment variable not set"))
+		return "", SystemToolError(ToolJava, fmt.Errorf("%s environment variable not set", EnvJavaHome))
 	}
 
 	// Check if JAVA_HOME points to a valid Java installation
@@ -320,7 +321,7 @@ func (j *JavaTool) getJavaHomeUncached(version string, cfg config.ToolConfig) (s
 	// If using system Java, return system JAVA_HOME if available (no version compatibility check)
 	if UseSystemTool(ToolJava) {
 		if systemJavaHome, err := getSystemJavaHome(); err == nil {
-			logVerbose("Using system Java from JAVA_HOME: %s (MVX_USE_SYSTEM_JAVA=true)", systemJavaHome)
+			logVerbose("Using system Java from %s: %s (MVX_USE_SYSTEM_JAVA=true)", EnvJavaHome, systemJavaHome)
 			return systemJavaHome, nil
 		} else {
 			return "", EnvironmentError(ToolJava, version, fmt.Errorf("MVX_USE_SYSTEM_JAVA=true but system Java not available: %w", err))
@@ -346,7 +347,7 @@ func (j *JavaTool) getJavaHomeUncached(version string, cfg config.ToolConfig) (s
 	// Determine JAVA_HOME from java executable path
 	// java executable is typically at $JAVA_HOME/bin/java
 	javaHome := filepath.Dir(filepath.Dir(javaExePath))
-	logVerbose("Found Java executable at: %s, using JAVA_HOME: %s", javaExePath, javaHome)
+	logVerbose("Found Java executable at: %s, using %s: %s", javaExePath, EnvJavaHome, javaHome)
 	return javaHome, nil
 }
 
@@ -504,6 +505,14 @@ func (j *JavaTool) GetDisplayName() string {
 // GetEmoji returns the emoji icon for Java (implements ToolMetadataProvider)
 func (j *JavaTool) GetEmoji() string {
 	return "📦"
+}
+
+// SetupEnvironment sets up Java-specific environment variables (implements EnvironmentProvider)
+func (j *JavaTool) SetupEnvironment(version string, cfg config.ToolConfig, envVars map[string]string) error {
+	// JAVA_HOME is optional - many tools work fine with just java in PATH
+	// However, some tools and IDEs expect JAVA_HOME to be set, so we set it when possible
+	// Note: We use the generic SetupHomeEnvironment which gracefully handles errors
+	return j.SetupHomeEnvironment(version, cfg, envVars, EnvJavaHome, j.GetPath)
 }
 
 // DiscoMajorVersion represents a major version entry from Disco API

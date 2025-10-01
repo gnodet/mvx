@@ -315,33 +315,8 @@ func (e *Executor) setupToolEnvironment(toolName, toolBinPath string) ([]string,
 	// Set PATH with tool directory first
 	envVars["PATH"] = strings.Join(pathDirs, string(os.PathListSeparator))
 
-	// Set tool-specific environment variables
-	switch toolName {
-	case "go":
-		// Set GOROOT if we can determine it from the binary path
-		if strings.HasSuffix(toolBinPath, "/bin") {
-			goRoot := strings.TrimSuffix(toolBinPath, "/bin")
-			envVars["GOROOT"] = goRoot
-		}
-	case "java":
-		// Set JAVA_HOME if we can determine it from the binary path
-		if strings.HasSuffix(toolBinPath, "/bin") {
-			javaHome := strings.TrimSuffix(toolBinPath, "/bin")
-			envVars["JAVA_HOME"] = javaHome
-		}
-	case "mvn", "maven":
-		// Set MAVEN_HOME if we can determine it from the binary path
-		if strings.HasSuffix(toolBinPath, "/bin") {
-			mavenHome := strings.TrimSuffix(toolBinPath, "/bin")
-			envVars["MAVEN_HOME"] = mavenHome
-		}
-	case "mvnd":
-		// Set MVND_HOME if we can determine it from the binary path
-		if strings.HasSuffix(toolBinPath, "/bin") {
-			mvndHome := strings.TrimSuffix(toolBinPath, "/bin")
-			envVars["MVND_HOME"] = mvndHome
-		}
-	}
+	// Tool-specific environment variables are already set by SetupEnvironment above
+	// which calls each tool's EnvironmentProvider.SetupEnvironment() method
 
 	// Convert map back to slice
 	env := make([]string, 0, len(envVars))

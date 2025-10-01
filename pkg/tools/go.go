@@ -13,6 +13,7 @@ import (
 // Compile-time interface validation
 var _ Tool = (*GoTool)(nil)
 var _ ToolMetadataProvider = (*GoTool)(nil)
+var _ EnvironmentProvider = (*GoTool)(nil)
 
 // GoTool implements Tool interface for Go toolchain management
 type GoTool struct {
@@ -104,6 +105,11 @@ func (g *GoTool) GetDisplayName() string {
 // GetEmoji returns the emoji icon for Go (implements ToolMetadataProvider)
 func (g *GoTool) GetEmoji() string {
 	return "🐹"
+}
+
+// SetupEnvironment sets up Go-specific environment variables (implements EnvironmentProvider)
+func (g *GoTool) SetupEnvironment(version string, cfg config.ToolConfig, envVars map[string]string) error {
+	return g.SetupHomeEnvironment(version, cfg, envVars, EnvGoRoot, g.GetPath)
 }
 
 // fetchGoVersions fetches Go versions from GitHub releases API

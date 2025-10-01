@@ -38,6 +38,7 @@ const (
 
 // Environment Variable Names
 const (
+	// MVX Configuration Environment Variables
 	EnvVerbose           = "MVX_VERBOSE"
 	EnvDownloadTimeout   = "MVX_DOWNLOAD_TIMEOUT"
 	EnvRegistryTimeout   = "MVX_REGISTRY_TIMEOUT"
@@ -49,6 +50,13 @@ const (
 	EnvRetryDelay        = "MVX_RETRY_DELAY"
 	EnvParallelDownloads = "MVX_PARALLEL_DOWNLOADS"
 	EnvNoColor           = "MVX_NO_COLOR"
+
+	// Tool Home Directory Environment Variables
+	EnvJavaHome  = "JAVA_HOME"
+	EnvMavenHome = "MAVEN_HOME"
+	EnvMvndHome  = "MVND_HOME"
+	EnvNodeHome  = "NODE_HOME"
+	EnvGoRoot    = "GOROOT"
 )
 
 // File Extensions

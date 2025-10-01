@@ -14,6 +14,8 @@ import (
 // Compile-time interface validation
 var _ Tool = (*MvndTool)(nil)
 var _ ToolMetadataProvider = (*MvndTool)(nil)
+var _ DependencyProvider = (*MvndTool)(nil)
+var _ EnvironmentProvider = (*MvndTool)(nil)
 
 // MvndTool implements Tool interface for Maven Daemon management
 type MvndTool struct {
@@ -98,6 +100,16 @@ func (m *MvndTool) GetDisplayName() string {
 // GetEmoji returns the emoji icon for Mvnd (implements ToolMetadataProvider)
 func (m *MvndTool) GetEmoji() string {
 	return "🚀"
+}
+
+// GetDependencies returns the list of tools that Maven Daemon depends on (implements DependencyProvider)
+func (m *MvndTool) GetDependencies() []string {
+	return []string{ToolJava}
+}
+
+// SetupEnvironment sets up Maven Daemon-specific environment variables (implements EnvironmentProvider)
+func (m *MvndTool) SetupEnvironment(version string, cfg config.ToolConfig, envVars map[string]string) error {
+	return m.SetupHomeEnvironment(version, cfg, envVars, EnvMvndHome, m.GetPath)
 }
 
 // fetchMvndVersionsFromApache fetches mvnd versions from Apache archive
