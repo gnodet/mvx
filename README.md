@@ -27,6 +27,10 @@ Imagine cloning any project and running:
 # Or use tools directly with natural syntax
 ./mvx mvn -V clean install    # Maven with version flag
 ./mvx --verbose mvn -X test   # mvx verbose + Maven debug
+
+# Execute shell commands in mvx environment
+./mvx shell 'echo $JAVA_HOME'  # Show Java home with mvx tools
+./mvx shell 'java -version'    # Run Java with mvx environment
 ```
 
 No more "works on my machine" - every developer gets the exact same environment.
@@ -355,6 +359,7 @@ The bootstrap scripts (`mvx` and `mvx.cmd`) are **shell/batch scripts** (not bin
 - [x] `mvx build` - Execute configured build commands
 - [x] `mvx test` - Execute configured test commands
 - [x] `mvx run` - Execute custom commands from configuration
+- [x] `mvx shell` - Execute shell commands in mvx environment
 - [x] `mvx tools` - Tool management and discovery
 - [x] `mvx info` - Detailed command information
 
