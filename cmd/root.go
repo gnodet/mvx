@@ -95,6 +95,9 @@ func init() {
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(updateBootstrapCmd)
 	rootCmd.AddCommand(configCmd)
+	rootCmd.AddCommand(activateCmd)
+	rootCmd.AddCommand(deactivateCmd)
+	rootCmd.AddCommand(envCmd)
 }
 
 // Helper functions for output
