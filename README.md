@@ -54,6 +54,7 @@ mvx provides seamless Maven integration with transparent argument passing:
 - **🔄 Transparent wrapper**: mvx acts like `mvnw` but with enhanced tool management
 - **⚡ No learning curve**: Existing Maven knowledge applies directly
 - **🛡️ Backward compatible**: Existing scripts continue to work
+- **🏢 Enterprise ready**: URL replacements for corporate networks and mirrors
 
 ## 📦 mvx Bootstrap
 
@@ -396,6 +397,12 @@ The bootstrap scripts (`mvx` and `mvx.cmd`) are **shell/batch scripts** (not bin
 - [x] **Environment variable support** - Global and command-specific environment variables
 - [x] **Intelligent interpreter selection** - Automatic selection based on script complexity
 - [x] **Cross-platform compatibility** - Commands work consistently across operating systems
+
+#### Enterprise & Network Support
+
+- [x] **URL replacements** - Redirect downloads through corporate proxies, mirrors, or alternative sources
+- [x] **Global configuration** - System-wide settings for enterprise environments
+- [x] **Regex-based URL transformations** - Advanced URL rewriting for complex enterprise setups
 
 ### 🚧 Planned Features
 

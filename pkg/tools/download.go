@@ -68,6 +68,22 @@ type DownloadResult struct {
 
 // RobustDownload performs a robust download with validation and retries
 func RobustDownload(config *DownloadConfig) (*DownloadResult, error) {
+	// Apply URL replacements if configured
+	originalURL := config.URL
+	urlReplacer, err := LoadURLReplacer()
+	if err != nil {
+		logVerbose("Warning: failed to load URL replacements: %v", err)
+	} else {
+		config.URL = urlReplacer.ApplyReplacements(config.URL)
+		if config.URL != originalURL {
+			toolPrefix := ""
+			if config.ToolName != "" {
+				toolPrefix = fmt.Sprintf("[%s] ", config.ToolName)
+			}
+			fmt.Printf("  🔄 %sUsing URL replacement: %s\n", toolPrefix, getUserFriendlyURL(config.URL))
+		}
+	}
+
 	var lastErr error
 
 	for attempt := 0; attempt <= config.MaxRetries; attempt++ {
