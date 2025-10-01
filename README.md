@@ -200,6 +200,37 @@ cd mvx
 ./mvx test
 ```
 
+## 🔄 Shell Activation
+
+For a seamless development experience, enable shell activation to automatically set up your environment when entering project directories:
+
+**Bash** - Add to `~/.bashrc`:
+```bash
+eval "$(mvx activate bash)"
+```
+
+**Zsh** - Add to `~/.zshrc`:
+```bash
+eval "$(mvx activate zsh)"
+```
+
+**Fish** - Add to `~/.config/fish/config.fish`:
+```bash
+mvx activate fish | source
+```
+
+With shell activation enabled, tools become available automatically:
+
+```bash
+cd my-project
+# mvx: activating environment in /Users/you/my-project
+
+java -version  # Uses mvx-managed Java
+mvn -version   # Uses mvx-managed Maven
+```
+
+**Learn more**: See the [Shell Activation Guide](https://gnodet.github.io/mvx/shell-activation/) for detailed documentation.
+
 ## 🎯 Shell Completion
 
 mvx supports shell completion for commands and arguments across multiple shells (bash, zsh, fish, powershell):

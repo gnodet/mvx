@@ -311,6 +311,37 @@ mvx provides powerful cross-platform script support, making your commands work s
 
 **Learn more**: [Cross-Platform Scripts Guide](/cross-platform-scripts)
 
+## Shell Activation (Optional)
+
+For an even more seamless experience, you can enable shell activation to automatically set up your environment when entering project directories:
+
+**Bash** - Add to `~/.bashrc`:
+```bash
+eval "$(mvx activate bash)"
+```
+
+**Zsh** - Add to `~/.zshrc`:
+```zsh
+eval "$(mvx activate zsh)"
+```
+
+**Fish** - Add to `~/.config/fish/config.fish`:
+```fish
+mvx activate fish | source
+```
+
+With shell activation enabled, tools become available automatically:
+
+```bash
+cd my-project
+# mvx: activating environment in /Users/you/my-project
+
+java -version  # Uses mvx-managed Java
+mvn -version   # Uses mvx-managed Maven
+```
+
+**Learn more**: [Shell Activation Guide](/shell-activation)
+
 ## Key Benefits
 
 - **🚀 Zero Dependencies**: No need to install tools on your system
@@ -318,9 +349,11 @@ mvx provides powerful cross-platform script support, making your commands work s
 - **🔧 Universal Tools**: One tool to manage Maven, Go, Node.js, and more
 - **📦 Version Isolation**: Each project specifies its own tool versions
 - **⚡ Fast Setup**: New team members can start building immediately
+- **🔄 Shell Integration**: Optional automatic activation when entering directories
 
 ## Next Steps
 
+- [Enable shell activation](/shell-activation) for automatic environment setup
 - [Learn about configuration options](/configuration)
 - [Write cross-platform scripts](/cross-platform-scripts)
 - [Explore supported tools](/tools)
