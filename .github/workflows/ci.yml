@@ -27,12 +27,16 @@ jobs:
       - name: Run go vet
         run: ./mvx go vet ./...
 
+      - name: Install golangci-lint
+        run: ./mvx install-golangci-lint
+
       - name: Check formatting
         run: |
           GOROOT=$(./mvx go env GOROOT)
-          if [ "$($GOROOT/bin/gofmt -s -l . | wc -l)" -gt 0 ]; then
+          unformatted=$($GOROOT/bin/gofmt -s -l .)
+          if [ -n "$unformatted" ]; then
             echo "The following files are not formatted:"
-            $GOROOT/bin/gofmt -s -l .
+            echo "$unformatted"
             exit 1
           fi
 
@@ -53,24 +57,7 @@ jobs:
           # Test that wrapper works with current version
           ./mvx version
 
-      - name: Check for website changes
-        uses: dorny/paths-filter@v3
-        id: website-changes
-        with:
-          filters: |
-            website:
-              - 'website/**'
-
-      - name: Set up JDK 21 for website
-        if: steps.website-changes.outputs.website == 'true'
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: maven
-
       - name: Check website build
-        if: steps.website-changes.outputs.website == 'true'
         run: |
           OWNER=$(echo "$GITHUB_REPOSITORY" | cut -d '/' -f 1)
           REPO=$(echo "$GITHUB_REPOSITORY" | cut -d '/' -f 2)
@@ -80,8 +67,7 @@ jobs:
           echo "SITE_PATH=$SITE_PATH" >> $GITHUB_ENV
           echo "GITHUB_REPOSITORY=$GITHUB_REPOSITORY SITE_DIR=$SITE_DIR SITE_URL=$SITE_URL SITE_PATH=$SITE_PATH"
           # Build website to catch template syntax errors
-          cd website
-          QUARKUS_ROQ_GENERATOR_BATCH=true mvn clean package quarkus:run -DskipTests --no-transfer-progress \
+          QUARKUS_ROQ_GENERATOR_BATCH=true ./mvx mvn clean package quarkus:run -f website -DskipTests --no-transfer-progress \
               -Dquarkus.http.root-path=$SITE_PATH \
               -Dsite.url=$SITE_URL
 
