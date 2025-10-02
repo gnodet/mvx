@@ -87,7 +87,7 @@ mvx shell 'cp file1.txt file2.txt'
 
 1. **Environment Setup**: Automatically sets up PATH and environment variables for all configured tools
 2. **Cross-platform**: Uses mvx-shell interpreter for consistent behavior across platforms
-3. **Variable Expansion**: Supports `$VAR` and `${VAR}` syntax for environment variables
+3. **Variable Expansion**: Supports `$VAR` and `$\{VAR\}` syntax for environment variables
 4. **Built-in Commands**: Includes cross-platform implementations of common commands (cd, echo, mkdir, rm, cp)
 5. **Tool Integration**: All mvx-managed tools are available in the PATH
 
