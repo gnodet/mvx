@@ -6,11 +6,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/gnodet/mvx/pkg/config"
+	"github.com/gnodet/mvx/pkg/tools"
 )
 
 // copyFile copies a file from src to dst
@@ -787,200 +787,27 @@ func testSingleToolInstallation(t *testing.T, mvxBinary, toolName, version, dist
 
 // verifyToolUsability checks that an installed tool is actually usable
 func verifyToolUsability(t *testing.T, toolName, version string) {
-	homeDir, err := os.UserHomeDir()
+	t.Logf("DEBUG: Verifying %s %s usability using Tool.IsInstalled()", toolName, version)
+
+	// Create a tool manager (same as production code)
+	manager, err := tools.NewManager()
 	if err != nil {
-		t.Fatalf("Failed to get home directory: %v", err)
+		t.Fatalf("Failed to create tool manager: %v", err)
 	}
 
-	switch toolName {
-	case "java":
-		// Find Java installation and test it
-		javaPath := filepath.Join(homeDir, ".mvx", "tools", "java")
-		if entries, err := os.ReadDir(javaPath); err == nil {
-			for _, entry := range entries {
-				if entry.IsDir() {
-					versionDir := filepath.Join(javaPath, entry.Name())
-					if javaExe := findJavaExecutable(versionDir); javaExe != "" {
-						cmd := exec.Command(javaExe, "-version")
-						output, err := cmd.CombinedOutput()
-						if err != nil {
-							t.Errorf("Java executable failed: %v\nOutput: %s", err, output)
-						} else {
-							t.Logf("Java verification successful: %s", strings.Split(string(output), "\n")[0])
-						}
-						return
-					}
-				}
-			}
-		}
-		t.Errorf("Could not find usable Java installation")
-
-	case "maven":
-		// Find Maven installation and test it
-		mavenPath := filepath.Join(homeDir, ".mvx", "tools", "maven")
-		if entries, err := os.ReadDir(mavenPath); err == nil {
-			for _, entry := range entries {
-				if entry.IsDir() {
-					versionDir := filepath.Join(mavenPath, entry.Name())
-					if mvnExe := findMavenExecutable(versionDir); mvnExe != "" {
-						cmd := exec.Command(mvnExe, "--version")
-						output, err := cmd.CombinedOutput()
-						if err != nil {
-							t.Errorf("Maven executable failed: %v\nOutput: %s", err, output)
-						} else {
-							t.Logf("Maven verification successful: %s", strings.Split(string(output), "\n")[0])
-						}
-						return
-					}
-				}
-			}
-		}
-		t.Errorf("Could not find usable Maven installation")
-
-	case "go":
-		// Find Go installation and test it
-		// Try new extraction format first (post-strip-components)
-		goPath := filepath.Join(homeDir, ".mvx", "tools", "go", version, "bin", "go")
-		if _, err := os.Stat(goPath); os.IsNotExist(err) {
-			// Fallback to legacy extraction format
-			goPath = filepath.Join(homeDir, ".mvx", "tools", "go", version, "go", "bin", "go")
-		}
-		cmd := exec.Command(goPath, "version")
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Errorf("Go executable failed: %v\nOutput: %s", err, output)
-		} else {
-			t.Logf("Go verification successful: %s", strings.TrimSpace(string(output)))
-		}
-
-	case "node":
-		// Find Node installation and test it
-		nodePath := filepath.Join(homeDir, ".mvx", "tools", "node")
-		if entries, err := os.ReadDir(nodePath); err == nil {
-			for _, entry := range entries {
-				if entry.IsDir() {
-					versionDir := filepath.Join(nodePath, entry.Name())
-					if nodeExe := findNodeExecutable(versionDir); nodeExe != "" {
-						cmd := exec.Command(nodeExe, "--version")
-						output, err := cmd.CombinedOutput()
-						if err != nil {
-							t.Errorf("Node executable failed: %v\nOutput: %s", err, output)
-						} else {
-							t.Logf("Node verification successful: %s", strings.TrimSpace(string(output)))
-						}
-						return
-					}
-				}
-			}
-		}
-		t.Errorf("Could not find usable Node installation")
-	}
-}
-
-// Helper functions to find executables in tool installations
-func findJavaExecutable(installDir string) string {
-	// Check for nested Java installations (like Zulu)
-	if entries, err := os.ReadDir(installDir); err == nil {
-		for _, entry := range entries {
-			if entry.IsDir() {
-				subPath := filepath.Join(installDir, entry.Name())
-
-				// Check standard location
-				javaExe := filepath.Join(subPath, "bin", "java")
-				if _, err := os.Stat(javaExe); err == nil {
-					return javaExe
-				}
-
-				// Check macOS location
-				if runtime.GOOS == "darwin" {
-					macOSJavaExe := filepath.Join(subPath, "Contents", "Home", "bin", "java")
-					if _, err := os.Stat(macOSJavaExe); err == nil {
-						return macOSJavaExe
-					}
-				}
-
-				// Check nested directories (like zulu-17.jdk)
-				if nestedEntries, err := os.ReadDir(subPath); err == nil {
-					for _, nestedEntry := range nestedEntries {
-						if nestedEntry.IsDir() {
-							nestedPath := filepath.Join(subPath, nestedEntry.Name())
-
-							// Check nested standard location
-							nestedJavaExe := filepath.Join(nestedPath, "bin", "java")
-							if _, err := os.Stat(nestedJavaExe); err == nil {
-								return nestedJavaExe
-							}
-
-							// Check nested macOS location
-							if runtime.GOOS == "darwin" {
-								nestedMacOSJavaExe := filepath.Join(nestedPath, "Contents", "Home", "bin", "java")
-								if _, err := os.Stat(nestedMacOSJavaExe); err == nil {
-									return nestedMacOSJavaExe
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-	return ""
-}
-
-func findMavenExecutable(installDir string) string {
-	// Try new extraction format first (post-strip-components)
-	// Maven files are directly in the version directory
-	mvnExe := filepath.Join(installDir, "bin", "mvn")
-	if runtime.GOOS == "windows" {
-		mvnExe += ".cmd"
-	}
-	if _, err := os.Stat(mvnExe); err == nil {
-		return mvnExe
+	// Get the actual tool implementation
+	tool, err := manager.GetTool(toolName)
+	if err != nil {
+		t.Fatalf("Failed to get tool %s: %v", toolName, err)
 	}
 
-	// Fallback to legacy extraction format
-	// Maven typically extracts to apache-maven-{version}/
-	if entries, err := os.ReadDir(installDir); err == nil {
-		for _, entry := range entries {
-			if entry.IsDir() && strings.Contains(entry.Name(), "apache-maven") {
-				mvnExe := filepath.Join(installDir, entry.Name(), "bin", "mvn")
-				if runtime.GOOS == "windows" {
-					mvnExe += ".cmd"
-				}
-				if _, err := os.Stat(mvnExe); err == nil {
-					return mvnExe
-				}
-			}
-		}
+	// Tool.IsInstalled() already checks binary existence and usability
+	// It handles version resolution, distribution parsing, and binary verification
+	if tool.IsInstalled(version, config.ToolConfig{}) {
+		t.Logf("%s %s verification successful using Tool.IsInstalled()", toolName, version)
+	} else {
+		t.Errorf("%s %s is not installed according to Tool.IsInstalled()", toolName, version)
 	}
-	return ""
-}
-
-func findNodeExecutable(installDir string) string {
-	// Try new extraction format first (post-strip-components)
-	nodeExe := filepath.Join(installDir, "bin", "node")
-	if runtime.GOOS == "windows" {
-		nodeExe += ".exe"
-	}
-	if _, err := os.Stat(nodeExe); err == nil {
-		return nodeExe
-	}
-
-	// Fallback to legacy extraction format: node-v{version}-{platform}/
-	if entries, err := os.ReadDir(installDir); err == nil {
-		for _, entry := range entries {
-			if entry.IsDir() && strings.HasPrefix(entry.Name(), "node-v") {
-				nodeExe := filepath.Join(installDir, entry.Name(), "bin", "node")
-				if runtime.GOOS == "windows" {
-					nodeExe += ".exe"
-				}
-				if _, err := os.Stat(nodeExe); err == nil {
-					return nodeExe
-				}
-			}
-		}
-	}
-	return ""
 }
 
 // testSetupCommand tests the complete setup command with multiple tools
