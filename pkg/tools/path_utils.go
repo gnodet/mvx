@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/gnodet/mvx/pkg/util"
 )
 
 // PathResolver provides common path resolution utilities for tools
@@ -47,7 +49,7 @@ func (pem *PathEnvironmentManager) BuildToolPATH(tools map[string]ToolPathInfo) 
 
 	for toolName, info := range tools {
 		if info.BinPath != "" {
-			logVerbose("Adding %s bin path to PATH: %s", toolName, info.BinPath)
+			util.LogVerbose("Adding %s bin path to PATH: %s", toolName, info.BinPath)
 			pathDirs = append(pathDirs, info.BinPath)
 		}
 	}

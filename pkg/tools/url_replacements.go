@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/gnodet/mvx/pkg/config"
+	"github.com/gnodet/mvx/pkg/util"
 )
 
 // URLReplacer handles URL replacements for enterprise networks and mirrors
@@ -27,7 +28,7 @@ func LoadURLReplacer() (*URLReplacer, error) {
 	globalConfig, err := config.LoadGlobalConfig()
 	if err != nil {
 		// Log warning but continue - global config is optional
-		logVerbose("Warning: failed to load global config: %v", err)
+		util.LogVerbose("Warning: failed to load global config: %v", err)
 		globalConfig = &config.GlobalConfig{}
 	}
 
@@ -78,7 +79,7 @@ func (r *URLReplacer) ApplyReplacements(originalURL string) string {
 		replacement := r.replacements[pattern]
 		newURL := r.applyReplacement(currentURL, pattern, replacement)
 		if newURL != currentURL {
-			logVerbose("URL replacement applied: %s -> %s (pattern: %s)", currentURL, newURL, pattern)
+			util.LogVerbose("URL replacement applied: %s -> %s (pattern: %s)", currentURL, newURL, pattern)
 			return newURL // Return after first match (like mise)
 		}
 	}
@@ -103,7 +104,7 @@ func (r *URLReplacer) applyRegexReplacement(url, regexPattern, replacement strin
 	// Compile the regex
 	regex, err := regexp.Compile(regexPattern)
 	if err != nil {
-		logVerbose("Warning: invalid regex pattern '%s': %v", regexPattern, err)
+		util.LogVerbose("Warning: invalid regex pattern '%s': %v", regexPattern, err)
 		return url
 	}
 
