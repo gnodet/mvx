@@ -57,6 +57,7 @@ const (
 	EnvMvndHome  = "MVND_HOME"
 	EnvNodeHome  = "NODE_HOME"
 	EnvGoRoot    = "GOROOT"
+	EnvGoPath    = "GOPATH"
 )
 
 // File Extensions

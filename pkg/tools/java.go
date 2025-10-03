@@ -509,11 +509,20 @@ func (j *JavaTool) GetEmoji() string {
 }
 
 // SetupEnvironment sets up Java-specific environment variables (implements EnvironmentProvider)
-func (j *JavaTool) SetupEnvironment(version string, cfg config.ToolConfig, envVars map[string]string) error {
-	// JAVA_HOME is optional - many tools work fine with just java in PATH
-	// However, some tools and IDEs expect JAVA_HOME to be set, so we set it when possible
-	// Note: We use the generic SetupHomeEnvironment which gracefully handles errors
-	return j.SetupHomeEnvironment(version, cfg, envVars, EnvJavaHome, j.GetPath)
+func (j *JavaTool) SetupEnvironment(version string, cfg config.ToolConfig, envManager *EnvironmentManager) error {
+	binPath, err := j.GetPath(version, cfg)
+	if err != nil {
+		util.LogVerbose("Could not determine %s for %s %s: %v", EnvJavaHome, j.toolName, version, err)
+		return nil
+	}
+
+	if strings.HasSuffix(binPath, "/bin") {
+		homeDir := strings.TrimSuffix(binPath, "/bin")
+		envManager.SetEnv(EnvJavaHome, homeDir)
+		util.LogVerbose("Set %s=%s for %s %s", EnvJavaHome, homeDir, j.toolName, version)
+	}
+
+	return nil
 }
 
 // DiscoMajorVersion represents a major version entry from Disco API

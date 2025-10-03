@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/gnodet/mvx/pkg/config"
+	"github.com/gnodet/mvx/pkg/util"
 	"github.com/gnodet/mvx/pkg/version"
 )
 
@@ -99,8 +100,20 @@ func (n *NodeTool) GetEmoji() string {
 }
 
 // SetupEnvironment sets up Node.js-specific environment variables (implements EnvironmentProvider)
-func (n *NodeTool) SetupEnvironment(version string, cfg config.ToolConfig, envVars map[string]string) error {
-	return n.SetupHomeEnvironment(version, cfg, envVars, EnvNodeHome, n.GetPath)
+func (n *NodeTool) SetupEnvironment(version string, cfg config.ToolConfig, envManager *EnvironmentManager) error {
+	binPath, err := n.GetPath(version, cfg)
+	if err != nil {
+		util.LogVerbose("Could not determine %s for %s %s: %v", EnvNodeHome, n.toolName, version, err)
+		return nil
+	}
+
+	if strings.HasSuffix(binPath, "/bin") {
+		homeDir := strings.TrimSuffix(binPath, "/bin")
+		envManager.SetEnv(EnvNodeHome, homeDir)
+		util.LogVerbose("Set %s=%s for %s %s", EnvNodeHome, homeDir, n.toolName, version)
+	}
+
+	return nil
 }
 
 func (n *NodeTool) fetchNodeVersions() ([]string, error) {
