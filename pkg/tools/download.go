@@ -442,26 +442,15 @@ func verifyChecksum(filePath string, config *DownloadConfig) error {
 		fmt.Printf("  🔍 Attempting to find checksum for file: %s\n", filename)
 
 		// Use tool's GetChecksum method for dynamic checksum resolution
-		if dynamicChecksum, err := config.Tool.GetChecksum(config.Version, filename); err == nil {
+		if dynamicChecksum, err := config.Tool.GetChecksum(config.Version, config.Config, filename); err == nil {
 			checksumInfo = dynamicChecksum
 			hasChecksum = true
 		} else {
 			fmt.Printf("  ⚠️  Tool checksum lookup failed: %v\n", err)
 		}
 
-		if !hasChecksum {
-			// Fallback to URL patterns for tools with static checksum URLs
-			checksumURL := config.Tool.GetChecksumURL(config.Version, filename)
-			if checksumURL != "" {
-				fmt.Printf("  🔍 Using checksum URL pattern: %s\n", checksumURL)
-				checksumInfo = ChecksumInfo{
-					Type:     SHA256,
-					URL:      checksumURL,
-					Filename: filename,
-				}
-				hasChecksum = true
-			}
-		}
+		// Tools should handle checksum fetching in their GetChecksum method
+		// No fallback URL pattern logic needed
 	}
 
 	if !hasChecksum {

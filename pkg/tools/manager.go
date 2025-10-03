@@ -61,17 +61,13 @@ var (
 	managerMutex  sync.Mutex
 )
 
-// InstallOptions contains options for tool installation
-type InstallOptions struct {
-	MaxConcurrent int  // Maximum number of concurrent downloads (default: 3)
-	Parallel      bool // Whether to use parallel downloads (default: true)
-	Verbose       bool // Whether to show verbose output (default: false)
-}
-
 // Tool represents a tool that can be installed and managed
 type Tool interface {
 	// Name returns the tool name (e.g., "java", "maven")
 	GetToolName() string
+
+	// GetDisplayName returns the human-readable name for the tool
+	GetDisplayName() string
 
 	// Install downloads and installs the specified version
 	Install(version string, config config.ToolConfig) error
@@ -90,11 +86,9 @@ type Tool interface {
 
 	// URL generation methods
 	GetDownloadURL(version string) string
-	GetChecksumURL(version, filename string) string
-	GetVersionsURL() string
 
 	// Checksum generation method
-	GetChecksum(version, filename string) (ChecksumInfo, error)
+	GetChecksum(version string, cfg config.ToolConfig, filename string) (ChecksumInfo, error)
 
 	// SupportsChecksumVerification returns whether this tool supports checksum verification
 	SupportsChecksumVerification() bool
@@ -134,14 +128,6 @@ type DistributionProvider interface {
 type DistributionVersionProvider interface {
 	// ListVersionsForDistribution returns available versions for a specific distribution
 	ListVersionsForDistribution(distribution string) ([]string, error)
-}
-
-// ToolMetadataProvider is an optional interface for tools that can provide display metadata
-type ToolMetadataProvider interface {
-	// GetDisplayName returns the human-readable name for the tool
-	GetDisplayName() string
-	// GetEmoji returns the emoji icon for the tool
-	GetEmoji() string
 }
 
 // DependencyProvider is an optional interface for tools that depend on other tools
@@ -320,20 +306,6 @@ func (m *Manager) Get(url string) (*http.Response, error) {
 	return resp, nil
 }
 
-// CacheManager interface for tools that support cache management
-type CacheManager interface {
-	ClearPathCache()
-}
-
-// ClearAllCaches clears all tool path caches (for testing purposes)
-func (m *Manager) ClearAllCaches() {
-	for _, tool := range m.tools {
-		if cacheManager, ok := tool.(CacheManager); ok {
-			cacheManager.ClearPathCache()
-		}
-	}
-}
-
 // RegisterTool registers a tool with the manager
 func (m *Manager) RegisterTool(tool Tool) {
 	m.tools[tool.GetToolName()] = tool
@@ -501,45 +473,6 @@ func (m *Manager) ValidateToolVersion(toolName, version, distribution string) er
 	return fmt.Errorf("version %s (resolved to %s) not found for tool %s", version, resolvedVersion, toolName)
 }
 
-// InstallTool is deprecated - use EnsureTool instead
-// This method always installs, even if already installed. Use EnsureTool for smarter behavior.
-func (m *Manager) InstallTool(name string, toolConfig config.ToolConfig) error {
-	tool, err := m.GetTool(name)
-	if err != nil {
-		return err
-	}
-
-	// Resolve version specification to concrete version
-	resolvedVersion, err := m.resolveVersion(name, toolConfig)
-	if err != nil {
-		return fmt.Errorf("failed to resolve version for %s: %w", name, err)
-	}
-
-	fmt.Printf("  🔍 Resolved %s version %s to %s\n", name, toolConfig.Version, resolvedVersion)
-
-	// Update config with resolved version for installation
-	resolvedConfig := toolConfig
-	resolvedConfig.Version = resolvedVersion
-
-	fmt.Printf("Installing %s %s", name, resolvedVersion)
-	if toolConfig.Distribution != "" {
-		fmt.Printf(" (%s)", toolConfig.Distribution)
-	}
-	fmt.Println("...")
-
-	if err := tool.Install(resolvedVersion, resolvedConfig); err != nil {
-		return fmt.Errorf("failed to install %s %s: %w", name, resolvedVersion, err)
-	}
-
-	// Verify installation
-	if err := tool.Verify(resolvedVersion, resolvedConfig); err != nil {
-		return fmt.Errorf("installation verification failed for %s %s: %w", name, resolvedVersion, err)
-	}
-
-	fmt.Printf("✅ %s %s installed successfully\n", name, resolvedVersion)
-	return nil
-}
-
 // GetDefaultConcurrency returns the default concurrency level from environment or default
 func GetDefaultConcurrency() int {
 	if concStr := os.Getenv("MVX_PARALLEL_DOWNLOADS"); concStr != "" {
@@ -667,40 +600,6 @@ func (m *Manager) getToolDependencies(toolName string, cfg *config.Config) []str
 	}
 
 	return configuredDeps
-}
-
-// InstallTools is deprecated - use EnsureTools instead
-func (m *Manager) InstallTools(cfg *config.Config) error {
-	return m.EnsureTools(cfg, GetDefaultConcurrency())
-}
-
-// InstallToolsParallel is deprecated - use EnsureTools instead
-func (m *Manager) InstallToolsParallel(cfg *config.Config, maxConcurrent int) error {
-	return m.EnsureTools(cfg, maxConcurrent)
-}
-
-// InstallToolsWithOptions is deprecated - use EnsureTools instead
-func (m *Manager) InstallToolsWithOptions(cfg *config.Config, opts *InstallOptions) error {
-	if opts == nil {
-		opts = &InstallOptions{
-			MaxConcurrent: 3,
-			Parallel:      true,
-			Verbose:       false,
-		}
-	}
-
-	// Set defaults
-	if opts.MaxConcurrent <= 0 {
-		opts.MaxConcurrent = 3
-	}
-
-	// Use sequential (maxConcurrent=1) if parallel is disabled
-	maxConcurrent := opts.MaxConcurrent
-	if !opts.Parallel {
-		maxConcurrent = 1
-	}
-
-	return m.EnsureTools(cfg, maxConcurrent)
 }
 
 // GetToolsNeedingInstallation returns a map of tools that need to be installed
@@ -1154,7 +1053,7 @@ func (m *Manager) InstallSpecificTools(cfg *config.Config, toolNames []string) e
 
 	// Install only the tools that need installation
 	for toolName, toolConfig := range toolsToInstall {
-		if err := m.InstallTool(toolName, toolConfig); err != nil {
+		if _, err := m.EnsureTool(toolName, toolConfig); err != nil {
 			return err
 		}
 	}
@@ -1188,7 +1087,8 @@ func (m *Manager) EnsureToolInstalled(cfg *config.Config, toolName string) error
 		return nil // Already installed
 	}
 
-	return m.InstallTool(toolName, toolConfig)
+	_, err = m.EnsureTool(toolName, toolConfig)
+	return err
 }
 
 // getDiskCachedResponse retrieves a cached HTTP response from disk

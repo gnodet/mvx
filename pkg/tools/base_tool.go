@@ -138,11 +138,6 @@ func (b *BaseTool) clearPathCache() {
 	b.pathCache = make(map[string]pathCacheEntry)
 }
 
-// ClearPathCache clears the path cache (public method for CacheManager interface)
-func (b *BaseTool) ClearPathCache() {
-	b.clearPathCache()
-}
-
 // getPlatformBinaryPath returns the platform-specific binary path
 func (b *BaseTool) getPlatformBinaryPath(binPath, binaryName string) string {
 	return b.getPlatformBinaryPathWithExtension(binPath, binaryName)
@@ -502,16 +497,10 @@ func (b *BaseTool) IsInstalled(binPath string) bool {
 	return err == nil
 }
 
-// GetDisplayName returns the display name for this tool
-// Tools can implement GetDisplayName() to provide their own display name
+// GetDisplayName returns the default display name for this tool
+// Tools should override this method to provide their own display name
 func (b *BaseTool) GetDisplayName() string {
-	// Use reflection to check if the concrete tool implements GetDisplayName
-	if tool, err := b.manager.GetTool(b.toolName); err == nil {
-		if nameProvider, hasMethod := tool.(interface{ GetDisplayName() string }); hasMethod {
-			return nameProvider.GetDisplayName()
-		}
-	}
-	// Fall back to title case of tool name
+	// Default implementation: title case of tool name
 	return strings.Title(b.toolName)
 }
 
