@@ -104,42 +104,16 @@ func outputEnvironment() error {
 		return fmt.Errorf("failed to create tool manager: %w", err)
 	}
 
-	// Get environment variables
+	// Get environment variables (includes PATH with tool directories)
 	env, err := manager.SetupEnvironment(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to setup environment: %w", err)
 	}
 
-	// Build PATH from tool bin directories
+	// Extract PATH from environment
 	pathDirs := []string{}
-
-	for toolName, toolConfig := range cfg.Tools {
-		// Check if user wants to use system tool instead
-		systemEnvVar := fmt.Sprintf("MVX_USE_SYSTEM_%s", strings.ToUpper(toolName))
-		if os.Getenv(systemEnvVar) == "true" {
-			continue
-		}
-
-		tool, err := manager.GetTool(toolName)
-		if err != nil {
-			continue
-		}
-
-		// Resolve version
-		resolvedVersion, err := manager.ResolveVersion(toolName, toolConfig)
-		if err != nil {
-			continue
-		}
-
-		// Create resolved config
-		resolvedConfig := toolConfig
-		resolvedConfig.Version = resolvedVersion
-
-		// Try to get tool path
-		binPath, err := tool.GetPath(resolvedVersion, resolvedConfig)
-		if err == nil {
-			pathDirs = append(pathDirs, binPath)
-		}
+	if pathValue, exists := env["PATH"]; exists && pathValue != "" {
+		pathDirs = strings.Split(pathValue, string(os.PathListSeparator))
 	}
 
 	// Output environment in shell-specific format

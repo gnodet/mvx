@@ -214,73 +214,20 @@ func autoSetupEnvironment() error {
 
 // setupGlobalEnvironment sets up PATH and environment variables globally
 func setupGlobalEnvironment(cfg *config.Config, manager *tools.Manager) error {
-	// Get environment variables from tool manager
+	// Get environment variables from tool manager (includes PATH with tool directories)
 	env, err := manager.SetupEnvironment(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to get tool environment: %w", err)
 	}
 
-	// Set up PATH with tool bin directories
-	pathDirs := []string{}
-
-	// Add all configured tools to PATH (respecting system tool bypass)
-	for toolName, toolConfig := range cfg.Tools {
-		// Check if user wants to use system tool instead
-		systemEnvVar := fmt.Sprintf("MVX_USE_SYSTEM_%s", strings.ToUpper(toolName))
-		if os.Getenv(systemEnvVar) == "true" {
-			printVerbose("Skipping %s PATH setup: %s=true (using system tool)", toolName, systemEnvVar)
-			continue
-		}
-
-		tool, err := manager.GetTool(toolName)
-		if err != nil {
-			printVerbose("Skipping tool %s: %v", toolName, err)
-			continue
-		}
-
-		// Resolve version
-		resolvedVersion, err := manager.ResolveVersion(toolName, toolConfig)
-		if err != nil {
-			printVerbose("Skipping tool %s: version resolution failed: %v", toolName, err)
-			continue
-		}
-
-		// Create resolved config
-		resolvedConfig := toolConfig
-		resolvedConfig.Version = resolvedVersion
-
-		// Try to get tool path - if successful, tool is installed and we can add it to PATH
-		binPath, err := tool.GetPath(resolvedVersion, resolvedConfig)
-		if err != nil {
-			printVerbose("Tool %s version %s is not installed or path unavailable, skipping PATH setup: %v", toolName, resolvedVersion, err)
-		} else {
-			printVerbose("Adding %s bin path to global PATH: %s", toolName, binPath)
-			pathDirs = append(pathDirs, binPath)
-		}
-	}
-
-	// Update PATH environment variable
-	if len(pathDirs) > 0 {
-		currentPath := os.Getenv("PATH")
-		newPath := strings.Join(pathDirs, string(os.PathListSeparator))
-		if currentPath != "" {
-			newPath = newPath + string(os.PathListSeparator) + currentPath
-		}
-
-		// Set PATH globally for this process and all child processes
-		if err := os.Setenv("PATH", newPath); err != nil {
-			return fmt.Errorf("failed to set PATH: %w", err)
-		}
-
-		printVerbose("Updated global PATH with %d tool directories", len(pathDirs))
-		printVerbose("New PATH: %s", newPath)
-	}
-
-	// Set other tool-specific environment variables globally
+	// Set all environment variables globally
 	for key, value := range env {
-		if key != "PATH" { // PATH is handled above
-			if err := os.Setenv(key, value); err != nil {
-				printVerbose("Failed to set environment variable %s: %v", key, err)
+		if err := os.Setenv(key, value); err != nil {
+			printVerbose("Failed to set environment variable %s: %v", key, err)
+		} else {
+			if key == "PATH" {
+				printVerbose("Set global PATH with tool directories")
+				printVerbose("New PATH: %s", value)
 			} else {
 				printVerbose("Set global environment variable: %s=%s", key, value)
 			}

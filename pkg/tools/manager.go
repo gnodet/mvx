@@ -153,8 +153,8 @@ type DependencyProvider interface {
 // EnvironmentProvider is an optional interface for tools that need custom environment setup
 type EnvironmentProvider interface {
 	// SetupEnvironment sets up tool-specific environment variables
-	// The envVars map should be modified in-place to add/override environment variables
-	SetupEnvironment(version string, cfg config.ToolConfig, envVars map[string]string) error
+	// The envManager provides safe environment variable management with special PATH handling
+	SetupEnvironment(version string, cfg config.ToolConfig, envManager *EnvironmentManager) error
 }
 
 // Distribution represents a tool distribution (e.g., Java distributions like Temurin, Zulu)
@@ -849,19 +849,41 @@ func (m *Manager) EnsureTool(toolName string, cfg config.ToolConfig) (string, er
 
 // SetupEnvironment sets up environment variables for installed tools
 func (m *Manager) SetupEnvironment(cfg *config.Config) (map[string]string, error) {
-	env := make(map[string]string)
+	// Create environment manager
+	envManager := NewEnvironmentManager()
 
-	// Copy existing environment
-	for key, value := range cfg.Environment {
-		env[key] = value
+	// Add system environment variables first (except PATH - we'll handle that after tools)
+	var systemPath string
+	for _, envVar := range os.Environ() {
+		parts := strings.SplitN(envVar, "=", 2)
+		if len(parts) == 2 {
+			if parts[0] == "PATH" {
+				// Store system PATH for later - we want tool paths to take priority
+				systemPath = parts[1]
+			} else {
+				envManager.SetEnv(parts[0], parts[1])
+			}
+		}
 	}
 
-	// Add tool-specific environment variables
+	// Override with config environment
+	for key, value := range cfg.Environment {
+		envManager.SetEnv(key, value)
+	}
+
+	// Add tool-specific environment variables and PATH entries
 	for toolName, toolConfig := range cfg.Tools {
-		// EnsureTool handles version resolution and checks if installed
-		// It only returns a path if the tool is installed (doesn't auto-install here)
+		// Check if user wants to use system tool instead
+		systemEnvVar := fmt.Sprintf("MVX_USE_SYSTEM_%s", strings.ToUpper(toolName))
+		if os.Getenv(systemEnvVar) == "true" {
+			util.LogVerbose("Skipping %s environment setup: %s=true (using system tool)", toolName, systemEnvVar)
+			continue
+		}
+
+		// Resolve version
 		resolvedVersion, err := m.resolveVersion(toolName, toolConfig)
 		if err != nil {
+			util.LogVerbose("Skipping tool %s: version resolution failed: %v", toolName, err)
 			continue // Skip tools with resolution errors
 		}
 
@@ -870,42 +892,47 @@ func (m *Manager) SetupEnvironment(cfg *config.Config) (map[string]string, error
 
 		// Check if installed (using cache)
 		if !m.isToolInstalled(toolName, resolvedVersion, resolvedConfig) {
+			util.LogVerbose("Skipping tool %s: not installed", toolName)
 			continue // Skip uninstalled tools
 		}
 
-		// Get tool path (using cache)
-		cacheKey := m.getCacheKey(toolName, resolvedVersion, resolvedConfig.Distribution)
-		m.cacheMutex.RLock()
-		toolPath, found := m.pathCache[cacheKey]
-		m.cacheMutex.RUnlock()
-
-		if !found {
-			// Not in cache, get it
-			tool, err := m.GetTool(toolName)
-			if err != nil {
-				continue
-			}
-			toolPath, err = tool.GetPath(resolvedVersion, resolvedConfig)
-			if err != nil {
-				continue
-			}
-			m.cacheMutex.Lock()
-			m.pathCache[cacheKey] = toolPath
-			m.cacheMutex.Unlock()
+		// Get tool instance
+		tool, err := m.GetTool(toolName)
+		if err != nil {
+			util.LogVerbose("Skipping tool %s: failed to get tool instance: %v", toolName, err)
+			continue
 		}
 
-		// Set tool-specific environment variables using virtual method
-		tool, err := m.GetTool(toolName)
-		if err == nil {
-			if envProvider, ok := tool.(EnvironmentProvider); ok {
-				if err := envProvider.SetupEnvironment(resolvedVersion, resolvedConfig, env); err != nil {
-					util.LogVerbose("Failed to setup environment for %s %s: %v", toolName, resolvedVersion, err)
-				}
+		// Get tool path and add to PATH
+		toolPath, err := tool.GetPath(resolvedVersion, resolvedConfig)
+		if err != nil {
+			util.LogVerbose("Skipping tool %s: failed to get path: %v", toolName, err)
+			continue
+		}
+
+		// Add tool bin directory to PATH
+		envManager.AddToPath(toolPath)
+		util.LogVerbose("Added %s bin path to PATH: %s", toolName, toolPath)
+
+		// Set tool-specific environment variables (HOME directories, etc.)
+		if envProvider, ok := tool.(EnvironmentProvider); ok {
+			if err := envProvider.SetupEnvironment(resolvedVersion, resolvedConfig, envManager); err != nil {
+				util.LogVerbose("Failed to setup environment for %s %s: %v", toolName, resolvedVersion, err)
 			}
 		}
 	}
 
-	return env, nil
+	// Add system PATH directories after tool directories (lower priority)
+	if systemPath != "" {
+		for _, dir := range strings.Split(systemPath, string(os.PathListSeparator)) {
+			if dir != "" {
+				envManager.AppendToPath(dir)
+			}
+		}
+	}
+
+	// Convert environment manager to map
+	return envManager.ToMap(), nil
 }
 
 // SetupProjectEnvironment sets up project-specific environment for tools

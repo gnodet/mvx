@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/gnodet/mvx/pkg/config"
+	"github.com/gnodet/mvx/pkg/util"
 	"github.com/gnodet/mvx/pkg/version"
 )
 
@@ -108,8 +109,20 @@ func (m *MvndTool) GetDependencies() []string {
 }
 
 // SetupEnvironment sets up Maven Daemon-specific environment variables (implements EnvironmentProvider)
-func (m *MvndTool) SetupEnvironment(version string, cfg config.ToolConfig, envVars map[string]string) error {
-	return m.SetupHomeEnvironment(version, cfg, envVars, EnvMvndHome, m.GetPath)
+func (m *MvndTool) SetupEnvironment(version string, cfg config.ToolConfig, envManager *EnvironmentManager) error {
+	binPath, err := m.GetPath(version, cfg)
+	if err != nil {
+		util.LogVerbose("Could not determine %s for %s %s: %v", EnvMvndHome, m.toolName, version, err)
+		return nil
+	}
+
+	if strings.HasSuffix(binPath, "/bin") {
+		homeDir := strings.TrimSuffix(binPath, "/bin")
+		envManager.SetEnv(EnvMvndHome, homeDir)
+		util.LogVerbose("Set %s=%s for %s %s", EnvMvndHome, homeDir, m.toolName, version)
+	}
+
+	return nil
 }
 
 // fetchMvndVersionsFromApache fetches mvnd versions from Apache archive
