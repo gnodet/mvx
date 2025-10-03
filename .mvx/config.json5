@@ -52,6 +52,11 @@
       script: "go fmt ./..."
     },
 
+    "format-check": {
+      description: "Check if Go files are properly formatted",
+      script: "gofmt -s -l ."
+    },
+
     lint: {
       description: "Run linter",
       script: "golangci-lint run"
