@@ -92,24 +92,18 @@ func setupEnvironment() error {
 	// Install tools with options
 	printInfo("📦 Installing tools...")
 
-	// Configure installation options
-	opts := &tools.InstallOptions{
-		MaxConcurrent: parallelDownloads,
-		Parallel:      !sequentialInstall,
-		Verbose:       verbose,
+	// Configure concurrency
+	maxConcurrent := parallelDownloads
+	if maxConcurrent == 0 {
+		maxConcurrent = tools.GetDefaultConcurrency()
 	}
 
-	// Use default concurrency if not specified
-	if parallelDownloads == 0 {
-		opts.MaxConcurrent = tools.GetDefaultConcurrency()
-	}
-
-	// Override parallel setting if sequential flag is set
+	// Use sequential if requested
 	if sequentialInstall {
-		opts.Parallel = false
+		maxConcurrent = 1
 	}
 
-	if err := manager.InstallToolsWithOptions(cfg, opts); err != nil {
+	if err := manager.EnsureTools(cfg, maxConcurrent); err != nil {
 		return fmt.Errorf("failed to install tools: %w", err)
 	}
 

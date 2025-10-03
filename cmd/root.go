@@ -185,13 +185,7 @@ func autoSetupEnvironment() error {
 		tempCfg := *cfg
 		tempCfg.Tools = filteredToolsToInstall
 
-		opts := &tools.InstallOptions{
-			MaxConcurrent: 3,
-			Parallel:      true,
-			Verbose:       verbose,
-		}
-
-		if err := manager.InstallToolsWithOptions(&tempCfg, opts); err != nil {
+		if err := manager.EnsureTools(&tempCfg, 3); err != nil {
 			return fmt.Errorf("failed to auto-install tools: %w", err)
 		}
 

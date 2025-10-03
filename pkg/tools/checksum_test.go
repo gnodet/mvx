@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/gnodet/mvx/pkg/config"
 )
 
 func TestChecksumVerifier_VerifyFile(t *testing.T) {
@@ -179,12 +181,13 @@ func TestJavaToolChecksum(t *testing.T) {
 
 	javaTool := NewJavaTool(manager)
 
-	// Test the GetChecksum method (should return error since Java checksums come from config)
-	_, err = javaTool.GetChecksum("21", "test-file.tar.gz")
+	// Test the GetChecksum method (should return error since Java checksums are handled during installation)
+	cfg := config.ToolConfig{Distribution: "temurin"}
+	checksum, err := javaTool.GetChecksum("21", cfg, "test-file.tar.gz")
 	if err == nil {
-		t.Errorf("Expected error for Java checksum without configuration")
+		t.Errorf("Expected error for Java checksum since it's handled during installation, but got checksum: %v", checksum)
 	}
-	t.Logf("Java checksum correctly returns error: %v", err)
+	t.Logf("Java checksum correctly returns error (handled during installation): %v", err)
 }
 
 func TestNodeToolChecksum(t *testing.T) {
@@ -196,7 +199,8 @@ func TestNodeToolChecksum(t *testing.T) {
 	nodeTool := NewNodeTool(manager)
 
 	// Test with a known Node.js version (this is a real API call)
-	checksum, err := nodeTool.GetChecksum("22.14.0", "node-v22.14.0-linux-x64.tar.xz")
+	nodeCfg := config.ToolConfig{}
+	checksum, err := nodeTool.GetChecksum("22.14.0", nodeCfg, "node-v22.14.0-linux-x64.tar.xz")
 	if err != nil {
 		t.Logf("Node.js checksum fetch failed (expected in CI): %v", err)
 		return // Skip test if API is not accessible

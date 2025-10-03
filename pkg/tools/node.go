@@ -9,13 +9,11 @@ import (
 	"strings"
 
 	"github.com/gnodet/mvx/pkg/config"
-	"github.com/gnodet/mvx/pkg/util"
 	"github.com/gnodet/mvx/pkg/version"
 )
 
 // Compile-time interface validation
 var _ Tool = (*NodeTool)(nil)
-var _ ToolMetadataProvider = (*NodeTool)(nil)
 var _ EnvironmentProvider = (*NodeTool)(nil)
 
 // NodeTool manages Node.js
@@ -31,18 +29,12 @@ func getNodeBinaryName() string {
 	return BinaryNode
 }
 
-func getNodeToolName() string {
-	return ToolNode
-}
-
 // NewNodeTool creates a new Node tool instance
 func NewNodeTool(manager *Manager) *NodeTool {
 	return &NodeTool{
-		BaseTool: NewBaseTool(manager, getNodeToolName(), getNodeBinaryName()),
+		BaseTool: NewBaseTool(manager, ToolNode, getNodeBinaryName()),
 	}
 }
-
-func (n *NodeTool) Name() string { return getNodeToolName() }
 
 func (n *NodeTool) Install(version string, cfg config.ToolConfig) error {
 	return n.StandardInstall(version, cfg, n.getDownloadURL)
@@ -62,7 +54,7 @@ func (n *NodeTool) GetBinaryName() string {
 
 // getInstalledPath returns the path for an installed Node version
 func (n *NodeTool) getInstalledPath(version string, cfg config.ToolConfig) (string, error) {
-	installDir := n.manager.GetToolVersionDir(n.Name(), version, "")
+	installDir := n.manager.GetToolVersionDir(n.GetToolName(), version, "")
 	pathResolver := NewPathResolver(n.manager.GetToolsDir())
 	binDir, err := pathResolver.FindBinaryParentDir(installDir, n.GetBinaryName())
 	if err != nil {
@@ -94,26 +86,18 @@ func (n *NodeTool) GetDisplayName() string {
 	return "Node.js"
 }
 
-// GetEmoji returns the emoji icon for Node.js (implements ToolMetadataProvider)
-func (n *NodeTool) GetEmoji() string {
-	return "📦"
-}
-
 // SetupEnvironment sets up Node.js-specific environment variables (implements EnvironmentProvider)
 func (n *NodeTool) SetupEnvironment(version string, cfg config.ToolConfig, envManager *EnvironmentManager) error {
-	binPath, err := n.GetPath(version, cfg)
-	if err != nil {
-		util.LogVerbose("Could not determine %s for %s %s: %v", EnvNodeHome, n.toolName, version, err)
-		return nil
+	// Convert EnvironmentManager to map for the existing helper
+	envVars := envManager.ToMap()
+	err := n.SetupHomeEnvironment(version, cfg, envVars, EnvNodeHome, n.GetPath)
+	// Update the environment manager with any changes
+	for key, value := range envVars {
+		if key != "PATH" { // PATH is handled separately by EnvironmentManager
+			envManager.SetEnv(key, value)
+		}
 	}
-
-	if strings.HasSuffix(binPath, "/bin") {
-		homeDir := strings.TrimSuffix(binPath, "/bin")
-		envManager.SetEnv(EnvNodeHome, homeDir)
-		util.LogVerbose("Set %s=%s for %s %s", EnvNodeHome, homeDir, n.toolName, version)
-	}
-
-	return nil
+	return err
 }
 
 func (n *NodeTool) fetchNodeVersions() ([]string, error) {
@@ -246,7 +230,7 @@ func (n *NodeTool) ResolveVersion(versionSpec, distribution string) (string, err
 }
 
 // GetChecksum implements ChecksumProvider interface for Node.js
-func (n *NodeTool) GetChecksum(version, filename string) (ChecksumInfo, error) {
+func (n *NodeTool) GetChecksum(version string, cfg config.ToolConfig, filename string) (ChecksumInfo, error) {
 	fmt.Printf("  🔍 Fetching Node.js checksum from SHASUMS256.txt...\n")
 
 	checksum, err := n.fetchNodeChecksum(version, filename)
@@ -363,14 +347,4 @@ func (n *NodeTool) getNodeFilename(version string) string {
 // GetDownloadURL implements URLProvider interface for Node.js
 func (n *NodeTool) GetDownloadURL(version string) string {
 	return n.getDownloadURL(version)
-}
-
-// GetChecksumURL implements URLProvider interface for Node.js
-func (n *NodeTool) GetChecksumURL(version, filename string) string {
-	return fmt.Sprintf("%s/v%s/SHASUMS256.txt", NodeJSDistBase, version)
-}
-
-// GetVersionsURL implements URLProvider interface for Node.js
-func (n *NodeTool) GetVersionsURL() string {
-	return NodeJSDistBase + "/index.json"
 }

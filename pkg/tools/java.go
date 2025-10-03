@@ -20,7 +20,6 @@ import (
 var _ Tool = (*JavaTool)(nil)
 var _ DistributionProvider = (*JavaTool)(nil)
 var _ DistributionVersionProvider = (*JavaTool)(nil)
-var _ ToolMetadataProvider = (*JavaTool)(nil)
 var _ VersionValidator = (*JavaTool)(nil)
 var _ EnvironmentProvider = (*JavaTool)(nil)
 
@@ -120,11 +119,6 @@ func NewJavaTool(manager *Manager) *JavaTool {
 	return &JavaTool{
 		BaseTool: NewBaseTool(manager, ToolJava, getJavaBinaryName()),
 	}
-}
-
-// Name returns the tool name
-func (j *JavaTool) Name() string {
-	return ToolJava
 }
 
 // Install downloads and installs the specified Java version
@@ -503,26 +497,18 @@ func (j *JavaTool) GetDisplayName() string {
 	return "Java Development Kit"
 }
 
-// GetEmoji returns the emoji icon for Java (implements ToolMetadataProvider)
-func (j *JavaTool) GetEmoji() string {
-	return "📦"
-}
-
 // SetupEnvironment sets up Java-specific environment variables (implements EnvironmentProvider)
 func (j *JavaTool) SetupEnvironment(version string, cfg config.ToolConfig, envManager *EnvironmentManager) error {
-	binPath, err := j.GetPath(version, cfg)
-	if err != nil {
-		util.LogVerbose("Could not determine %s for %s %s: %v", EnvJavaHome, j.toolName, version, err)
-		return nil
+	// Convert EnvironmentManager to map for the existing helper
+	envVars := envManager.ToMap()
+	err := j.SetupHomeEnvironment(version, cfg, envVars, EnvJavaHome, j.GetPath)
+	// Update the environment manager with any changes
+	for key, value := range envVars {
+		if key != "PATH" { // PATH is handled separately by EnvironmentManager
+			envManager.SetEnv(key, value)
+		}
 	}
-
-	if strings.HasSuffix(binPath, "/bin") {
-		homeDir := strings.TrimSuffix(binPath, "/bin")
-		envManager.SetEnv(EnvJavaHome, homeDir)
-		util.LogVerbose("Set %s=%s for %s %s", EnvJavaHome, homeDir, j.toolName, version)
-	}
-
-	return nil
+	return err
 }
 
 // DiscoMajorVersion represents a major version entry from Disco API
@@ -954,11 +940,12 @@ func (j *JavaTool) getChecksumFromDiscoAPI(packageID string) (ChecksumInfo, erro
 }
 
 // GetChecksum implements ChecksumProvider interface for Java
-func (j *JavaTool) GetChecksum(version, filename string) (ChecksumInfo, error) {
-	// Java checksums are provided via configuration from the Java tool
-	// which extracts them from the Foojay Disco API during URL resolution
-	fmt.Printf("  🔍 Checking for Java checksum from Disco API...\n")
-	return ChecksumInfo{}, fmt.Errorf("Java checksums should be provided via configuration")
+func (j *JavaTool) GetChecksum(version string, cfg config.ToolConfig, filename string) (ChecksumInfo, error) {
+	// Java checksums are handled during the installation process via getDownloadURLWithChecksum
+	// and getChecksumFromDiscoAPI, which adds checksums to the configuration automatically.
+	// This method is not used for Java since checksums are fetched during URL resolution.
+	fmt.Printf("  ℹ️  Java checksums are handled during installation via Disco API\n")
+	return ChecksumInfo{}, fmt.Errorf("Java checksums are provided via configuration during installation")
 }
 
 // ValidateVersion validates that a Java version exists (implements VersionValidator)
@@ -1031,15 +1018,4 @@ func (j *JavaTool) GetDownloadURL(version string) string {
 		return ""
 	}
 	return url
-}
-
-// GetChecksumURL implements Tool interface for Java
-func (j *JavaTool) GetChecksumURL(version, filename string) string {
-	// Java checksums are provided via Disco API package info
-	return ""
-}
-
-// GetVersionsURL implements Tool interface for Java
-func (j *JavaTool) GetVersionsURL() string {
-	return FoojayDiscoAPIBase + "/major_versions?distribution=temurin&maintained=true"
 }

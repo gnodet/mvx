@@ -106,12 +106,8 @@ func listTools() error {
 		}
 
 		// Get display metadata
-		emoji := "📦" // default emoji
-		displayName := toolName
-		if metadataProvider, ok := tool.(tools.ToolMetadataProvider); ok {
-			emoji = metadataProvider.GetEmoji()
-			displayName = metadataProvider.GetDisplayName()
-		}
+		emoji := "📦" // default emoji for all tools
+		displayName := tool.GetDisplayName()
 
 		printInfo("%s %s", emoji, displayName)
 
