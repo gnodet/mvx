@@ -29,10 +29,10 @@ jobs:
 
       - name: Check formatting
         run: |
-          GOROOT=$(./mvx go env GOROOT)
-          if [ "$($GOROOT/bin/gofmt -s -l . | wc -l)" -gt 0 ]; then
+          unformatted=$(./mvx format-check)
+          if [ -n "$unformatted" ]; then
             echo "The following files are not formatted:"
-            $GOROOT/bin/gofmt -s -l .
+            echo "$unformatted"
             exit 1
           fi
 
