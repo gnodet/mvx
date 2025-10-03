@@ -10,6 +10,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/gnodet/mvx/pkg/util"
 )
 
 // detectSingleTopLevelDirectory checks if all files in a ZIP archive are under a single top-level directory
@@ -295,7 +297,7 @@ func extractTarGzFile(src, dest string) error {
 			}
 		default:
 			// Skip other file types (char devices, block devices, etc.)
-			logVerbose("Skipping unsupported file type %d for %s", header.Typeflag, header.Name)
+			util.LogVerbose("Skipping unsupported file type %d for %s", header.Typeflag, header.Name)
 		}
 	}
 
@@ -334,14 +336,14 @@ func createSymlinkSafely(linkname, targetPath string) error {
 		if existingLink, err := os.Readlink(targetPath); err == nil {
 			if existingLink == linkname {
 				// Already the correct symlink, nothing to do
-				logVerbose("Symlink %s already exists with correct target %s", targetPath, linkname)
+				util.LogVerbose("Symlink %s already exists with correct target %s", targetPath, linkname)
 				return nil
 			}
 			// Different symlink target, remove and recreate
-			logVerbose("Removing existing symlink %s (target: %s) to create new one (target: %s)", targetPath, existingLink, linkname)
+			util.LogVerbose("Removing existing symlink %s (target: %s) to create new one (target: %s)", targetPath, existingLink, linkname)
 		} else {
 			// Not a symlink, but some other file/directory exists
-			logVerbose("Removing existing file/directory %s to create symlink (target: %s)", targetPath, linkname)
+			util.LogVerbose("Removing existing file/directory %s to create symlink (target: %s)", targetPath, linkname)
 		}
 
 		// Remove existing file/symlink/directory

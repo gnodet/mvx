@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/gnodet/mvx/pkg/util"
 )
 
 // MVXShell provides cross-platform command execution
@@ -629,18 +631,11 @@ func (s *MVXShell) open(args []string) error {
 	return cmd.Run()
 }
 
-// logVerbose prints verbose log messages for mvx-shell
-func logVerbose(format string, args ...interface{}) {
-	if os.Getenv("MVX_VERBOSE") == "true" {
-		fmt.Printf("[VERBOSE] "+format+"\n", args...)
-	}
-}
-
 // executeExternal executes an external command
 func (s *MVXShell) executeExternal(cmd Command) error {
-	logVerbose("mvx-shell executing external command: %s %v", cmd.Name, cmd.Args)
-	logVerbose("mvx-shell working directory: %s", s.workDir)
-	logVerbose("mvx-shell environment variables count: %d", len(s.env))
+	util.LogVerbose("mvx-shell executing external command: %s %v", cmd.Name, cmd.Args)
+	util.LogVerbose("mvx-shell working directory: %s", s.workDir)
+	util.LogVerbose("mvx-shell environment variables count: %d", len(s.env))
 
 	execCmd := exec.Command(cmd.Name, cmd.Args...)
 	execCmd.Dir = s.workDir
@@ -675,7 +670,7 @@ func (s *MVXShell) executeExternal(cmd Command) error {
 	// Log PATH specifically
 	for _, envVar := range env {
 		if strings.HasPrefix(envVar, "PATH=") {
-			logVerbose("mvx-shell PATH in environment: %s", envVar)
+			util.LogVerbose("mvx-shell PATH in environment: %s", envVar)
 			break
 		}
 	}

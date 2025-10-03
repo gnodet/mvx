@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gnodet/mvx/pkg/config"
+	"github.com/gnodet/mvx/pkg/util"
 )
 
 // DownloadConfig contains configuration for robust downloads with checksum verification
@@ -72,7 +73,7 @@ func RobustDownload(config *DownloadConfig) (*DownloadResult, error) {
 	originalURL := config.URL
 	urlReplacer, err := LoadURLReplacer()
 	if err != nil {
-		logVerbose("Warning: failed to load URL replacements: %v", err)
+		util.LogVerbose("Warning: failed to load URL replacements: %v", err)
 	} else {
 		config.URL = urlReplacer.ApplyReplacements(config.URL)
 		if config.URL != originalURL {

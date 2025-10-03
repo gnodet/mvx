@@ -7,18 +7,6 @@ import (
 	"strings"
 )
 
-// isVerbose checks if verbose logging is enabled
-func isVerbose() bool {
-	return os.Getenv("MVX_VERBOSE") == "true"
-}
-
-// logVerbose prints verbose log messages
-func logVerbose(format string, args ...interface{}) {
-	if isVerbose() {
-		fmt.Printf("[VERBOSE] "+format+"\n", args...)
-	}
-}
-
 // UseSystemTool checks if a system tool should be used instead of downloading
 // by checking the MVX_USE_SYSTEM_<TOOL> environment variable
 func UseSystemTool(toolName string) bool {

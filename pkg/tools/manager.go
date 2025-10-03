@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gnodet/mvx/pkg/config"
+	"github.com/gnodet/mvx/pkg/util"
 	"github.com/gnodet/mvx/pkg/version"
 )
 
@@ -385,7 +386,7 @@ func (m *Manager) discoverAndRegisterTools() error {
 	for toolName, factory := range toolFactories {
 		tool := factory(m)
 		m.RegisterTool(tool)
-		logVerbose("Registered tool: %s", toolName)
+		util.LogVerbose("Registered tool: %s", toolName)
 	}
 
 	// Future enhancement: could also load tools from configuration files
@@ -820,7 +821,7 @@ func (m *Manager) EnsureTool(toolName string, cfg config.ToolConfig) (string, er
 	// Check if installed
 	if !tool.IsInstalled(resolvedVersion, resolvedConfig) {
 		// Auto-install
-		logVerbose("Auto-installing %s %s...", toolName, resolvedVersion)
+		util.LogVerbose("Auto-installing %s %s...", toolName, resolvedVersion)
 		if err := tool.Install(resolvedVersion, resolvedConfig); err != nil {
 			return "", fmt.Errorf("failed to install %s %s: %w", toolName, resolvedVersion, err)
 		}
@@ -898,7 +899,7 @@ func (m *Manager) SetupEnvironment(cfg *config.Config) (map[string]string, error
 		if err == nil {
 			if envProvider, ok := tool.(EnvironmentProvider); ok {
 				if err := envProvider.SetupEnvironment(resolvedVersion, resolvedConfig, env); err != nil {
-					logVerbose("Failed to setup environment for %s %s: %v", toolName, resolvedVersion, err)
+					util.LogVerbose("Failed to setup environment for %s %s: %v", toolName, resolvedVersion, err)
 				}
 			}
 		}
@@ -932,7 +933,7 @@ func (m *Manager) ResolveVersion(toolName string, toolConfig config.ToolConfig) 
 func (m *Manager) resolveVersion(toolName string, toolConfig config.ToolConfig) (string, error) {
 	// Check for environment variable override first
 	if overrideVersion := getToolVersionOverride(toolName); overrideVersion != "" {
-		logVerbose("Using version override from %s: %s", getToolVersionOverrideEnvVar(toolName), overrideVersion)
+		util.LogVerbose("Using version override from %s: %s", getToolVersionOverrideEnvVar(toolName), overrideVersion)
 		// Fast path: Check if override version is already concrete
 		if m.isConcreteVersion(toolName, overrideVersion) {
 			return overrideVersion, nil
@@ -957,11 +958,11 @@ func (m *Manager) resolveVersionInternal(toolName string, toolConfig config.Tool
 
 	// Check cache first
 	if cached, found := m.getCachedVersion(toolName, toolConfig.Version, distribution); found {
-		logVerbose("Using cached version resolution: %s %s (%s) -> %s", toolName, toolConfig.Version, distribution, cached)
+		util.LogVerbose("Using cached version resolution: %s %s (%s) -> %s", toolName, toolConfig.Version, distribution, cached)
 		return cached, nil
 	}
 
-	logVerbose("Resolving version online: %s %s (%s)", toolName, toolConfig.Version, distribution)
+	util.LogVerbose("Resolving version online: %s %s (%s)", toolName, toolConfig.Version, distribution)
 
 	// Get the tool instance
 	tool, err := m.GetTool(toolName)
@@ -981,7 +982,7 @@ func (m *Manager) resolveVersionInternal(toolName string, toolConfig config.Tool
 		resolved = toolConfig.Version
 	}
 
-	logVerbose("Resolved %s %s (%s) -> %s (caching for 24h)", toolName, toolConfig.Version, distribution, resolved)
+	util.LogVerbose("Resolved %s %s (%s) -> %s (caching for 24h)", toolName, toolConfig.Version, distribution, resolved)
 
 	// Cache the resolved version
 	m.setCachedVersion(toolName, toolConfig.Version, distribution, resolved)

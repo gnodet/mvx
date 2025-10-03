@@ -11,14 +11,8 @@ import (
 	"github.com/gnodet/mvx/pkg/config"
 	"github.com/gnodet/mvx/pkg/shell"
 	"github.com/gnodet/mvx/pkg/tools"
+	"github.com/gnodet/mvx/pkg/util"
 )
-
-// logVerbose prints verbose log messages
-func logVerbose(format string, args ...interface{}) {
-	if os.Getenv("MVX_VERBOSE") == "true" {
-		fmt.Printf("[VERBOSE] "+format+"\n", args...)
-	}
-}
 
 // Executor handles command execution with proper environment setup
 type Executor struct {
@@ -166,7 +160,7 @@ func (e *Executor) setupEnvironment(cmdConfig config.CommandConfig) ([]string, e
 			requiredTools = append(requiredTools, toolName)
 		}
 	}
-	logVerbose("Required tools for command: %v", requiredTools)
+	util.LogVerbose("Required tools for command: %v", requiredTools)
 
 	// Add tool bin directories to PATH
 	for _, toolName := range requiredTools {
@@ -174,11 +168,11 @@ func (e *Executor) setupEnvironment(cmdConfig config.CommandConfig) ([]string, e
 			// EnsureTool handles version resolution, installation check, auto-install, and path retrieval
 			binPath, err := e.toolManager.EnsureTool(toolName, toolConfig)
 			if err != nil {
-				logVerbose("Skipping tool %s: %v", toolName, err)
+				util.LogVerbose("Skipping tool %s: %v", toolName, err)
 				continue
 			}
 
-			logVerbose("Adding %s bin path to PATH: %s", toolName, binPath)
+			util.LogVerbose("Adding %s bin path to PATH: %s", toolName, binPath)
 			pathDirs = append(pathDirs, binPath)
 		}
 	}
@@ -191,9 +185,9 @@ func (e *Executor) setupEnvironment(cmdConfig config.CommandConfig) ([]string, e
 			newPath = newPath + string(os.PathListSeparator) + currentPath
 		}
 		envVars["PATH"] = newPath
-		logVerbose("Updated PATH with %d tool directories: %s", len(pathDirs), newPath)
+		util.LogVerbose("Updated PATH with %d tool directories: %s", len(pathDirs), newPath)
 	} else {
-		logVerbose("No tool directories added to PATH")
+		util.LogVerbose("No tool directories added to PATH")
 	}
 
 	// Convert environment map back to slice format
@@ -219,11 +213,11 @@ func (e *Executor) processScriptString(script string, args []string) string {
 
 // executeScriptWithInterpreter executes a script using the specified interpreter
 func (e *Executor) executeScriptWithInterpreter(script, workDir string, env []string, interpreter string) error {
-	logVerbose("executeScriptWithInterpreter called with interpreter: '%s', script: '%s'", interpreter, script)
+	util.LogVerbose("executeScriptWithInterpreter called with interpreter: '%s', script: '%s'", interpreter, script)
 
 	// Default to native interpreter if not specified
 	if interpreter == "" || interpreter == "native" {
-		logVerbose("Using native interpreter")
+		util.LogVerbose("Using native interpreter")
 		return e.executeNativeScript(script, workDir, env)
 	}
 
@@ -247,14 +241,14 @@ func (e *Executor) executeNativeScript(script, workDir string, env []string) err
 		shellArgs = []string{"/c"}
 	}
 
-	logVerbose("Executing native script: %s", script)
-	logVerbose("Working directory: %s", workDir)
-	logVerbose("Environment variables count: %d", len(env))
+	util.LogVerbose("Executing native script: %s", script)
+	util.LogVerbose("Working directory: %s", workDir)
+	util.LogVerbose("Environment variables count: %d", len(env))
 
 	// Log PATH specifically
 	for _, envVar := range env {
 		if strings.HasPrefix(envVar, "PATH=") {
-			logVerbose("PATH in environment: %s", envVar)
+			util.LogVerbose("PATH in environment: %s", envVar)
 			break
 		}
 	}
