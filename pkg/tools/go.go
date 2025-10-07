@@ -192,8 +192,10 @@ func (g *GoTool) getFallbackGoVersions() []string {
 
 // GetDownloadOptions returns download options specific to Go
 func (g *GoTool) GetDownloadOptions() DownloadOptions {
+	// Note: FileExtension is used for temporary file naming
+	// Actual archive type is auto-detected during extraction
 	return DownloadOptions{
-		FileExtension: ExtTarGz,
+		FileExtension: ExtTarGz, // Default extension for temp file naming
 	}
 }
 

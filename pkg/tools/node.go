@@ -158,8 +158,10 @@ func (n *NodeTool) fetchNodeLTSVersions() ([]string, error) {
 
 // GetDownloadOptions returns download options specific to Node.js
 func (n *NodeTool) GetDownloadOptions() DownloadOptions {
+	// Note: FileExtension is used for temporary file naming
+	// Actual archive type is auto-detected during extraction
 	return DownloadOptions{
-		FileExtension: ExtTarGz,
+		FileExtension: ExtTarGz, // Default extension for temp file naming
 	}
 }
 

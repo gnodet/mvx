@@ -203,7 +203,8 @@ func (b *BaseTool) Download(url, version string, cfg config.ToolConfig, options 
 
 // Extract extracts an archive file to the destination directory
 func (b *BaseTool) Extract(archivePath, destDir string, options DownloadOptions) error {
-	return b.extractFile(archivePath, destDir, options.GetArchiveType())
+	// Use automatic archive type detection based on file extension
+	return ExtractArchive(archivePath, destDir)
 }
 
 // VerificationConfig contains configuration for tool verification
@@ -389,42 +390,7 @@ func (b *BaseTool) DownloadAndExtract(url, destDir, version string, cfg config.T
 
 // DownloadOptions contains options for downloading and extracting files
 type DownloadOptions struct {
-	FileExtension string // e.g., ".tar.gz", ".zip" - used to infer archive type
-}
-
-// GetArchiveType infers the archive type from the file extension
-func (o DownloadOptions) GetArchiveType() string {
-	ext := o.FileExtension
-	// Normalize extension
-	if !strings.HasPrefix(ext, ".") {
-		ext = "." + ext
-	}
-
-	switch ext {
-	case ".zip":
-		return ArchiveTypeZip
-	case ".tar.gz", ".tgz":
-		return ArchiveTypeTarGz
-	case ".tar.xz":
-		return ArchiveTypeTarXz
-	default:
-		// Default to tar.gz for unknown extensions
-		return ArchiveTypeTarGz
-	}
-}
-
-// extractFile extracts an archive file based on its type
-func (b *BaseTool) extractFile(src, dest, archiveType string) error {
-	switch archiveType {
-	case ArchiveTypeZip:
-		return extractZipFile(src, dest)
-	case ArchiveTypeTarGz:
-		return extractTarGzFile(src, dest)
-	case ArchiveTypeTarXz:
-		return extractTarXzFile(src, dest)
-	default:
-		return fmt.Errorf("unsupported archive type: %s", archiveType)
-	}
+	FileExtension string // e.g., ".tar.gz", ".zip" - used for temporary file naming
 }
 
 // VerifyBinary runs a binary with version flag and checks the output
