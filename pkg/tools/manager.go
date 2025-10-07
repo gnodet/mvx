@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gnodet/mvx/pkg/config"
+	"github.com/gnodet/mvx/pkg/util"
 	"github.com/gnodet/mvx/pkg/version"
 )
 
@@ -60,17 +61,13 @@ var (
 	managerMutex  sync.Mutex
 )
 
-// InstallOptions contains options for tool installation
-type InstallOptions struct {
-	MaxConcurrent int  // Maximum number of concurrent downloads (default: 3)
-	Parallel      bool // Whether to use parallel downloads (default: true)
-	Verbose       bool // Whether to show verbose output (default: false)
-}
-
 // Tool represents a tool that can be installed and managed
 type Tool interface {
 	// Name returns the tool name (e.g., "java", "maven")
 	GetToolName() string
+
+	// GetDisplayName returns the human-readable name for the tool
+	GetDisplayName() string
 
 	// Install downloads and installs the specified version
 	Install(version string, config config.ToolConfig) error
@@ -89,11 +86,9 @@ type Tool interface {
 
 	// URL generation methods
 	GetDownloadURL(version string) string
-	GetChecksumURL(version, filename string) string
-	GetVersionsURL() string
 
 	// Checksum generation method
-	GetChecksum(version, filename string) (ChecksumInfo, error)
+	GetChecksum(version string, cfg config.ToolConfig, filename string) (ChecksumInfo, error)
 
 	// SupportsChecksumVerification returns whether this tool supports checksum verification
 	SupportsChecksumVerification() bool
@@ -135,14 +130,6 @@ type DistributionVersionProvider interface {
 	ListVersionsForDistribution(distribution string) ([]string, error)
 }
 
-// ToolMetadataProvider is an optional interface for tools that can provide display metadata
-type ToolMetadataProvider interface {
-	// GetDisplayName returns the human-readable name for the tool
-	GetDisplayName() string
-	// GetEmoji returns the emoji icon for the tool
-	GetEmoji() string
-}
-
 // DependencyProvider is an optional interface for tools that depend on other tools
 type DependencyProvider interface {
 	// GetDependencies returns a list of tool names that this tool depends on
@@ -152,8 +139,8 @@ type DependencyProvider interface {
 // EnvironmentProvider is an optional interface for tools that need custom environment setup
 type EnvironmentProvider interface {
 	// SetupEnvironment sets up tool-specific environment variables
-	// The envVars map should be modified in-place to add/override environment variables
-	SetupEnvironment(version string, cfg config.ToolConfig, envVars map[string]string) error
+	// The envManager provides safe environment variable management with special PATH handling
+	SetupEnvironment(version string, cfg config.ToolConfig, envManager *EnvironmentManager) error
 }
 
 // Distribution represents a tool distribution (e.g., Java distributions like Temurin, Zulu)
@@ -218,6 +205,8 @@ func ResetManager() {
 	defer managerMutex.Unlock()
 	globalManager = nil
 }
+
+
 
 // Get performs an HTTP GET request with verbose logging and multi-level caching
 // This centralizes all HTTP requests and provides visibility into API calls
@@ -319,20 +308,6 @@ func (m *Manager) Get(url string) (*http.Response, error) {
 	return resp, nil
 }
 
-// CacheManager interface for tools that support cache management
-type CacheManager interface {
-	ClearPathCache()
-}
-
-// ClearAllCaches clears all tool path caches (for testing purposes)
-func (m *Manager) ClearAllCaches() {
-	for _, tool := range m.tools {
-		if cacheManager, ok := tool.(CacheManager); ok {
-			cacheManager.ClearPathCache()
-		}
-	}
-}
-
 // RegisterTool registers a tool with the manager
 func (m *Manager) RegisterTool(tool Tool) {
 	m.tools[tool.GetToolName()] = tool
@@ -385,7 +360,7 @@ func (m *Manager) discoverAndRegisterTools() error {
 	for toolName, factory := range toolFactories {
 		tool := factory(m)
 		m.RegisterTool(tool)
-		logVerbose("Registered tool: %s", toolName)
+		util.LogVerbose("Registered tool: %s", toolName)
 	}
 
 	// Future enhancement: could also load tools from configuration files
@@ -498,45 +473,6 @@ func (m *Manager) ValidateToolVersion(toolName, version, distribution string) er
 	}
 
 	return fmt.Errorf("version %s (resolved to %s) not found for tool %s", version, resolvedVersion, toolName)
-}
-
-// InstallTool is deprecated - use EnsureTool instead
-// This method always installs, even if already installed. Use EnsureTool for smarter behavior.
-func (m *Manager) InstallTool(name string, toolConfig config.ToolConfig) error {
-	tool, err := m.GetTool(name)
-	if err != nil {
-		return err
-	}
-
-	// Resolve version specification to concrete version
-	resolvedVersion, err := m.resolveVersion(name, toolConfig)
-	if err != nil {
-		return fmt.Errorf("failed to resolve version for %s: %w", name, err)
-	}
-
-	fmt.Printf("  🔍 Resolved %s version %s to %s\n", name, toolConfig.Version, resolvedVersion)
-
-	// Update config with resolved version for installation
-	resolvedConfig := toolConfig
-	resolvedConfig.Version = resolvedVersion
-
-	fmt.Printf("Installing %s %s", name, resolvedVersion)
-	if toolConfig.Distribution != "" {
-		fmt.Printf(" (%s)", toolConfig.Distribution)
-	}
-	fmt.Println("...")
-
-	if err := tool.Install(resolvedVersion, resolvedConfig); err != nil {
-		return fmt.Errorf("failed to install %s %s: %w", name, resolvedVersion, err)
-	}
-
-	// Verify installation
-	if err := tool.Verify(resolvedVersion, resolvedConfig); err != nil {
-		return fmt.Errorf("installation verification failed for %s %s: %w", name, resolvedVersion, err)
-	}
-
-	fmt.Printf("✅ %s %s installed successfully\n", name, resolvedVersion)
-	return nil
 }
 
 // GetDefaultConcurrency returns the default concurrency level from environment or default
@@ -668,40 +604,6 @@ func (m *Manager) getToolDependencies(toolName string, cfg *config.Config) []str
 	return configuredDeps
 }
 
-// InstallTools is deprecated - use EnsureTools instead
-func (m *Manager) InstallTools(cfg *config.Config) error {
-	return m.EnsureTools(cfg, GetDefaultConcurrency())
-}
-
-// InstallToolsParallel is deprecated - use EnsureTools instead
-func (m *Manager) InstallToolsParallel(cfg *config.Config, maxConcurrent int) error {
-	return m.EnsureTools(cfg, maxConcurrent)
-}
-
-// InstallToolsWithOptions is deprecated - use EnsureTools instead
-func (m *Manager) InstallToolsWithOptions(cfg *config.Config, opts *InstallOptions) error {
-	if opts == nil {
-		opts = &InstallOptions{
-			MaxConcurrent: 3,
-			Parallel:      true,
-			Verbose:       false,
-		}
-	}
-
-	// Set defaults
-	if opts.MaxConcurrent <= 0 {
-		opts.MaxConcurrent = 3
-	}
-
-	// Use sequential (maxConcurrent=1) if parallel is disabled
-	maxConcurrent := opts.MaxConcurrent
-	if !opts.Parallel {
-		maxConcurrent = 1
-	}
-
-	return m.EnsureTools(cfg, maxConcurrent)
-}
-
 // GetToolsNeedingInstallation returns a map of tools that need to be installed
 func (m *Manager) GetToolsNeedingInstallation(cfg *config.Config) (map[string]config.ToolConfig, error) {
 	needInstallation := make(map[string]config.ToolConfig)
@@ -820,7 +722,7 @@ func (m *Manager) EnsureTool(toolName string, cfg config.ToolConfig) (string, er
 	// Check if installed
 	if !tool.IsInstalled(resolvedVersion, resolvedConfig) {
 		// Auto-install
-		logVerbose("Auto-installing %s %s...", toolName, resolvedVersion)
+		util.LogVerbose("Auto-installing %s %s...", toolName, resolvedVersion)
 		if err := tool.Install(resolvedVersion, resolvedConfig); err != nil {
 			return "", fmt.Errorf("failed to install %s %s: %w", toolName, resolvedVersion, err)
 		}
@@ -848,19 +750,41 @@ func (m *Manager) EnsureTool(toolName string, cfg config.ToolConfig) (string, er
 
 // SetupEnvironment sets up environment variables for installed tools
 func (m *Manager) SetupEnvironment(cfg *config.Config) (map[string]string, error) {
-	env := make(map[string]string)
+	// Create environment manager
+	envManager := NewEnvironmentManager()
 
-	// Copy existing environment
-	for key, value := range cfg.Environment {
-		env[key] = value
+	// Add system environment variables first (except PATH - we'll handle that after tools)
+	var systemPath string
+	for _, envVar := range os.Environ() {
+		parts := strings.SplitN(envVar, "=", 2)
+		if len(parts) == 2 {
+			if parts[0] == "PATH" {
+				// Store system PATH for later - we want tool paths to take priority
+				systemPath = parts[1]
+			} else {
+				envManager.SetEnv(parts[0], parts[1])
+			}
+		}
 	}
 
-	// Add tool-specific environment variables
+	// Override with config environment
+	for key, value := range cfg.Environment {
+		envManager.SetEnv(key, value)
+	}
+
+	// Add tool-specific environment variables and PATH entries
 	for toolName, toolConfig := range cfg.Tools {
-		// EnsureTool handles version resolution and checks if installed
-		// It only returns a path if the tool is installed (doesn't auto-install here)
+		// Check if user wants to use system tool instead
+		systemEnvVar := fmt.Sprintf("MVX_USE_SYSTEM_%s", strings.ToUpper(toolName))
+		if os.Getenv(systemEnvVar) == "true" {
+			util.LogVerbose("Skipping %s environment setup: %s=true (using system tool)", toolName, systemEnvVar)
+			continue
+		}
+
+		// Resolve version
 		resolvedVersion, err := m.resolveVersion(toolName, toolConfig)
 		if err != nil {
+			util.LogVerbose("Skipping tool %s: version resolution failed: %v", toolName, err)
 			continue // Skip tools with resolution errors
 		}
 
@@ -869,42 +793,47 @@ func (m *Manager) SetupEnvironment(cfg *config.Config) (map[string]string, error
 
 		// Check if installed (using cache)
 		if !m.isToolInstalled(toolName, resolvedVersion, resolvedConfig) {
+			util.LogVerbose("Skipping tool %s: not installed", toolName)
 			continue // Skip uninstalled tools
 		}
 
-		// Get tool path (using cache)
-		cacheKey := m.getCacheKey(toolName, resolvedVersion, resolvedConfig.Distribution)
-		m.cacheMutex.RLock()
-		toolPath, found := m.pathCache[cacheKey]
-		m.cacheMutex.RUnlock()
-
-		if !found {
-			// Not in cache, get it
-			tool, err := m.GetTool(toolName)
-			if err != nil {
-				continue
-			}
-			toolPath, err = tool.GetPath(resolvedVersion, resolvedConfig)
-			if err != nil {
-				continue
-			}
-			m.cacheMutex.Lock()
-			m.pathCache[cacheKey] = toolPath
-			m.cacheMutex.Unlock()
+		// Get tool instance
+		tool, err := m.GetTool(toolName)
+		if err != nil {
+			util.LogVerbose("Skipping tool %s: failed to get tool instance: %v", toolName, err)
+			continue
 		}
 
-		// Set tool-specific environment variables using virtual method
-		tool, err := m.GetTool(toolName)
-		if err == nil {
-			if envProvider, ok := tool.(EnvironmentProvider); ok {
-				if err := envProvider.SetupEnvironment(resolvedVersion, resolvedConfig, env); err != nil {
-					logVerbose("Failed to setup environment for %s %s: %v", toolName, resolvedVersion, err)
-				}
+		// Get tool path and add to PATH
+		toolPath, err := tool.GetPath(resolvedVersion, resolvedConfig)
+		if err != nil {
+			util.LogVerbose("Skipping tool %s: failed to get path: %v", toolName, err)
+			continue
+		}
+
+		// Add tool bin directory to PATH
+		envManager.AddToPath(toolPath)
+		util.LogVerbose("Added %s bin path to PATH: %s", toolName, toolPath)
+
+		// Set tool-specific environment variables (HOME directories, etc.)
+		if envProvider, ok := tool.(EnvironmentProvider); ok {
+			if err := envProvider.SetupEnvironment(resolvedVersion, resolvedConfig, envManager); err != nil {
+				util.LogVerbose("Failed to setup environment for %s %s: %v", toolName, resolvedVersion, err)
 			}
 		}
 	}
 
-	return env, nil
+	// Add system PATH directories after tool directories (lower priority)
+	if systemPath != "" {
+		for _, dir := range strings.Split(systemPath, string(os.PathListSeparator)) {
+			if dir != "" {
+				envManager.AppendToPath(dir)
+			}
+		}
+	}
+
+	// Convert environment manager to map
+	return envManager.ToMap(), nil
 }
 
 // SetupProjectEnvironment sets up project-specific environment for tools
@@ -932,7 +861,7 @@ func (m *Manager) ResolveVersion(toolName string, toolConfig config.ToolConfig) 
 func (m *Manager) resolveVersion(toolName string, toolConfig config.ToolConfig) (string, error) {
 	// Check for environment variable override first
 	if overrideVersion := getToolVersionOverride(toolName); overrideVersion != "" {
-		logVerbose("Using version override from %s: %s", getToolVersionOverrideEnvVar(toolName), overrideVersion)
+		util.LogVerbose("Using version override from %s: %s", getToolVersionOverrideEnvVar(toolName), overrideVersion)
 		// Fast path: Check if override version is already concrete
 		if m.isConcreteVersion(toolName, overrideVersion) {
 			return overrideVersion, nil
@@ -957,11 +886,11 @@ func (m *Manager) resolveVersionInternal(toolName string, toolConfig config.Tool
 
 	// Check cache first
 	if cached, found := m.getCachedVersion(toolName, toolConfig.Version, distribution); found {
-		logVerbose("Using cached version resolution: %s %s (%s) -> %s", toolName, toolConfig.Version, distribution, cached)
+		util.LogVerbose("Using cached version resolution: %s %s (%s) -> %s", toolName, toolConfig.Version, distribution, cached)
 		return cached, nil
 	}
 
-	logVerbose("Resolving version online: %s %s (%s)", toolName, toolConfig.Version, distribution)
+	util.LogVerbose("Resolving version online: %s %s (%s)", toolName, toolConfig.Version, distribution)
 
 	// Get the tool instance
 	tool, err := m.GetTool(toolName)
@@ -981,7 +910,7 @@ func (m *Manager) resolveVersionInternal(toolName string, toolConfig config.Tool
 		resolved = toolConfig.Version
 	}
 
-	logVerbose("Resolved %s %s (%s) -> %s (caching for 24h)", toolName, toolConfig.Version, distribution, resolved)
+	util.LogVerbose("Resolved %s %s (%s) -> %s (caching for 24h)", toolName, toolConfig.Version, distribution, resolved)
 
 	// Cache the resolved version
 	m.setCachedVersion(toolName, toolConfig.Version, distribution, resolved)
@@ -1126,7 +1055,7 @@ func (m *Manager) InstallSpecificTools(cfg *config.Config, toolNames []string) e
 
 	// Install only the tools that need installation
 	for toolName, toolConfig := range toolsToInstall {
-		if err := m.InstallTool(toolName, toolConfig); err != nil {
+		if _, err := m.EnsureTool(toolName, toolConfig); err != nil {
 			return err
 		}
 	}
@@ -1160,7 +1089,8 @@ func (m *Manager) EnsureToolInstalled(cfg *config.Config, toolName string) error
 		return nil // Already installed
 	}
 
-	return m.InstallTool(toolName, toolConfig)
+	_, err = m.EnsureTool(toolName, toolConfig)
+	return err
 }
 
 // getDiskCachedResponse retrieves a cached HTTP response from disk

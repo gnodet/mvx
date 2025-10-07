@@ -52,9 +52,6 @@ type CommandConfig struct {
 	Environment map[string]string  `json:"environment,omitempty" yaml:"environment,omitempty"`
 	Interpreter string             `json:"interpreter,omitempty" yaml:"interpreter,omitempty"` // "native" (default), "mvx-shell"
 
-	// Hooks (deprecated - kept for backward compatibility but not used)
-	Pre  interface{} `json:"pre,omitempty" yaml:"pre,omitempty"`   // Deprecated: no longer used
-	Post interface{} `json:"post,omitempty" yaml:"post,omitempty"` // Deprecated: no longer used
 }
 
 // PlatformScript represents platform-specific script definitions

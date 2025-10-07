@@ -113,6 +113,12 @@ mvx is an open source project and welcomes contributions:
 
 mvx is released under the [Apache License 2.0](https://github.com/gnodet/mvx/blob/main/LICENSE).
 
+## Comparison with Other Tools
+
+Wondering how mvx compares to other tool managers like mise, asdf, or direnv?
+
+- **[mvx vs mise](/comparison-mise)**: Detailed comparison with mise (formerly rtx)
+
 ## Community
 
 - **GitHub**: [gnodet/mvx](https://github.com/gnodet/mvx)

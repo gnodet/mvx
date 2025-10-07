@@ -13,7 +13,6 @@ import (
 
 // Compile-time interface validation
 var _ Tool = (*MavenTool)(nil)
-var _ ToolMetadataProvider = (*MavenTool)(nil)
 var _ DependencyProvider = (*MavenTool)(nil)
 var _ EnvironmentProvider = (*MavenTool)(nil)
 
@@ -133,19 +132,23 @@ func (m *MavenTool) GetDisplayName() string {
 	return "Apache Maven"
 }
 
-// GetEmoji returns the emoji icon for Maven (implements ToolMetadataProvider)
-func (m *MavenTool) GetEmoji() string {
-	return "📦"
-}
-
 // GetDependencies returns the list of tools that Maven depends on (implements DependencyProvider)
 func (m *MavenTool) GetDependencies() []string {
 	return []string{ToolJava}
 }
 
 // SetupEnvironment sets up Maven-specific environment variables (implements EnvironmentProvider)
-func (m *MavenTool) SetupEnvironment(version string, cfg config.ToolConfig, envVars map[string]string) error {
-	return m.SetupHomeEnvironment(version, cfg, envVars, EnvMavenHome, m.GetPath)
+func (m *MavenTool) SetupEnvironment(version string, cfg config.ToolConfig, envManager *EnvironmentManager) error {
+	// Convert EnvironmentManager to map for the existing helper
+	envVars := envManager.ToMap()
+	err := m.SetupHomeEnvironment(version, cfg, envVars, EnvMavenHome, m.GetPath)
+	// Update the environment manager with any changes
+	for key, value := range envVars {
+		if key != "PATH" { // PATH is handled separately by EnvironmentManager
+			envManager.SetEnv(key, value)
+		}
+	}
+	return err
 }
 
 // fetchMavenVersionsFromApache fetches Maven versions from Apache archive repositories
@@ -251,8 +254,8 @@ func (m *MavenTool) GetDownloadURL(version string) string {
 	return m.getDownloadURL(version)
 }
 
-// GetChecksumURL implements URLProvider interface for Maven
-func (m *MavenTool) GetChecksumURL(version, filename string) string {
+// getChecksumURL returns the checksum URL for Maven (internal method)
+func (m *MavenTool) getChecksumURL(version, filename string) string {
 	if strings.HasPrefix(version, "4.") {
 		return fmt.Sprintf("%s/maven-4/%s/binaries/%s.sha512",
 			ApacheMavenBase, version, filename)
@@ -261,16 +264,11 @@ func (m *MavenTool) GetChecksumURL(version, filename string) string {
 		ApacheMavenBase, version, filename)
 }
 
-// GetVersionsURL implements Tool interface for Maven
-func (m *MavenTool) GetVersionsURL() string {
-	return ApacheMavenBase + "/maven-3/"
-}
-
 // GetChecksum implements Tool interface for Maven
-func (m *MavenTool) GetChecksum(version, filename string) (ChecksumInfo, error) {
+func (m *MavenTool) GetChecksum(version string, cfg config.ToolConfig, filename string) (ChecksumInfo, error) {
 	fmt.Printf("  🔍 Fetching Maven checksum from Apache archive...\n")
 
-	checksumURL := m.GetChecksumURL(version, filename)
+	checksumURL := m.getChecksumURL(version, filename)
 	if checksumURL == "" {
 		return ChecksumInfo{}, fmt.Errorf("no checksum URL available for Maven %s", version)
 	}

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gnodet/mvx/pkg/config"
+	"github.com/gnodet/mvx/pkg/util"
 )
 
 // DownloadConfig contains configuration for robust downloads with checksum verification
@@ -68,6 +69,22 @@ type DownloadResult struct {
 
 // RobustDownload performs a robust download with validation and retries
 func RobustDownload(config *DownloadConfig) (*DownloadResult, error) {
+	// Apply URL replacements if configured
+	originalURL := config.URL
+	urlReplacer, err := LoadURLReplacer()
+	if err != nil {
+		util.LogVerbose("Warning: failed to load URL replacements: %v", err)
+	} else {
+		config.URL = urlReplacer.ApplyReplacements(config.URL)
+		if config.URL != originalURL {
+			toolPrefix := ""
+			if config.ToolName != "" {
+				toolPrefix = fmt.Sprintf("[%s] ", config.ToolName)
+			}
+			fmt.Printf("  🔄 %sUsing URL replacement: %s\n", toolPrefix, getUserFriendlyURL(config.URL))
+		}
+	}
+
 	var lastErr error
 
 	for attempt := 0; attempt <= config.MaxRetries; attempt++ {
@@ -425,26 +442,15 @@ func verifyChecksum(filePath string, config *DownloadConfig) error {
 		fmt.Printf("  🔍 Attempting to find checksum for file: %s\n", filename)
 
 		// Use tool's GetChecksum method for dynamic checksum resolution
-		if dynamicChecksum, err := config.Tool.GetChecksum(config.Version, filename); err == nil {
+		if dynamicChecksum, err := config.Tool.GetChecksum(config.Version, config.Config, filename); err == nil {
 			checksumInfo = dynamicChecksum
 			hasChecksum = true
 		} else {
 			fmt.Printf("  ⚠️  Tool checksum lookup failed: %v\n", err)
 		}
 
-		if !hasChecksum {
-			// Fallback to URL patterns for tools with static checksum URLs
-			checksumURL := config.Tool.GetChecksumURL(config.Version, filename)
-			if checksumURL != "" {
-				fmt.Printf("  🔍 Using checksum URL pattern: %s\n", checksumURL)
-				checksumInfo = ChecksumInfo{
-					Type:     SHA256,
-					URL:      checksumURL,
-					Filename: filename,
-				}
-				hasChecksum = true
-			}
-		}
+		// Tools should handle checksum fetching in their GetChecksum method
+		// No fallback URL pattern logic needed
 	}
 
 	if !hasChecksum {

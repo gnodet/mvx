@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/gnodet/mvx/pkg/config"
+	"github.com/gnodet/mvx/pkg/util"
 	"github.com/gnodet/mvx/pkg/version"
 )
 
@@ -137,11 +138,6 @@ func (b *BaseTool) clearPathCache() {
 	b.pathCache = make(map[string]pathCacheEntry)
 }
 
-// ClearPathCache clears the path cache (public method for CacheManager interface)
-func (b *BaseTool) ClearPathCache() {
-	b.clearPathCache()
-}
-
 // getPlatformBinaryPath returns the platform-specific binary path
 func (b *BaseTool) getPlatformBinaryPath(binPath, binaryName string) string {
 	return b.getPlatformBinaryPathWithExtension(binPath, binaryName)
@@ -261,7 +257,7 @@ func (b *BaseTool) VerifyWithConfig(version string, cfg config.ToolConfig, verif
 	// Set up environment for verification (needed for tools like Maven that depend on Java)
 	env, err := b.setupVerificationEnvironment(cfg)
 	if err != nil {
-		logVerbose("Failed to setup verification environment: %v", err)
+		util.LogVerbose("Failed to setup verification environment: %v", err)
 		env = nil // Fall back to default environment
 	}
 
@@ -287,7 +283,7 @@ func (b *BaseTool) setupVerificationEnvironment(cfg config.ToolConfig) ([]string
 	if tool, err := b.manager.GetTool(b.toolName); err == nil {
 		if depProvider, ok := tool.(DependencyProvider); ok {
 			dependencies := depProvider.GetDependencies()
-			logVerbose("Setting up dependencies for %s verification: %v", b.toolName, dependencies)
+			util.LogVerbose("Setting up dependencies for %s verification: %v", b.toolName, dependencies)
 
 			// Add dependencies to the temporary config
 			for _, depName := range dependencies {
@@ -300,7 +296,7 @@ func (b *BaseTool) setupVerificationEnvironment(cfg config.ToolConfig) ([]string
 							Distribution: installedVersions[0].Distribution,
 						}
 						tempConfig.Tools[depName] = depConfig
-						logVerbose("Added dependency %s %s to verification environment", depName, installedVersions[0].Version)
+						util.LogVerbose("Added dependency %s %s to verification environment", depName, installedVersions[0].Version)
 					}
 				}
 			}
@@ -342,7 +338,7 @@ func (b *BaseTool) setupVerificationEnvironment(cfg config.ToolConfig) ([]string
 func (b *BaseTool) SetupHomeEnvironment(version string, cfg config.ToolConfig, envVars map[string]string, envVarName string, getPath func(string, config.ToolConfig) (string, error)) error {
 	binPath, err := getPath(version, cfg)
 	if err != nil {
-		logVerbose("Could not determine %s for %s %s: %v", envVarName, b.toolName, version, err)
+		util.LogVerbose("Could not determine %s for %s %s: %v", envVarName, b.toolName, version, err)
 		return nil
 	}
 
@@ -350,7 +346,7 @@ func (b *BaseTool) SetupHomeEnvironment(version string, cfg config.ToolConfig, e
 	if strings.HasSuffix(binPath, "/bin") {
 		homeDir := strings.TrimSuffix(binPath, "/bin")
 		envVars[envVarName] = homeDir
-		logVerbose("Set %s=%s for %s %s", envVarName, homeDir, b.toolName, version)
+		util.LogVerbose("Set %s=%s for %s %s", envVarName, homeDir, b.toolName, version)
 	}
 
 	return nil
@@ -501,16 +497,10 @@ func (b *BaseTool) IsInstalled(binPath string) bool {
 	return err == nil
 }
 
-// GetDisplayName returns the display name for this tool
-// Tools can implement GetDisplayName() to provide their own display name
+// GetDisplayName returns the default display name for this tool
+// Tools should override this method to provide their own display name
 func (b *BaseTool) GetDisplayName() string {
-	// Use reflection to check if the concrete tool implements GetDisplayName
-	if tool, err := b.manager.GetTool(b.toolName); err == nil {
-		if nameProvider, hasMethod := tool.(interface{ GetDisplayName() string }); hasMethod {
-			return nameProvider.GetDisplayName()
-		}
-	}
-	// Fall back to title case of tool name
+	// Default implementation: title case of tool name
 	return strings.Title(b.toolName)
 }
 
@@ -544,7 +534,7 @@ func (b *BaseTool) getDownloadOptions() DownloadOptions {
 func (b *BaseTool) StandardInstall(version string, cfg config.ToolConfig, getDownloadURL func(string) string) error {
 	// Check if we should use system tool instead of downloading
 	if UseSystemTool(b.toolName) {
-		logVerbose("%s=true, forcing use of system %s", getSystemToolEnvVar(b.toolName), b.toolName)
+		util.LogVerbose("%s=true, forcing use of system %s", getSystemToolEnvVar(b.toolName), b.toolName)
 
 		// Try primary binary name in PATH
 		if toolPath, err := exec.LookPath(b.binaryName); err == nil {
@@ -665,29 +655,29 @@ func (b *BaseTool) ListInstalledVersions(distribution string) []InstalledVersion
 func (b *BaseTool) StandardIsInstalled(versionSpec string, cfg config.ToolConfig, getPath func(string, config.ToolConfig) (string, error)) bool {
 	if UseSystemTool(b.toolName) {
 		if _, err := exec.LookPath(b.GetBinaryName()); err == nil {
-			logVerbose("System %s is available in PATH (MVX_USE_SYSTEM_%s=true)", b.toolName, strings.ToUpper(b.toolName))
+			util.LogVerbose("System %s is available in PATH (MVX_USE_SYSTEM_%s=true)", b.toolName, strings.ToUpper(b.toolName))
 			return true
 		}
 
-		logVerbose("System %s not available: not found in environment variables or PATH", b.toolName)
+		util.LogVerbose("System %s not available: not found in environment variables or PATH", b.toolName)
 		return false
 	}
 
 	tool, err := b.manager.GetTool(b.toolName)
 	if err != nil {
-		logVerbose("Failed to get tool %s: %v", b.toolName, err)
+		util.LogVerbose("Failed to get tool %s: %v", b.toolName, err)
 		return false
 	}
 
 	spec, err := version.ParseSpec(versionSpec)
 	if err != nil {
-		logVerbose("Failed to parse version spec %q: %v", versionSpec, err)
+		util.LogVerbose("Failed to parse version spec %q: %v", versionSpec, err)
 		return false
 	}
 
 	targetVersion, resolveErr := b.resolveTargetVersion(tool, spec, versionSpec, cfg)
 	if resolveErr != nil {
-		logVerbose("Failed to resolve target version for %s %s: %v", b.toolName, versionSpec, resolveErr)
+		util.LogVerbose("Failed to resolve target version for %s %s: %v", b.toolName, versionSpec, resolveErr)
 	}
 
 	installed := b.ListInstalledVersions(cfg.Distribution)
@@ -700,7 +690,7 @@ func (b *BaseTool) StandardIsInstalled(versionSpec string, cfg config.ToolConfig
 	for _, inst := range installed {
 		parsed, err := version.ParseVersion(inst.Version)
 		if err != nil {
-			logVerbose("Failed to parse installed version %s: %v", inst.Version, err)
+			util.LogVerbose("Failed to parse installed version %s: %v", inst.Version, err)
 			continue
 		}
 		if spec.Matches(parsed) {
@@ -718,7 +708,7 @@ func (b *BaseTool) StandardIsInstalled(versionSpec string, cfg config.ToolConfig
 
 	// Check candidates in order, return immediately on first valid installation
 	for _, candidate := range candidates {
-		logVerbose("   Checking installed version: %s (%s) at %s", candidate.info.Version, candidate.info.Distribution, candidate.info.Path)
+		util.LogVerbose("   Checking installed version: %s (%s) at %s", candidate.info.Version, candidate.info.Distribution, candidate.info.Path)
 
 		candidateCfg := cfg
 		candidateCfg.Version = candidate.info.Version
@@ -728,12 +718,12 @@ func (b *BaseTool) StandardIsInstalled(versionSpec string, cfg config.ToolConfig
 
 		binPath, err := getPath(candidate.info.Version, candidateCfg)
 		if err != nil {
-			logVerbose("Failed to compute binary path for %s %s: %v", b.toolName, candidate.info.Version, err)
+			util.LogVerbose("Failed to compute binary path for %s %s: %v", b.toolName, candidate.info.Version, err)
 			continue
 		}
 
 		if !b.IsInstalled(binPath) {
-			logVerbose("Binary for %s %s not found at %s", b.toolName, candidate.info.Version, binPath)
+			util.LogVerbose("Binary for %s %s not found at %s", b.toolName, candidate.info.Version, binPath)
 			continue
 		}
 
@@ -742,7 +732,7 @@ func (b *BaseTool) StandardIsInstalled(versionSpec string, cfg config.ToolConfig
 		// This avoids running "java -version", "mvn --version", etc. on every startup
 
 		// Found a valid installation - return immediately
-		logVerbose("Using previously installed %s %s (%s)", b.toolName, candidate.info.Version, candidate.info.Distribution)
+		util.LogVerbose("Using previously installed %s %s (%s)", b.toolName, candidate.info.Version, candidate.info.Distribution)
 		return true
 	}
 
@@ -751,26 +741,26 @@ func (b *BaseTool) StandardIsInstalled(versionSpec string, cfg config.ToolConfig
 	}
 
 	if targetVersion == "" {
-		logVerbose("Resolved target version for %s %s is empty", b.toolName, versionSpec)
+		util.LogVerbose("Resolved target version for %s %s is empty", b.toolName, versionSpec)
 		return false
 	}
 
 	installCfg := cfg
 	installCfg.Version = targetVersion
 
-	logVerbose("%s version %s not installed, attempting automatic installation", b.toolName, targetVersion)
+	util.LogVerbose("%s version %s not installed, attempting automatic installation", b.toolName, targetVersion)
 	if err := tool.Install(targetVersion, installCfg); err != nil {
-		logVerbose("Automatic installation of %s %s failed: %v", b.toolName, targetVersion, err)
+		util.LogVerbose("Automatic installation of %s %s failed: %v", b.toolName, targetVersion, err)
 		return false
 	}
 
 	if err := tool.Verify(targetVersion, installCfg); err != nil {
-		logVerbose("Verification after installing %s %s failed: %v", b.toolName, targetVersion, err)
+		util.LogVerbose("Verification after installing %s %s failed: %v", b.toolName, targetVersion, err)
 		return false
 	}
 
 	b.clearPathCache()
-	logVerbose("Successfully installed %s %s on demand", b.toolName, targetVersion)
+	util.LogVerbose("Successfully installed %s %s on demand", b.toolName, targetVersion)
 	return true
 }
 
@@ -817,7 +807,7 @@ func (b *BaseTool) StandardGetPath(version string, cfg config.ToolConfig, getIns
 	if UseSystemTool(b.toolName) {
 		// Try primary binary name in PATH
 		if _, err := exec.LookPath(b.GetBinaryName()); err == nil {
-			logVerbose("Using system %s from PATH (MVX_USE_SYSTEM_%s=true)", b.toolName, strings.ToUpper(b.toolName))
+			util.LogVerbose("Using system %s from PATH (MVX_USE_SYSTEM_%s=true)", b.toolName, strings.ToUpper(b.toolName))
 			b.setCachedPath(cacheKey, "", nil)
 			return "", nil
 		}

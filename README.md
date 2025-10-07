@@ -27,6 +27,10 @@ Imagine cloning any project and running:
 # Or use tools directly with natural syntax
 ./mvx mvn -V clean install    # Maven with version flag
 ./mvx --verbose mvn -X test   # mvx verbose + Maven debug
+
+# Execute shell commands in mvx environment
+./mvx shell 'echo $JAVA_HOME'  # Show Java home with mvx tools
+./mvx shell 'java -version'    # Run Java with mvx environment
 ```
 
 No more "works on my machine" - every developer gets the exact same environment.
@@ -54,6 +58,7 @@ mvx provides seamless Maven integration with transparent argument passing:
 - **🔄 Transparent wrapper**: mvx acts like `mvnw` but with enhanced tool management
 - **⚡ No learning curve**: Existing Maven knowledge applies directly
 - **🛡️ Backward compatible**: Existing scripts continue to work
+- **🏢 Enterprise ready**: URL replacements for corporate networks and mirrors
 
 ## 📦 mvx Bootstrap
 
@@ -198,6 +203,37 @@ cd mvx
 ```bash
 ./mvx test
 ```
+
+## 🔄 Shell Activation
+
+For a seamless development experience, enable shell activation to automatically set up your environment when entering project directories:
+
+**Bash** - Add to `~/.bashrc`:
+```bash
+eval "$(mvx activate bash)"
+```
+
+**Zsh** - Add to `~/.zshrc`:
+```bash
+eval "$(mvx activate zsh)"
+```
+
+**Fish** - Add to `~/.config/fish/config.fish`:
+```bash
+mvx activate fish | source
+```
+
+With shell activation enabled, tools become available automatically:
+
+```bash
+cd my-project
+# mvx: activating environment in /Users/you/my-project
+
+java -version  # Uses mvx-managed Java
+mvn -version   # Uses mvx-managed Maven
+```
+
+**Learn more**: See the [Shell Activation Guide](https://gnodet.github.io/mvx/shell-activation/) for detailed documentation.
 
 ## 🎯 Shell Completion
 
@@ -354,6 +390,7 @@ The bootstrap scripts (`mvx` and `mvx.cmd`) are **shell/batch scripts** (not bin
 - [x] `mvx build` - Execute configured build commands
 - [x] `mvx test` - Execute configured test commands
 - [x] `mvx run` - Execute custom commands from configuration
+- [x] `mvx shell` - Execute shell commands in mvx environment
 - [x] `mvx tools` - Tool management and discovery
 - [x] `mvx info` - Detailed command information
 
@@ -396,6 +433,12 @@ The bootstrap scripts (`mvx` and `mvx.cmd`) are **shell/batch scripts** (not bin
 - [x] **Environment variable support** - Global and command-specific environment variables
 - [x] **Intelligent interpreter selection** - Automatic selection based on script complexity
 - [x] **Cross-platform compatibility** - Commands work consistently across operating systems
+
+#### Enterprise & Network Support
+
+- [x] **URL replacements** - Redirect downloads through corporate proxies, mirrors, or alternative sources
+- [x] **Global configuration** - System-wide settings for enterprise environments
+- [x] **Regex-based URL transformations** - Advanced URL rewriting for complex enterprise setups
 
 ### 🚧 Planned Features
 

@@ -4,15 +4,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/gnodet/mvx/pkg/config"
+	"github.com/gnodet/mvx/pkg/util"
 	"github.com/gnodet/mvx/pkg/version"
 )
 
 // Compile-time interface validation
 var _ Tool = (*GoTool)(nil)
-var _ ToolMetadataProvider = (*GoTool)(nil)
 var _ EnvironmentProvider = (*GoTool)(nil)
 
 // GoTool implements Tool interface for Go toolchain management
@@ -33,11 +35,6 @@ func NewGoTool(manager *Manager) *GoTool {
 	return &GoTool{
 		BaseTool: NewBaseTool(manager, ToolGo, getGoBinaryName()),
 	}
-}
-
-// Name returns the tool name
-func (g *GoTool) Name() string {
-	return ToolGo
 }
 
 // Install downloads and installs the specified Go version
@@ -61,7 +58,7 @@ func (g *GoTool) GetBinaryName() string {
 
 // getInstalledPath returns the path for an installed Go version
 func (g *GoTool) getInstalledPath(version string, cfg config.ToolConfig) (string, error) {
-	installDir := g.manager.GetToolVersionDir(g.Name(), version, "")
+	installDir := g.manager.GetToolVersionDir(g.GetToolName(), version, "")
 	pathResolver := NewPathResolver(g.manager.GetToolsDir())
 	binDir, err := pathResolver.FindBinaryParentDir(installDir, g.GetBinaryName())
 	if err != nil {
@@ -102,14 +99,47 @@ func (g *GoTool) GetDisplayName() string {
 	return "Go Programming Language"
 }
 
-// GetEmoji returns the emoji icon for Go (implements ToolMetadataProvider)
-func (g *GoTool) GetEmoji() string {
-	return "🐹"
-}
-
 // SetupEnvironment sets up Go-specific environment variables (implements EnvironmentProvider)
-func (g *GoTool) SetupEnvironment(version string, cfg config.ToolConfig, envVars map[string]string) error {
-	return g.SetupHomeEnvironment(version, cfg, envVars, EnvGoRoot, g.GetPath)
+func (g *GoTool) SetupEnvironment(version string, cfg config.ToolConfig, envManager *EnvironmentManager) error {
+	util.LogVerbose("Go SetupEnvironment called for version %s", version)
+
+	// Set up GOROOT (Go installation directory)
+	// GetPath returns the bin directory, but GOROOT should be the parent directory
+	goBinDir, err := g.GetPath(version, cfg)
+	if err != nil {
+		util.LogVerbose("Failed to get Go path: %v", err)
+		return err
+	}
+
+	// GOROOT should be the parent of the bin directory
+	goRoot := filepath.Dir(goBinDir)
+	envManager.SetEnv(EnvGoRoot, goRoot)
+	util.LogVerbose("Set %s=%s for Go %s", EnvGoRoot, goRoot, version)
+
+	// Set up GOPATH if not already set
+	var goPath string
+	if existingGoPath, exists := envManager.GetEnv(EnvGoPath); exists {
+		goPath = existingGoPath
+		util.LogVerbose("Using existing GOPATH: %s", goPath)
+	} else {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			util.LogVerbose("Failed to get user home directory: %v", err)
+		} else {
+			goPath = filepath.Join(homeDir, "go")
+			envManager.SetEnv(EnvGoPath, goPath)
+			util.LogVerbose("Set %s=%s for Go %s", EnvGoPath, goPath, version)
+		}
+	}
+
+	// Add GOPATH/bin to PATH if GOPATH is set (for tools like golangci-lint)
+	if goPath != "" {
+		goPathBin := filepath.Join(goPath, "bin")
+		envManager.AddToPath(goPathBin)
+		util.LogVerbose("Added %s to PATH for Go %s", goPathBin, version)
+	}
+
+	return nil
 }
 
 // fetchGoVersions fetches Go versions from GitHub releases API
@@ -208,7 +238,7 @@ func (g *GoTool) ResolveVersion(versionSpec, distribution string) (string, error
 }
 
 // GetChecksum implements ChecksumProvider interface for Go
-func (g *GoTool) GetChecksum(version, filename string) (ChecksumInfo, error) {
+func (g *GoTool) GetChecksum(version string, cfg config.ToolConfig, filename string) (ChecksumInfo, error) {
 	fmt.Printf("  🔍 Fetching Go checksum from go.dev API...\n")
 
 	checksum, err := g.fetchGoChecksum(version, filename)
@@ -279,14 +309,4 @@ func (g *GoTool) fetchGoChecksum(version, filename string) (string, error) {
 // GetDownloadURL implements URLProvider interface for Go
 func (g *GoTool) GetDownloadURL(version string) string {
 	return g.getDownloadURL(version)
-}
-
-// GetChecksumURL implements URLProvider interface for Go
-func (g *GoTool) GetChecksumURL(version, filename string) string {
-	return GoDevAPIBase + "/?mode=json&include=all"
-}
-
-// GetVersionsURL implements URLProvider interface for Go
-func (g *GoTool) GetVersionsURL() string {
-	return GitHubAPIBase + "/repos/golang/go/tags?per_page=100"
 }

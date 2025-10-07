@@ -84,6 +84,11 @@ mvx --help
 ### Environment Management
 
 ```bash
+# Execute shell commands in mvx environment
+./mvx shell 'echo $JAVA_HOME'
+./mvx shell 'java -version'
+./mvx shell env
+
 # Show environment information
 ./mvx env
 
@@ -99,6 +104,14 @@ mvx --help
 # Clean all tools
 ./mvx clean tools
 ```
+
+The `shell` command is particularly useful for:
+- Testing tool installations and environment setup
+- Running ad-hoc commands with mvx-managed tools
+- Debugging environment variable issues
+- Accessing tools interactively without defining custom commands
+
+See the [Shell Command](/shell-command) page for detailed examples and usage patterns.
 
 ## Custom Commands
 

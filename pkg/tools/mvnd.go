@@ -13,7 +13,6 @@ import (
 
 // Compile-time interface validation
 var _ Tool = (*MvndTool)(nil)
-var _ ToolMetadataProvider = (*MvndTool)(nil)
 var _ DependencyProvider = (*MvndTool)(nil)
 var _ EnvironmentProvider = (*MvndTool)(nil)
 
@@ -34,11 +33,6 @@ func NewMvndTool(manager *Manager) *MvndTool {
 	return &MvndTool{
 		BaseTool: NewBaseTool(manager, "mvnd", getMvndBinaryName()),
 	}
-}
-
-// Name returns the tool name
-func (m *MvndTool) Name() string {
-	return "mvnd"
 }
 
 // Install downloads and installs the specified mvnd version
@@ -62,7 +56,7 @@ func (m *MvndTool) GetBinaryName() string {
 
 // getInstalledPath returns the path for an installed Mvnd version
 func (m *MvndTool) getInstalledPath(version string, cfg config.ToolConfig) (string, error) {
-	installDir := m.manager.GetToolVersionDir("mvnd", version, "")
+	installDir := m.manager.GetToolVersionDir(m.GetToolName(), version, "")
 	pathResolver := NewPathResolver(m.manager.GetToolsDir())
 	binDir, err := pathResolver.FindBinaryParentDir(installDir, m.GetBinaryName())
 	if err != nil {
@@ -97,19 +91,23 @@ func (m *MvndTool) GetDisplayName() string {
 	return "Maven Daemon (mvnd)"
 }
 
-// GetEmoji returns the emoji icon for Mvnd (implements ToolMetadataProvider)
-func (m *MvndTool) GetEmoji() string {
-	return "🚀"
-}
-
 // GetDependencies returns the list of tools that Maven Daemon depends on (implements DependencyProvider)
 func (m *MvndTool) GetDependencies() []string {
 	return []string{ToolJava}
 }
 
 // SetupEnvironment sets up Maven Daemon-specific environment variables (implements EnvironmentProvider)
-func (m *MvndTool) SetupEnvironment(version string, cfg config.ToolConfig, envVars map[string]string) error {
-	return m.SetupHomeEnvironment(version, cfg, envVars, EnvMvndHome, m.GetPath)
+func (m *MvndTool) SetupEnvironment(version string, cfg config.ToolConfig, envManager *EnvironmentManager) error {
+	// Convert EnvironmentManager to map for the existing helper
+	envVars := envManager.ToMap()
+	err := m.SetupHomeEnvironment(version, cfg, envVars, EnvMvndHome, m.GetPath)
+	// Update the environment manager with any changes
+	for key, value := range envVars {
+		if key != "PATH" { // PATH is handled separately by EnvironmentManager
+			envManager.SetEnv(key, value)
+		}
+	}
+	return err
 }
 
 // fetchMvndVersionsFromApache fetches mvnd versions from Apache archive
@@ -211,22 +209,17 @@ func (m *MvndTool) GetDownloadURL(version string) string {
 	return m.getDownloadURL(version)
 }
 
-// GetChecksumURL implements Tool interface for Maven Daemon
-func (m *MvndTool) GetChecksumURL(version, filename string) string {
+// getChecksumURL returns the checksum URL for Maven Daemon (internal method)
+func (m *MvndTool) getChecksumURL(version, filename string) string {
 	return fmt.Sprintf("%s/mvnd/%s/%s.sha512",
 		ApacheMavenBase, version, filename)
 }
 
-// GetVersionsURL implements Tool interface for Maven Daemon
-func (m *MvndTool) GetVersionsURL() string {
-	return ApacheMavenBase + "/mvnd/"
-}
-
 // GetChecksum implements Tool interface for Maven Daemon
-func (m *MvndTool) GetChecksum(version, filename string) (ChecksumInfo, error) {
+func (m *MvndTool) GetChecksum(version string, cfg config.ToolConfig, filename string) (ChecksumInfo, error) {
 	fmt.Printf("  🔍 Fetching Maven Daemon checksum from Apache archive...\n")
 
-	checksumURL := m.GetChecksumURL(version, filename)
+	checksumURL := m.getChecksumURL(version, filename)
 	if checksumURL == "" {
 		return ChecksumInfo{}, fmt.Errorf("no checksum URL available for Maven Daemon %s", version)
 	}
