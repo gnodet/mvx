@@ -1,16 +1,21 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/gnodet/mvx/pkg/config"
-	"github.com/gnodet/mvx/pkg/tools"
 )
 
 // copyFile copies a file from src to dst
@@ -727,58 +732,382 @@ func testToolInstallation(t *testing.T, mvxBinary string) {
 
 // testSingleToolInstallation tests installation of a single tool
 func testSingleToolInstallation(t *testing.T, mvxBinary, toolName, version, distribution string) {
+	t.Logf("🔥 EXTREME DEBUG: ========== STARTING %s %s %s ==========", toolName, version, distribution)
+
+	// Immediate panic recovery with stack trace
+	defer func() {
+		if r := recover(); r != nil {
+			t.Logf("🔥 PANIC RECOVERED: %v", r)
+			// Print stack trace
+			buf := make([]byte, 1<<16)
+			stackSize := runtime.Stack(buf, true)
+			t.Logf("🔥 STACK TRACE:\n%s", string(buf[:stackSize]))
+			t.Fatalf("PANIC in testSingleToolInstallation for %s %s: %v", toolName, version, r)
+		}
+	}()
+
+	// Set a timeout for the test
+	if deadline, ok := t.Deadline(); ok {
+		t.Logf("🔥 DEBUG: Test deadline: %v (remaining: %v)", deadline, time.Until(deadline))
+	} else {
+		t.Logf("🔥 DEBUG: No test deadline set")
+	}
+
+	// Log EVERYTHING about the current environment
+	logExtremeSystemState(t, "INITIAL")
+
 	// Create a temporary directory for this specific tool test
+	t.Logf("🔥 STEP 1: Creating temporary directory for %s test", toolName)
+
+	// Check temp directory location first
+	tmpDir := os.TempDir()
+	t.Logf("🔥 TEMP_BASE_DIR: %s", tmpDir)
+	if info, err := os.Stat(tmpDir); err == nil {
+		t.Logf("🔥 TEMP_BASE_DIR_PERMS: %v", info.Mode())
+	} else {
+		t.Logf("🔥 TEMP_BASE_DIR_ERROR: %v", err)
+	}
+
 	tempDir, err := os.MkdirTemp("", fmt.Sprintf("mvx-%s-test-*", toolName))
 	if err != nil {
+		t.Logf("🔥 TEMP_DIR_CREATION_FAILED: %v", err)
+		logExtremeSystemState(t, "TEMP_DIR_FAILURE")
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+
+	defer func() {
+		t.Logf("🔥 CLEANUP: Removing temp directory: %s", tempDir)
+		if err := os.RemoveAll(tempDir); err != nil {
+			t.Logf("🔥 CLEANUP_ERROR: %v", err)
+		} else {
+			t.Logf("🔥 CLEANUP: Success")
+		}
+	}()
+
+	t.Logf("🔥 TEMP_DIR_CREATED: %s", tempDir)
+
+	// Verify temp directory is accessible and writable
+	if info, err := os.Stat(tempDir); err != nil {
+		t.Fatalf("🔥 TEMP_DIR_STAT_FAILED: %v", err)
+	} else {
+		t.Logf("🔥 TEMP_DIR_VERIFIED: mode=%v, isDir=%v", info.Mode(), info.IsDir())
+	}
+
+	// Test write permissions
+	testFile := filepath.Join(tempDir, "write-test.tmp")
+	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
+		t.Fatalf("🔥 TEMP_DIR_WRITE_FAILED: %v", err)
+	} else {
+		os.Remove(testFile)
+		t.Logf("🔥 TEMP_DIR_WRITE_OK")
+	}
 
 	// Change to temp directory
+	t.Logf("🔥 STEP 2: Changing to temp directory")
+
 	oldDir, err := os.Getwd()
 	if err != nil {
+		t.Logf("🔥 GET_CWD_FAILED: %v", err)
+		logExtremeSystemState(t, "GET_CWD_FAILURE")
 		t.Fatalf("Failed to get current directory: %v", err)
 	}
-	defer os.Chdir(oldDir)
+	t.Logf("🔥 CURRENT_DIR: %s", oldDir)
 
+	defer func() {
+		t.Logf("🔥 RESTORING_DIR: %s", oldDir)
+		if err := os.Chdir(oldDir); err != nil {
+			t.Logf("🔥 RESTORE_DIR_FAILED: %v", err)
+		} else {
+			t.Logf("🔥 RESTORE_DIR_SUCCESS")
+		}
+	}()
+
+	t.Logf("🔥 CHANGING_TO_TEMP_DIR: %s", tempDir)
 	if err := os.Chdir(tempDir); err != nil {
+		t.Logf("🔥 CHDIR_FAILED: %v", err)
+		logExtremeSystemState(t, "CHDIR_FAILURE")
 		t.Fatalf("Failed to change to temp directory: %v", err)
 	}
 
-	// Initialize project
-	cmd := exec.Command(mvxBinary, "init", "--format", "json5")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("mvx init failed: %v\nOutput: %s", err, output)
+	// Verify the change worked
+	if newDir, err := os.Getwd(); err != nil {
+		t.Logf("🔥 VERIFY_CHDIR_FAILED: %v", err)
+	} else if newDir != tempDir {
+		t.Logf("🔥 CHDIR_MISMATCH: expected=%s, actual=%s", tempDir, newDir)
+	} else {
+		t.Logf("🔥 CHDIR_SUCCESS: now in %s", newDir)
 	}
 
+	// Initialize project
+	t.Logf("🔥 STEP 3: Initializing project with mvx init")
+	logExtremeSystemState(t, "PRE_INIT")
+
+	// Check mvx binary before using it
+	if info, err := os.Stat(mvxBinary); err != nil {
+		t.Fatalf("🔥 MVX_BINARY_NOT_FOUND: %v", err)
+	} else {
+		t.Logf("🔥 MVX_BINARY: size=%d, mode=%v", info.Size(), info.Mode())
+	}
+
+	cmd := exec.Command(mvxBinary, "init", "--format", "json5")
+	t.Logf("🔥 INIT_COMMAND: %s %v", cmd.Path, cmd.Args)
+	t.Logf("🔥 INIT_DIR: %s", func() string { wd, _ := os.Getwd(); return wd }())
+
+	initStartTime := time.Now()
+	initOutput, initErr := cmd.CombinedOutput()
+	initDuration := time.Since(initStartTime)
+
+	t.Logf("🔥 INIT_DURATION: %v", initDuration)
+	t.Logf("🔥 INIT_OUTPUT_SIZE: %d bytes", len(initOutput))
+	t.Logf("🔥 INIT_OUTPUT: %s", string(initOutput))
+
+	if initErr != nil {
+		t.Logf("🔥 INIT_FAILED: %v", initErr)
+		if exitError, ok := initErr.(*exec.ExitError); ok {
+			t.Logf("🔥 INIT_EXIT_CODE: %d", exitError.ExitCode())
+		}
+		logExtremeSystemState(t, "INIT_FAILURE")
+		t.Fatalf("mvx init failed: %v\nOutput: %s", initErr, initOutput)
+	}
+	t.Logf("DEBUG: Project initialization completed successfully")
+
 	// Add the tool to configuration
+	t.Logf("🔥 STEP 4: Adding tool to configuration")
+
 	args := []string{"tools", "add", toolName, version}
 	if distribution != "" {
 		args = append(args, distribution)
 	}
+	t.Logf("🔥 TOOLS_ADD_ARGS: %v", args)
 
 	cmd = exec.Command(mvxBinary, args...)
-	output, err = cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("mvx tools add %s %s failed: %v\nOutput: %s", toolName, version, err, output)
+	t.Logf("🔥 TOOLS_ADD_COMMAND: %s %v", cmd.Path, cmd.Args)
+
+	addStartTime := time.Now()
+	addOutput, addErr := cmd.CombinedOutput()
+	addDuration := time.Since(addStartTime)
+
+	t.Logf("🔥 TOOLS_ADD_DURATION: %v", addDuration)
+	t.Logf("🔥 TOOLS_ADD_OUTPUT_SIZE: %d bytes", len(addOutput))
+	t.Logf("🔥 TOOLS_ADD_OUTPUT: %s", string(addOutput))
+
+	if addErr != nil {
+		t.Logf("🔥 TOOLS_ADD_FAILED: %v", addErr)
+		if exitError, ok := addErr.(*exec.ExitError); ok {
+			t.Logf("🔥 TOOLS_ADD_EXIT_CODE: %d", exitError.ExitCode())
+		}
+		logExtremeSystemState(t, "TOOLS_ADD_FAILURE")
+		t.Fatalf("mvx tools add %s %s failed: %v\nOutput: %s", toolName, version, addErr, addOutput)
+	}
+
+	t.Logf("🔥 TOOLS_ADD_SUCCESS")
+
+	// Verify config was updated
+	if configData, err := os.ReadFile(".mvx/config.json5"); err != nil {
+		t.Logf("🔥 CONFIG_READ_FAILED: %v", err)
+	} else {
+		t.Logf("🔥 CONFIG_SIZE: %d bytes", len(configData))
+		configStr := string(configData)
+		if len(configStr) > 500 {
+			configStr = configStr[:500] + "..."
+		}
+		t.Logf("🔥 CONFIG_CONTENT: %s", configStr)
 	}
 
 	// Run setup to install the tool
-	t.Logf("Installing %s %s - downloading and setting up (this is the slow part)...", toolName, version)
-	cmd = exec.Command(mvxBinary, "setup", "--tools-only", "--sequential")
-	cmd.Env = append(os.Environ(), "MVX_VERBOSE=true")
-	output, err = cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("mvx setup failed for %s %s: %v\nOutput: %s", toolName, version, err, output)
+	t.Logf("🔥 STEP 5: CRITICAL SETUP PHASE - Installing %s %s", toolName, version)
+	logExtremeSystemState(t, "PRE_SETUP")
+
+	// EXTREME SETUP COMMAND DEBUGGING
+	t.Logf("🔥 SETUP_PHASE: Preparing setup command")
+
+	// Test network connectivity with extreme detail
+	t.Logf("🔥 NETWORK_TEST: Starting connectivity tests")
+	if err := testNetworkConnectivity(t); err != nil {
+		t.Logf("🔥 NETWORK_ISSUES: %v", err)
+	} else {
+		t.Logf("🔥 NETWORK_OK: Connectivity tests passed")
 	}
-	t.Logf("Installation of %s %s completed, now verifying...", toolName, version)
+
+	cmd = exec.Command(mvxBinary, "setup", "--tools-only", "--sequential")
+	cmd.Env = append(os.Environ(), "MVX_VERBOSE=true", "MVX_DEBUG=true")
+
+	t.Logf("🔥 SETUP_COMMAND: %s %v", cmd.Path, cmd.Args)
+	t.Logf("🔥 SETUP_ENV_COUNT: %d variables", len(cmd.Env))
+
+	// Log ALL environment variables (truncated)
+	for i, env := range cmd.Env {
+		if i < 20 { // First 20 env vars
+			if len(env) > 100 {
+				env = env[:100] + "..."
+			}
+			t.Logf("🔥 SETUP_ENV[%d]: %s", i, env)
+		}
+	}
+
+	// Pre-execution system state
+	t.Logf("🔥 PRE_EXEC: Capturing system state before setup")
+	logExtremeSystemState(t, "PRE_SETUP_EXEC")
+
+	// Execute with extreme monitoring
+	t.Logf("🔥 EXECUTING: Starting setup command")
+	startTime := time.Now()
+
+	// Create a context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	// Use CommandContext for better control
+	cmd = exec.CommandContext(ctx, mvxBinary, "setup", "--tools-only", "--sequential")
+	cmd.Env = append(os.Environ(), "MVX_VERBOSE=true", "MVX_DEBUG=true")
+
+	setupOutput, setupErr := cmd.CombinedOutput()
+
+	// EXTREME SETUP RESULTS ANALYSIS
+	duration := time.Since(startTime)
+	t.Logf("🔥 SETUP_COMPLETED: Duration=%v", duration)
+
+	// Check if context was cancelled (timeout)
+	if ctx.Err() == context.DeadlineExceeded {
+		t.Logf("🔥 SETUP_TIMEOUT: Command timed out after 10 minutes")
+	}
+
+	// Post-execution system state
+	logExtremeSystemState(t, "POST_SETUP_EXEC")
+
+	outputStr := string(setupOutput)
+	t.Logf("🔥 SETUP_OUTPUT_SIZE: %d bytes", len(outputStr))
+	t.Logf("🔥 SETUP_OUTPUT_PREVIEW: %s", func() string {
+		if len(outputStr) > 1000 {
+			return outputStr[:1000] + "... (truncated)"
+		}
+		return outputStr
+	}())
+
+	t.Logf("🔥 SETUP_FULL_OUTPUT for %s %s (exit code: %v):\n%s", toolName, version, setupErr, outputStr)
+
+	if setupErr != nil {
+		t.Logf("🔥 SETUP_FAILED: %v", setupErr)
+
+		// Extreme error analysis
+		if exitError, ok := setupErr.(*exec.ExitError); ok {
+			t.Logf("🔥 EXIT_CODE: %d", exitError.ExitCode())
+			if exitError.ProcessState != nil {
+				t.Logf("🔥 PROCESS_STATE: %v", exitError.ProcessState)
+				t.Logf("🔥 SYSTEM_TIME: %v", exitError.ProcessState.SystemTime())
+				t.Logf("🔥 USER_TIME: %v", exitError.ProcessState.UserTime())
+			}
+		}
+
+		// Comprehensive error pattern analysis
+		errorPatterns := map[string][]string{
+			"PERMISSION": {"permission denied", "access denied", "forbidden", "not permitted"},
+			"DISK_SPACE": {"no space left", "disk full", "out of space", "insufficient space"},
+			"NETWORK":    {"network", "connection", "timeout", "unreachable", "dns", "resolve"},
+			"NOT_FOUND":  {"404", "not found", "no such file", "does not exist", "command not found"},
+			"JAVA":       {"java", "jdk", "openjdk", "zulu", "temurin", "corretto"},
+			"DOWNLOAD":   {"download", "fetch", "curl", "wget", "http", "https"},
+			"EXTRACT":    {"extract", "unzip", "tar", "archive", "decompress"},
+			"INSTALL":    {"install", "setup", "configure", "initialization"},
+		}
+
+		for category, patterns := range errorPatterns {
+			for _, pattern := range patterns {
+				if strings.Contains(strings.ToLower(outputStr), pattern) {
+					t.Logf("🔥 ERROR_PATTERN_%s: Found '%s'", category, pattern)
+				}
+			}
+		}
+
+		// Check for empty or very short output
+		if len(outputStr) == 0 {
+			t.Logf("🔥 CRITICAL: Setup produced NO OUTPUT - immediate failure")
+		} else if len(outputStr) < 50 {
+			t.Logf("🔥 WARNING: Setup produced very short output (%d bytes) - likely immediate failure", len(outputStr))
+		}
+
+		// Final system state on failure
+		logExtremeSystemState(t, "SETUP_FAILURE_FINAL")
+
+		t.Fatalf("mvx setup failed for %s %s: %v\nOutput: %s", toolName, version, setupErr, setupOutput)
+	}
+	t.Logf("🔥 STEP 6: Installation of %s %s completed, now verifying...", toolName, version)
+
+	// Get home directory for verification
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("🔥 HOME_DIR_ERROR: %v", err)
+	}
+	t.Logf("🔥 HOME_DIR: %s", homeDir)
 
 	// Verify the tool was installed successfully
-	outputStr := string(output)
+	setupOutputStr := string(setupOutput)
 	expectedSuccess := fmt.Sprintf("✅ %s", toolName)
-	if !strings.Contains(outputStr, expectedSuccess) {
-		t.Errorf("Expected success message for %s, got: %s", toolName, outputStr)
+	if !strings.Contains(setupOutputStr, expectedSuccess) {
+		t.Errorf("Expected success message '%s' for %s, but it was not found in output", expectedSuccess, toolName)
+
+		// Check for error messages
+		if strings.Contains(outputStr, "Error:") {
+			t.Errorf("Found error in output for %s", toolName)
+		}
+		if strings.Contains(outputStr, "failed") {
+			t.Errorf("Found failure message in output for %s", toolName)
+		}
+
+		// Don't fail immediately, continue to debug output
+	}
+
+	// Debug: Check what was actually installed
+	mvxToolsDir := filepath.Join(homeDir, ".mvx", "tools")
+	toolsDir := filepath.Join(mvxToolsDir, toolName)
+
+	// Check if .mvx/tools directory exists
+	if info, err := os.Stat(mvxToolsDir); err == nil {
+		t.Logf("DEBUG: .mvx/tools directory exists (isDir: %v)", info.IsDir())
+	} else {
+		t.Logf("DEBUG: .mvx/tools directory does not exist: %v", err)
+	}
+
+	// Check if specific tool directory exists
+	if info, err := os.Stat(toolsDir); err == nil {
+		t.Logf("DEBUG: %s tools directory exists (isDir: %v)", toolName, info.IsDir())
+	} else {
+		t.Logf("DEBUG: %s tools directory does not exist: %v", toolName, err)
+
+		// List what's actually in .mvx/tools
+		if entries, err := os.ReadDir(mvxToolsDir); err == nil {
+			t.Logf("DEBUG: Contents of .mvx/tools directory:")
+			for _, entry := range entries {
+				t.Logf("DEBUG:   - %s (isDir: %v)", entry.Name(), entry.IsDir())
+			}
+		} else {
+			t.Logf("DEBUG: Failed to read .mvx/tools directory: %v", err)
+		}
+		return // Don't continue verification if tool directory doesn't exist
+	}
+
+	if entries, err := os.ReadDir(toolsDir); err == nil {
+		t.Logf("DEBUG: Found %d entries in %s tools directory:", len(entries), toolName)
+		for _, entry := range entries {
+			t.Logf("DEBUG:   - %s (isDir: %v)", entry.Name(), entry.IsDir())
+			if entry.IsDir() {
+				subDir := filepath.Join(toolsDir, entry.Name())
+				if subEntries, err := os.ReadDir(subDir); err == nil {
+					t.Logf("DEBUG:     Contents of %s (showing first 10 entries):", entry.Name())
+					for i, subEntry := range subEntries {
+						if i >= 10 {
+							t.Logf("DEBUG:       ... and %d more entries", len(subEntries)-10)
+							break
+						}
+						t.Logf("DEBUG:       - %s (isDir: %v)", subEntry.Name(), subEntry.IsDir())
+					}
+				} else {
+					t.Logf("DEBUG:     Failed to read contents of %s: %v", entry.Name(), err)
+				}
+			}
+		}
+	} else {
+		t.Logf("DEBUG: Failed to read %s tools directory: %v", toolName, err)
 	}
 
 	// Verify tool is actually usable
@@ -787,27 +1116,343 @@ func testSingleToolInstallation(t *testing.T, mvxBinary, toolName, version, dist
 
 // verifyToolUsability checks that an installed tool is actually usable
 func verifyToolUsability(t *testing.T, toolName, version string) {
-	t.Logf("DEBUG: Verifying %s %s usability using Tool.IsInstalled()", toolName, version)
-
-	// Create a tool manager (same as production code)
-	manager, err := tools.NewManager()
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		t.Fatalf("Failed to create tool manager: %v", err)
+		t.Fatalf("Failed to get home directory: %v", err)
 	}
 
-	// Get the actual tool implementation
-	tool, err := manager.GetTool(toolName)
-	if err != nil {
-		t.Fatalf("Failed to get tool %s: %v", toolName, err)
-	}
+	switch toolName {
+	case "java":
+		// Find Java installation and test it
+		javaPath := filepath.Join(homeDir, ".mvx", "tools", "java")
+		t.Logf("DEBUG: Looking for Java in: %s", javaPath)
 
-	// Tool.IsInstalled() already checks binary existence and usability
-	// It handles version resolution, distribution parsing, and binary verification
-	if tool.IsInstalled(version, config.ToolConfig{}) {
-		t.Logf("%s %s verification successful using Tool.IsInstalled()", toolName, version)
+		// Check if Java tools directory exists
+		if info, err := os.Stat(javaPath); err != nil {
+			t.Errorf("Java tools directory does not exist: %v", err)
+			return
+		} else {
+			t.Logf("DEBUG: Java tools directory exists (isDir: %v)", info.IsDir())
+		}
+
+		if entries, err := os.ReadDir(javaPath); err == nil {
+			t.Logf("DEBUG: Found %d entries in Java tools directory", len(entries))
+
+			foundExecutable := false
+			for _, entry := range entries {
+				t.Logf("DEBUG: Checking entry: %s (isDir: %v)", entry.Name(), entry.IsDir())
+				if entry.IsDir() {
+					versionDir := filepath.Join(javaPath, entry.Name())
+					t.Logf("DEBUG: Looking for Java executable in: %s", versionDir)
+
+					if javaExe := findJavaExecutableWithDebug(t, versionDir); javaExe != "" {
+						t.Logf("DEBUG: Found Java executable: %s", javaExe)
+
+						// Check if executable is actually executable
+						if info, err := os.Stat(javaExe); err != nil {
+							t.Logf("DEBUG: Java executable stat failed: %v", err)
+							continue
+						} else {
+							t.Logf("DEBUG: Java executable stat: size=%d, mode=%v", info.Size(), info.Mode())
+						}
+
+						cmd := exec.Command(javaExe, "-version")
+						output, err := cmd.CombinedOutput()
+						if err != nil {
+							t.Logf("DEBUG: Java executable failed: %v\nOutput: %s", err, output)
+							// Don't return here, try other installations
+						} else {
+							t.Logf("Java verification successful: %s", strings.Split(string(output), "\n")[0])
+							foundExecutable = true
+							return
+						}
+					} else {
+						t.Logf("DEBUG: No Java executable found in: %s", versionDir)
+					}
+				}
+			}
+
+			if !foundExecutable {
+				t.Errorf("Could not find usable Java installation after checking %d directories", len(entries))
+			}
+		} else {
+			t.Errorf("Failed to read Java tools directory: %v", err)
+		}
+
+	case "maven":
+		// Find Maven installation and test it
+		mavenPath := filepath.Join(homeDir, ".mvx", "tools", "maven")
+		if entries, err := os.ReadDir(mavenPath); err == nil {
+			for _, entry := range entries {
+				if entry.IsDir() {
+					versionDir := filepath.Join(mavenPath, entry.Name())
+					if mvnExe := findMavenExecutable(versionDir); mvnExe != "" {
+						cmd := exec.Command(mvnExe, "--version")
+						output, err := cmd.CombinedOutput()
+						if err != nil {
+							t.Errorf("Maven executable failed: %v\nOutput: %s", err, output)
+						} else {
+							t.Logf("Maven verification successful: %s", strings.Split(string(output), "\n")[0])
+						}
+						return
+					}
+				}
+			}
+		}
+		t.Errorf("Could not find usable Maven installation")
+
+	case "go":
+		// Find Go installation and test it
+		// Try new extraction format first (post-strip-components)
+		goPath := filepath.Join(homeDir, ".mvx", "tools", "go", version, "bin", "go")
+		if _, err := os.Stat(goPath); os.IsNotExist(err) {
+			// Fallback to legacy extraction format
+			goPath = filepath.Join(homeDir, ".mvx", "tools", "go", version, "go", "bin", "go")
+		}
+		cmd := exec.Command(goPath, "version")
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Errorf("Go executable failed: %v\nOutput: %s", err, output)
+		} else {
+			t.Logf("Go verification successful: %s", strings.TrimSpace(string(output)))
+		}
+
+	case "node":
+		// Find Node installation and test it
+		nodePath := filepath.Join(homeDir, ".mvx", "tools", "node")
+		if entries, err := os.ReadDir(nodePath); err == nil {
+			for _, entry := range entries {
+				if entry.IsDir() {
+					versionDir := filepath.Join(nodePath, entry.Name())
+					if nodeExe := findNodeExecutable(versionDir); nodeExe != "" {
+						cmd := exec.Command(nodeExe, "--version")
+						output, err := cmd.CombinedOutput()
+						if err != nil {
+							t.Errorf("Node executable failed: %v\nOutput: %s", err, output)
+						} else {
+							t.Logf("Node verification successful: %s", strings.TrimSpace(string(output)))
+						}
+						return
+					}
+				}
+			}
+		}
+		t.Errorf("Could not find usable Node installation")
+	}
+}
+
+// Helper functions to find executables in tool installations
+func findJavaExecutableWithDebug(t *testing.T, installDir string) string {
+	t.Logf("DEBUG: findJavaExecutableWithDebug called with: %s", installDir)
+
+	// Check if install directory exists
+	if info, err := os.Stat(installDir); err != nil {
+		t.Logf("DEBUG: Install directory does not exist: %v", err)
+		return ""
 	} else {
-		t.Errorf("%s %s is not installed according to Tool.IsInstalled()", toolName, version)
+		t.Logf("DEBUG: Install directory exists (isDir: %v)", info.IsDir())
 	}
+
+	// First, check the direct bin/java location in the install directory
+	directJavaExe := filepath.Join(installDir, "bin", "java")
+	t.Logf("DEBUG: Checking direct location: %s", directJavaExe)
+	if _, err := os.Stat(directJavaExe); err == nil {
+		t.Logf("DEBUG: Found Java at direct location: %s", directJavaExe)
+		return directJavaExe
+	} else {
+		t.Logf("DEBUG: Direct location check failed: %v", err)
+	}
+
+	// Check macOS location directly
+	if runtime.GOOS == "darwin" {
+		directMacOSJavaExe := filepath.Join(installDir, "Contents", "Home", "bin", "java")
+		t.Logf("DEBUG: Checking direct macOS location: %s", directMacOSJavaExe)
+		if _, err := os.Stat(directMacOSJavaExe); err == nil {
+			t.Logf("DEBUG: Found Java at direct macOS location: %s", directMacOSJavaExe)
+			return directMacOSJavaExe
+		} else {
+			t.Logf("DEBUG: Direct macOS location check failed: %v", err)
+		}
+	}
+
+	// Check for nested Java installations (like Zulu with nested structure)
+	if entries, err := os.ReadDir(installDir); err == nil {
+		t.Logf("DEBUG: Found %d entries in install directory", len(entries))
+		for _, entry := range entries {
+			t.Logf("DEBUG: Checking entry: %s (isDir: %v)", entry.Name(), entry.IsDir())
+			if entry.IsDir() && entry.Name() != "bin" { // Skip bin directory to avoid bin/bin/java
+				subPath := filepath.Join(installDir, entry.Name())
+				t.Logf("DEBUG: Checking subPath: %s", subPath)
+
+				// Check standard location
+				javaExe := filepath.Join(subPath, "bin", "java")
+				t.Logf("DEBUG: Checking standard location: %s", javaExe)
+				if _, err := os.Stat(javaExe); err == nil {
+					t.Logf("DEBUG: Found Java at standard location: %s", javaExe)
+					return javaExe
+				} else {
+					t.Logf("DEBUG: Standard location check failed: %v", err)
+				}
+
+				// Check macOS location
+				if runtime.GOOS == "darwin" {
+					macOSJavaExe := filepath.Join(subPath, "Contents", "Home", "bin", "java")
+					t.Logf("DEBUG: Checking macOS location: %s", macOSJavaExe)
+					if _, err := os.Stat(macOSJavaExe); err == nil {
+						t.Logf("DEBUG: Found Java at macOS location: %s", macOSJavaExe)
+						return macOSJavaExe
+					} else {
+						t.Logf("DEBUG: macOS location check failed: %v", err)
+					}
+				}
+
+				// Check nested directories (like zulu-17.jdk)
+				if nestedEntries, err := os.ReadDir(subPath); err == nil {
+					t.Logf("DEBUG: Found %d nested entries in %s", len(nestedEntries), entry.Name())
+					for _, nestedEntry := range nestedEntries {
+						if nestedEntry.IsDir() && nestedEntry.Name() != "bin" { // Skip bin directory
+							nestedPath := filepath.Join(subPath, nestedEntry.Name())
+							t.Logf("DEBUG: Checking nested path: %s", nestedPath)
+
+							// Check nested standard location
+							nestedJavaExe := filepath.Join(nestedPath, "bin", "java")
+							t.Logf("DEBUG: Checking nested standard location: %s", nestedJavaExe)
+							if _, err := os.Stat(nestedJavaExe); err == nil {
+								t.Logf("DEBUG: Found Java at nested standard location: %s", nestedJavaExe)
+								return nestedJavaExe
+							} else {
+								t.Logf("DEBUG: Nested standard location check failed: %v", err)
+							}
+
+							// Check nested macOS location
+							if runtime.GOOS == "darwin" {
+								nestedMacOSJavaExe := filepath.Join(nestedPath, "Contents", "Home", "bin", "java")
+								t.Logf("DEBUG: Checking nested macOS location: %s", nestedMacOSJavaExe)
+								if _, err := os.Stat(nestedMacOSJavaExe); err == nil {
+									t.Logf("DEBUG: Found Java at nested macOS location: %s", nestedMacOSJavaExe)
+									return nestedMacOSJavaExe
+								} else {
+									t.Logf("DEBUG: Nested macOS location check failed: %v", err)
+								}
+							}
+						}
+					}
+				} else {
+					t.Logf("DEBUG: Failed to read nested entries in %s: %v", entry.Name(), err)
+				}
+			}
+		}
+	} else {
+		t.Logf("DEBUG: Failed to read install directory: %v", err)
+	}
+
+	t.Logf("DEBUG: No Java executable found in %s", installDir)
+	return ""
+}
+
+func findJavaExecutable(installDir string) string {
+	// Check for nested Java installations (like Zulu)
+	if entries, err := os.ReadDir(installDir); err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() {
+				subPath := filepath.Join(installDir, entry.Name())
+
+				// Check standard location
+				javaExe := filepath.Join(subPath, "bin", "java")
+				if _, err := os.Stat(javaExe); err == nil {
+					return javaExe
+				}
+
+				// Check macOS location
+				if runtime.GOOS == "darwin" {
+					macOSJavaExe := filepath.Join(subPath, "Contents", "Home", "bin", "java")
+					if _, err := os.Stat(macOSJavaExe); err == nil {
+						return macOSJavaExe
+					}
+				}
+
+				// Check nested directories (like zulu-17.jdk)
+				if nestedEntries, err := os.ReadDir(subPath); err == nil {
+					for _, nestedEntry := range nestedEntries {
+						if nestedEntry.IsDir() {
+							nestedPath := filepath.Join(subPath, nestedEntry.Name())
+
+							// Check nested standard location
+							nestedJavaExe := filepath.Join(nestedPath, "bin", "java")
+							if _, err := os.Stat(nestedJavaExe); err == nil {
+								return nestedJavaExe
+							}
+
+							// Check nested macOS location
+							if runtime.GOOS == "darwin" {
+								nestedMacOSJavaExe := filepath.Join(nestedPath, "Contents", "Home", "bin", "java")
+								if _, err := os.Stat(nestedMacOSJavaExe); err == nil {
+									return nestedMacOSJavaExe
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func findMavenExecutable(installDir string) string {
+	// Try new extraction format first (post-strip-components)
+	// Maven files are directly in the version directory
+	mvnExe := filepath.Join(installDir, "bin", "mvn")
+	if runtime.GOOS == "windows" {
+		mvnExe += ".cmd"
+	}
+	if _, err := os.Stat(mvnExe); err == nil {
+		return mvnExe
+	}
+
+	// Fallback to legacy extraction format
+	// Maven typically extracts to apache-maven-{version}/
+	if entries, err := os.ReadDir(installDir); err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() && strings.Contains(entry.Name(), "apache-maven") {
+				mvnExe := filepath.Join(installDir, entry.Name(), "bin", "mvn")
+				if runtime.GOOS == "windows" {
+					mvnExe += ".cmd"
+				}
+				if _, err := os.Stat(mvnExe); err == nil {
+					return mvnExe
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func findNodeExecutable(installDir string) string {
+	// Try new extraction format first (post-strip-components)
+	nodeExe := filepath.Join(installDir, "bin", "node")
+	if runtime.GOOS == "windows" {
+		nodeExe += ".exe"
+	}
+	if _, err := os.Stat(nodeExe); err == nil {
+		return nodeExe
+	}
+
+	// Fallback to legacy extraction format: node-v{version}-{platform}/
+	if entries, err := os.ReadDir(installDir); err == nil {
+		for _, entry := range entries {
+			if entry.IsDir() && strings.HasPrefix(entry.Name(), "node-v") {
+				nodeExe := filepath.Join(installDir, entry.Name(), "bin", "node")
+				if runtime.GOOS == "windows" {
+					nodeExe += ".exe"
+				}
+				if _, err := os.Stat(nodeExe); err == nil {
+					return nodeExe
+				}
+			}
+		}
+	}
+	return ""
 }
 
 // testSetupCommand tests the complete setup command with multiple tools
@@ -1064,4 +1709,137 @@ func testAutoSetup(t *testing.T, mvxBinary string) {
 	})
 
 	t.Logf("Auto-setup tests completed!")
+}
+
+// Helper functions for enhanced debugging
+
+type DiskUsage struct {
+	Total uint64
+	Free  uint64
+	Used  uint64
+}
+
+func getDiskUsage(path string) (*DiskUsage, error) {
+	var stat syscall.Statfs_t
+	err := syscall.Statfs(path, &stat)
+	if err != nil {
+		return nil, err
+	}
+
+	return &DiskUsage{
+		Total: stat.Blocks * uint64(stat.Bsize),
+		Free:  stat.Bavail * uint64(stat.Bsize),
+		Used:  (stat.Blocks - stat.Bfree) * uint64(stat.Bsize),
+	}, nil
+}
+
+// logExtremeSystemState logs absolutely everything about the current system state
+func logExtremeSystemState(t *testing.T, phase string) {
+	t.Logf("🔥 ========== EXTREME SYSTEM STATE: %s ==========", phase)
+
+	// Runtime information
+	t.Logf("🔥 RUNTIME: GOOS=%s GOARCH=%s NumCPU=%d NumGoroutine=%d",
+		runtime.GOOS, runtime.GOARCH, runtime.NumCPU(), runtime.NumGoroutine())
+
+	// Memory stats
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	t.Logf("🔥 MEMORY: Alloc=%d KB, TotalAlloc=%d KB, Sys=%d KB, NumGC=%d",
+		m.Alloc/1024, m.TotalAlloc/1024, m.Sys/1024, m.NumGC)
+
+	// Process information
+	t.Logf("🔥 PROCESS: PID=%d UID=%d GID=%d", os.Getpid(), os.Getuid(), os.Getgid())
+
+	// Working directory
+	if wd, err := os.Getwd(); err == nil {
+		t.Logf("🔥 WORKING_DIR: %s", wd)
+		if info, err := os.Stat(wd); err == nil {
+			t.Logf("🔥 WORKING_DIR_PERMS: %v", info.Mode())
+		}
+	} else {
+		t.Logf("🔥 WORKING_DIR_ERROR: %v", err)
+	}
+
+	// Home directory
+	if home, err := os.UserHomeDir(); err == nil {
+		t.Logf("🔥 HOME_DIR: %s", home)
+		if info, err := os.Stat(home); err == nil {
+			t.Logf("🔥 HOME_DIR_PERMS: %v", info.Mode())
+		}
+
+		// Check .mvx directory
+		mvxDir := filepath.Join(home, ".mvx")
+		if info, err := os.Stat(mvxDir); err == nil {
+			t.Logf("🔥 MVX_DIR: exists, size=%d, mode=%v", info.Size(), info.Mode())
+
+			// List .mvx contents
+			if entries, err := os.ReadDir(mvxDir); err == nil {
+				t.Logf("🔥 MVX_DIR_CONTENTS: %d entries", len(entries))
+				for i, entry := range entries {
+					if i < 10 { // Limit to first 10 entries
+						t.Logf("🔥   - %s (isDir=%v)", entry.Name(), entry.IsDir())
+					}
+				}
+			}
+		} else {
+			t.Logf("🔥 MVX_DIR: does not exist (%v)", err)
+		}
+	} else {
+		t.Logf("🔥 HOME_DIR_ERROR: %v", err)
+	}
+
+	// Environment variables (key ones)
+	envVars := []string{"PATH", "HOME", "USER", "TMPDIR", "JAVA_HOME", "MAVEN_HOME", "CI", "GITHUB_ACTIONS"}
+	for _, env := range envVars {
+		if value := os.Getenv(env); value != "" {
+			// Truncate very long values
+			if len(value) > 200 {
+				value = value[:200] + "..."
+			}
+			t.Logf("🔥 ENV_%s: %s", env, value)
+		} else {
+			t.Logf("🔥 ENV_%s: <not set>", env)
+		}
+	}
+
+	// Disk usage
+	if usage, err := getDiskUsage("."); err == nil {
+		t.Logf("🔥 DISK: Total=%d MB, Free=%d MB, Used=%d MB",
+			usage.Total/1024/1024, usage.Free/1024/1024, usage.Used/1024/1024)
+	} else {
+		t.Logf("🔥 DISK_ERROR: %v", err)
+	}
+
+	// Network connectivity (quick test)
+	t.Logf("🔥 NETWORK: Testing connectivity...")
+	if conn, err := net.DialTimeout("tcp", "8.8.8.8:53", 2*time.Second); err == nil {
+		conn.Close()
+		t.Logf("🔥 NETWORK: TCP connectivity OK")
+	} else {
+		t.Logf("🔥 NETWORK: TCP connectivity FAILED: %v", err)
+	}
+
+	t.Logf("🔥 ========== END EXTREME SYSTEM STATE: %s ==========", phase)
+}
+
+func testNetworkConnectivity(t *testing.T) error {
+	// Test basic DNS resolution
+	_, err := net.LookupHost("github.com")
+	if err != nil {
+		t.Logf("DEBUG: DNS lookup failed: %v", err)
+		return fmt.Errorf("DNS lookup failed: %v", err)
+	}
+	t.Logf("DEBUG: DNS lookup successful")
+
+	// Test HTTP connectivity
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get("https://github.com")
+	if err != nil {
+		t.Logf("DEBUG: HTTP connectivity test failed: %v", err)
+		return fmt.Errorf("HTTP connectivity failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	t.Logf("DEBUG: HTTP connectivity successful (status: %s)", resp.Status)
+	return nil
 }

@@ -11,15 +11,17 @@ import (
 
 // EnvironmentManager provides safe environment variable management with special PATH handling
 type EnvironmentManager struct {
-	envVars  map[string]string
-	pathDirs []string
+	envVars         map[string]string
+	pathDirs        []string
+	originalEnvVars map[string]string // Track original values to detect changes
 }
 
 // NewEnvironmentManager creates a new environment manager
 func NewEnvironmentManager() *EnvironmentManager {
 	return &EnvironmentManager{
-		envVars:  make(map[string]string),
-		pathDirs: []string{},
+		envVars:         make(map[string]string),
+		pathDirs:        []string{},
+		originalEnvVars: make(map[string]string),
 	}
 }
 
@@ -35,6 +37,7 @@ func NewEnvironmentManagerFromMap(envVars map[string]string) *EnvironmentManager
 			}
 		} else {
 			em.envVars[key] = value
+			em.originalEnvVars[key] = value // Track original value
 		}
 	}
 
@@ -46,8 +49,28 @@ func (em *EnvironmentManager) SetEnv(key, value string) {
 	if key == "PATH" {
 		panic("Cannot set PATH directly, use AddToPath() or AppendToPath() instead")
 	}
+
+	// Check if this is a new value or a change
+	oldValue, existed := em.envVars[key]
+	_, hadOriginal := em.originalEnvVars[key]
+
+	// Store the original value if this is the first time we're seeing this key
+	if !hadOriginal {
+		em.originalEnvVars[key] = os.Getenv(key)
+	}
+
 	em.envVars[key] = value
-	util.LogVerbose("Set environment variable %s=%s", key, value)
+
+	// Only log if the value actually changed from the original
+	if !existed {
+		// New variable being set
+		if em.originalEnvVars[key] != value {
+			util.LogVerbose("Set environment variable %s=%s", key, value)
+		}
+	} else if oldValue != value {
+		// Value changed
+		util.LogVerbose("Updated environment variable %s=%s (was: %s)", key, value, oldValue)
+	}
 }
 
 // GetEnv gets an environment variable
