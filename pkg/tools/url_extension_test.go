@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"strings"
 	"testing"
 )
 
@@ -39,19 +38,22 @@ func TestURLExtensionDetection(t *testing.T) {
 			downloadURL: "https://example.com/tool-1.0.0.tar.xz",
 			expectedExt: ".tar.xz",
 		},
+		{
+			name:        "Java Windows ZIP (GitHub redirect)",
+			downloadURL: "https://github.com/adoptium/temurin22-binaries/releases/download/jdk-22.0.2%2B9/OpenJDK22U-jdk_x64_windows_hotspot_22.0.2_9.zip",
+			expectedExt: ".zip",
+		},
+		{
+			name:        "Java Linux tar.gz (GitHub redirect)",
+			downloadURL: "https://github.com/adoptium/temurin22-binaries/releases/download/jdk-22.0.2%2B9/OpenJDK22U-jdk_x64_linux_hotspot_22.0.2_9.tar.gz",
+			expectedExt: ".tar.gz",
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Simulate what happens in Download method - always detect from URL
-			fileExtension := ExtTarGz // fallback
-			if strings.HasSuffix(tc.downloadURL, ExtZip) {
-				fileExtension = ExtZip
-			} else if strings.HasSuffix(tc.downloadURL, ExtTarXz) {
-				fileExtension = ExtTarXz
-			} else if strings.HasSuffix(tc.downloadURL, ExtTarGz) {
-				fileExtension = ExtTarGz
-			}
+			// Use the actual detection function from Download method
+			fileExtension := detectFileExtensionFromURL(tc.downloadURL)
 
 			if fileExtension != tc.expectedExt {
 				t.Errorf("Expected extension %s for URL %s, got %s", tc.expectedExt, tc.downloadURL, fileExtension)
