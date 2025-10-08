@@ -475,7 +475,7 @@ func verifyChecksum(filePath string, config *DownloadConfig) error {
 			// Don't panic, return error instead for better error handling
 			return fmt.Errorf("checksum verification failed (required): %v", err)
 		}
-		fmt.Printf("✅ Checksum verified successfully (required)\n")
+		fmt.Printf("  ✅ Checksum verified successfully (required)\n")
 	} else {
 		// Optional verification - warn on error
 		verifier.VerifyFileWithWarning(filePath, checksumInfo)
