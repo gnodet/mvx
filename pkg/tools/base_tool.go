@@ -168,14 +168,7 @@ func (b *BaseTool) CreateInstallDir(version, distribution string) (string, error
 // Download performs a robust download with checksum verification
 func (b *BaseTool) Download(url, version string, cfg config.ToolConfig) (string, error) {
 	// Always determine file extension from the download URL
-	fileExtension := ExtTarGz // fallback
-	if strings.HasSuffix(url, ExtZip) {
-		fileExtension = ExtZip
-	} else if strings.HasSuffix(url, ExtTarXz) {
-		fileExtension = ExtTarXz
-	} else if strings.HasSuffix(url, ExtTarGz) {
-		fileExtension = ExtTarGz
-	}
+	fileExtension := detectFileExtensionFromURL(url)
 
 	// Create temporary file for download
 	tmpFile, err := os.CreateTemp("", fmt.Sprintf("%s-*%s", b.toolName, fileExtension))
@@ -552,6 +545,49 @@ func (b *BaseTool) StandardVerify(version string, cfg config.ToolConfig, getPath
 		return VerifyError(b.toolName, version, err)
 	}
 	return nil
+}
+
+// detectFileExtensionFromURL detects the correct file extension from a download URL
+// This handles both direct URLs and redirect URLs (like Java's Disco API)
+func detectFileExtensionFromURL(downloadURL string) string {
+	// First try direct URL suffix detection
+	if strings.HasSuffix(downloadURL, ExtZip) {
+		return ExtZip
+	}
+	if strings.HasSuffix(downloadURL, ExtTarXz) {
+		return ExtTarXz
+	}
+	if strings.HasSuffix(downloadURL, ExtTarGz) {
+		return ExtTarGz
+	}
+
+	// For redirect URLs (like Java Disco API), try to extract filename from URL path
+	// Example: https://github.com/adoptium/temurin22-binaries/releases/download/jdk-22.0.2%2B9/OpenJDK22U-jdk_x64_windows_hotspot_22.0.2_9.zip
+	if parsed, err := url.Parse(downloadURL); err == nil {
+		// Extract filename from URL path
+		pathParts := strings.Split(parsed.Path, "/")
+		if len(pathParts) > 0 {
+			filename := pathParts[len(pathParts)-1]
+			// URL decode the filename in case it's encoded
+			if decoded, err := url.QueryUnescape(filename); err == nil {
+				filename = decoded
+			}
+
+			// Check file extension in the filename
+			if strings.HasSuffix(strings.ToLower(filename), ".zip") {
+				return ExtZip
+			}
+			if strings.HasSuffix(strings.ToLower(filename), ".tar.xz") {
+				return ExtTarXz
+			}
+			if strings.HasSuffix(strings.ToLower(filename), ".tar.gz") || strings.HasSuffix(strings.ToLower(filename), ".tgz") {
+				return ExtTarGz
+			}
+		}
+	}
+
+	// Default fallback
+	return ExtTarGz
 }
 
 // StandardVerifyWithConfig provides standard verification using VerificationConfig
