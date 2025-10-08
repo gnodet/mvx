@@ -195,10 +195,10 @@ func truncateString(s string, maxLen int) string {
 // VerifyFileWithWarning verifies a file with checksum, but only warns if verification fails
 func (cv *ChecksumVerifier) VerifyFileWithWarning(filePath string, checksum ChecksumInfo) {
 	if err := cv.VerifyFile(filePath, checksum); err != nil {
-		fmt.Printf("⚠️  Checksum verification failed: %v\n", err)
-		fmt.Printf("   File: %s\n", filePath)
-		fmt.Printf("   This could indicate a corrupted download or security issue.\n")
+		fmt.Printf("  ⚠️  Checksum verification failed: %v\n", err)
+		fmt.Printf("      File: %s\n", filePath)
+		fmt.Printf("      This could indicate a corrupted download or security issue.\n")
 	} else {
-		fmt.Printf("✅ Checksum verified successfully\n")
+		fmt.Printf("  ✅ Checksum verified successfully\n")
 	}
 }
