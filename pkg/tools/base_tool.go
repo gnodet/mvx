@@ -166,9 +166,19 @@ func (b *BaseTool) CreateInstallDir(version, distribution string) (string, error
 }
 
 // Download performs a robust download with checksum verification
-func (b *BaseTool) Download(url, version string, cfg config.ToolConfig, options DownloadOptions) (string, error) {
+func (b *BaseTool) Download(url, version string, cfg config.ToolConfig) (string, error) {
+	// Always determine file extension from the download URL
+	fileExtension := ExtTarGz // fallback
+	if strings.HasSuffix(url, ExtZip) {
+		fileExtension = ExtZip
+	} else if strings.HasSuffix(url, ExtTarXz) {
+		fileExtension = ExtTarXz
+	} else if strings.HasSuffix(url, ExtTarGz) {
+		fileExtension = ExtTarGz
+	}
+
 	// Create temporary file for download
-	tmpFile, err := os.CreateTemp("", fmt.Sprintf("%s-*%s", b.toolName, options.FileExtension))
+	tmpFile, err := os.CreateTemp("", fmt.Sprintf("%s-*%s", b.toolName, fileExtension))
 	if err != nil {
 		return "", fmt.Errorf("failed to create temporary file: %w", err)
 	}
@@ -202,7 +212,7 @@ func (b *BaseTool) Download(url, version string, cfg config.ToolConfig, options 
 }
 
 // Extract extracts an archive file to the destination directory
-func (b *BaseTool) Extract(archivePath, destDir string, options DownloadOptions) error {
+func (b *BaseTool) Extract(archivePath, destDir string) error {
 	// Use automatic archive type detection based on file extension
 	return ExtractArchive(archivePath, destDir)
 }
@@ -376,21 +386,16 @@ func (b *BaseTool) getInstalledVersionsForTool(tool Tool, toolName string) []Ins
 
 // DownloadAndExtract performs a robust download with checksum verification and extraction
 // This is a convenience method that combines Download and Extract
-func (b *BaseTool) DownloadAndExtract(url, destDir, version string, cfg config.ToolConfig, options DownloadOptions) error {
+func (b *BaseTool) DownloadAndExtract(url, destDir, version string, cfg config.ToolConfig) error {
 	// Download the file
-	archivePath, err := b.Download(url, version, cfg, options)
+	archivePath, err := b.Download(url, version, cfg)
 	if err != nil {
 		return err
 	}
 	defer os.Remove(archivePath) // Clean up downloaded file after extraction
 
 	// Extract the file
-	return b.Extract(archivePath, destDir, options)
-}
-
-// DownloadOptions contains options for downloading and extracting files
-type DownloadOptions struct {
-	FileExtension string // e.g., ".tar.gz", ".zip" - used for temporary file naming
+	return b.Extract(archivePath, destDir)
 }
 
 // VerifyBinary runs a binary with version flag and checks the output
@@ -476,26 +481,6 @@ func (b *BaseTool) PrintDownloadMessage(version string) {
 	fmt.Printf("  ⏳ Downloading %s %s...\n", toolDisplayName, version)
 }
 
-// GetDefaultDownloadOptions returns default download options for tools that don't specify their own
-func (b *BaseTool) GetDefaultDownloadOptions() DownloadOptions {
-	return DownloadOptions{
-		FileExtension: ExtTarGz,
-	}
-}
-
-// getDownloadOptions returns download options for this tool
-// Tools can implement GetDownloadOptions() to provide their own options
-func (b *BaseTool) getDownloadOptions() DownloadOptions {
-	// Use reflection to check if the concrete tool implements GetDownloadOptions
-	if tool, err := b.manager.GetTool(b.toolName); err == nil {
-		if optionsProvider, hasMethod := tool.(interface{ GetDownloadOptions() DownloadOptions }); hasMethod {
-			return optionsProvider.GetDownloadOptions()
-		}
-	}
-	// Fall back to default options
-	return b.GetDefaultDownloadOptions()
-}
-
 // StandardInstall provides a standard installation flow for most tools
 func (b *BaseTool) StandardInstall(version string, cfg config.ToolConfig, getDownloadURL func(string) string) error {
 	// Check if we should use system tool instead of downloading
@@ -524,18 +509,15 @@ func (b *BaseTool) StandardInstall(version string, cfg config.ToolConfig, getDow
 	// Print download message
 	b.PrintDownloadMessage(version)
 
-	// Get tool-specific download options
-	options := b.getDownloadOptions()
-
 	// Download the file
-	archivePath, err := b.Download(downloadURL, version, cfg, options)
+	archivePath, err := b.Download(downloadURL, version, cfg)
 	if err != nil {
 		return InstallError(b.toolName, version, err)
 	}
 	defer os.Remove(archivePath) // Clean up downloaded file
 
 	// Extract the file
-	if err := b.Extract(archivePath, installDir, options); err != nil {
+	if err := b.Extract(archivePath, installDir); err != nil {
 		return InstallError(b.toolName, version, err)
 	}
 

@@ -156,15 +156,6 @@ func (n *NodeTool) fetchNodeLTSVersions() ([]string, error) {
 	return versions, nil
 }
 
-// GetDownloadOptions returns download options specific to Node.js
-func (n *NodeTool) GetDownloadOptions() DownloadOptions {
-	// Note: FileExtension is used for temporary file naming
-	// Actual archive type is auto-detected during extraction
-	return DownloadOptions{
-		FileExtension: ExtTarGz, // Default extension for temp file naming
-	}
-}
-
 func (n *NodeTool) getDownloadURL(version string) string {
 	platformMapper := NewPlatformMapper()
 

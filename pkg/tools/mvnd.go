@@ -137,13 +137,6 @@ func (m *MvndTool) getFallbackMvndVersions() []string {
 	}
 }
 
-// GetDownloadOptions returns download options specific to Maven Daemon
-func (m *MvndTool) GetDownloadOptions() DownloadOptions {
-	return DownloadOptions{
-		FileExtension: ".zip",
-	}
-}
-
 // getDownloadURL returns the download URL for the specified version
 func (m *MvndTool) getDownloadURL(version string) string {
 	// Determine platform-specific archive name
@@ -282,16 +275,14 @@ func (m *MvndTool) installWithFallback(version string, cfg config.ToolConfig) er
 	archiveURL := m.getArchiveDownloadURL(version)
 	m.PrintDownloadMessage(version)
 
-	options := m.GetDownloadOptions()
-
 	// Try to download with alternating URLs and reduced retries per URL
-	archivePath, err := m.downloadWithAlternatingURLs(primaryURL, archiveURL, version, cfg, options)
+	archivePath, err := m.downloadWithAlternatingURLs(primaryURL, archiveURL, version, cfg)
 	if err != nil {
 		return InstallError("mvnd", version, fmt.Errorf("download failed from both primary and archive URLs: %w", err))
 	}
 
 	// Extract archive
-	if err := m.Extract(archivePath, installDir, options); err != nil {
+	if err := m.Extract(archivePath, installDir); err != nil {
 		return InstallError("mvnd", version, fmt.Errorf("failed to extract archive: %w", err))
 	}
 
@@ -306,7 +297,7 @@ func (m *MvndTool) installWithFallback(version string, cfg config.ToolConfig) er
 
 // downloadWithAlternatingURLs tries downloading from both URLs with reduced retries per URL
 // instead of exhausting all retries on the first URL before trying the second
-func (m *MvndTool) downloadWithAlternatingURLs(primaryURL, archiveURL, version string, cfg config.ToolConfig, options DownloadOptions) (string, error) {
+func (m *MvndTool) downloadWithAlternatingURLs(primaryURL, archiveURL, version string, cfg config.ToolConfig) (string, error) {
 	urls := []struct {
 		url  string
 		name string
@@ -339,8 +330,8 @@ func (m *MvndTool) downloadWithAlternatingURLs(primaryURL, archiveURL, version s
 		downloadConfig.Config = cfg
 		downloadConfig.Tool = m
 
-		// Create temporary file for download
-		tmpFile, err := os.CreateTemp("", fmt.Sprintf("mvnd-*%s", options.FileExtension))
+		// Create temporary file for download (Mvnd always uses ZIP)
+		tmpFile, err := os.CreateTemp("", "mvnd-*.zip")
 		if err != nil {
 			lastErr = fmt.Errorf("failed to create temporary file: %w", err)
 			continue
