@@ -56,17 +56,15 @@ func (m *MavenTool) installWithFallback(version string, cfg config.ToolConfig) e
 	archiveURL := m.getArchiveDownloadURL(version)
 	m.PrintDownloadMessage(version)
 
-	options := m.GetDownloadOptions()
-
 	// Try to download with alternating URLs and reduced retries per URL
-	archivePath, err := m.downloadWithAlternatingURLs(primaryURL, archiveURL, version, cfg, options)
+	archivePath, err := m.downloadWithAlternatingURLs(primaryURL, archiveURL, version, cfg)
 	if err != nil {
 		return InstallError(m.GetToolName(), version, fmt.Errorf("download failed from both primary and archive URLs: %w", err))
 	}
 	defer os.Remove(archivePath) // Clean up downloaded file
 
 	// Extract the downloaded file
-	if err := m.Extract(archivePath, installDir, options); err != nil {
+	if err := m.Extract(archivePath, installDir); err != nil {
 		return InstallError(m.toolName, version, err)
 	}
 
@@ -199,13 +197,6 @@ func (m *MavenTool) fetchVersionsFromApacheRepo(repoURL string) ([]string, error
 	return registry.FetchVersionsFromApacheRepo(repoURL)
 }
 
-// GetDownloadOptions returns download options specific to Maven
-func (m *MavenTool) GetDownloadOptions() DownloadOptions {
-	return DownloadOptions{
-		FileExtension: ExtZip,
-	}
-}
-
 // getDownloadURL returns the download URL for the specified version
 func (m *MavenTool) getDownloadURL(version string) string {
 	// For recent releases, use dist.apache.org (CDN-backed)
@@ -315,7 +306,7 @@ func (m *MavenTool) fetchChecksumFromURL(url string) (string, error) {
 
 // downloadWithAlternatingURLs tries downloading from both URLs with reduced retries per URL
 // instead of exhausting all retries on the first URL before trying the second
-func (m *MavenTool) downloadWithAlternatingURLs(primaryURL, archiveURL, version string, cfg config.ToolConfig, options DownloadOptions) (string, error) {
+func (m *MavenTool) downloadWithAlternatingURLs(primaryURL, archiveURL, version string, cfg config.ToolConfig) (string, error) {
 	urls := []struct {
 		url  string
 		name string
@@ -348,8 +339,8 @@ func (m *MavenTool) downloadWithAlternatingURLs(primaryURL, archiveURL, version 
 		downloadConfig.Config = cfg
 		downloadConfig.Tool = m
 
-		// Create temporary file for download
-		tmpFile, err := os.CreateTemp("", fmt.Sprintf("maven-*%s", options.FileExtension))
+		// Create temporary file for download (Maven always uses ZIP)
+		tmpFile, err := os.CreateTemp("", "maven-*.zip")
 		if err != nil {
 			lastErr = fmt.Errorf("failed to create temporary file: %w", err)
 			continue

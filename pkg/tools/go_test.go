@@ -5,18 +5,17 @@ import (
 	"testing"
 )
 
-func TestGoToolGetDownloadOptions(t *testing.T) {
+func TestGoToolBasicFunctionality(t *testing.T) {
 	manager, err := NewManager()
 	if err != nil {
 		t.Fatalf("Failed to create manager: %v", err)
 	}
 
 	goTool := NewGoTool(manager)
-	options := goTool.GetDownloadOptions()
 
-	// Test that download options are returned (FileExtension is used for temp file naming)
-	if options.FileExtension == "" {
-		t.Errorf("Expected FileExtension to be non-empty")
+	// Test that the tool can be created without issues
+	if goTool.GetToolName() != "go" {
+		t.Errorf("Expected tool name 'go', got '%s'", goTool.GetToolName())
 	}
 }
 

@@ -182,18 +182,15 @@ func (j *JavaTool) installWithDistribution(version string, cfg config.ToolConfig
 		}
 	}
 
-	// Get tool-specific download options
-	options := j.getDownloadOptions()
-
 	// Download the file with checksum verification
-	archivePath, err := j.Download(downloadURL, version, configWithChecksum, options)
+	archivePath, err := j.Download(downloadURL, version, configWithChecksum)
 	if err != nil {
 		return InstallError(j.toolName, version, err)
 	}
 	defer os.Remove(archivePath) // Clean up downloaded file
 
 	// Extract the file
-	if err := j.Extract(archivePath, installDir, options); err != nil {
+	if err := j.Extract(archivePath, installDir); err != nil {
 		return InstallError(j.toolName, version, err)
 	}
 
@@ -627,13 +624,6 @@ func (j *JavaTool) getDetailedVersionsForMajor(majorVersion, distribution string
 	})
 
 	return versions, nil
-}
-
-// GetDownloadOptions returns download options specific to Java
-func (j *JavaTool) GetDownloadOptions() DownloadOptions {
-	return DownloadOptions{
-		FileExtension: ExtTarGz,
-	}
 }
 
 // getDownloadURL returns the download URL for the specified version and distribution using Disco API
