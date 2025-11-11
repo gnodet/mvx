@@ -240,6 +240,12 @@ func (b *BaseTool) Verify(installDir, version string, cfg config.ToolConfig) err
 
 // VerifyWithConfig performs comprehensive verification using configuration
 func (b *BaseTool) VerifyWithConfig(version string, cfg config.ToolConfig, verifyConfig VerificationConfig) error {
+	// If using system tool, skip mvx-managed verification entirely
+	if UseSystemTool(b.toolName) {
+		util.LogVerbose("Skipping %s verification: %s=true (using system tool)", b.toolName, getSystemToolEnvVar(b.toolName))
+		return nil
+	}
+
 	// Get tool path
 	_, err := b.manager.GetTool(b.toolName)
 	if err != nil {
