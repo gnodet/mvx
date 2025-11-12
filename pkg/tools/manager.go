@@ -772,13 +772,6 @@ func (m *Manager) SetupEnvironment(cfg *config.Config) (map[string]string, error
 
 	// Add tool-specific environment variables and PATH entries
 	for toolName, toolConfig := range cfg.Tools {
-		// Check if user wants to use system tool instead
-		systemEnvVar := fmt.Sprintf("MVX_USE_SYSTEM_%s", strings.ToUpper(toolName))
-		if os.Getenv(systemEnvVar) == "true" {
-			util.LogVerbose("Skipping %s environment setup: %s=true (using system tool)", toolName, systemEnvVar)
-			continue
-		}
-
 		// Resolve version
 		resolvedVersion, err := m.resolveVersion(toolName, toolConfig)
 		if err != nil {
@@ -789,7 +782,7 @@ func (m *Manager) SetupEnvironment(cfg *config.Config) (map[string]string, error
 		resolvedConfig := toolConfig
 		resolvedConfig.Version = resolvedVersion
 
-		// Check if installed (using cache)
+		// Check if installed (using cache) - this works for both system and mvx-managed tools
 		if !m.isToolInstalled(toolName, resolvedVersion, resolvedConfig) {
 			util.LogVerbose("Skipping tool %s: not installed", toolName)
 			continue // Skip uninstalled tools
@@ -802,18 +795,24 @@ func (m *Manager) SetupEnvironment(cfg *config.Config) (map[string]string, error
 			continue
 		}
 
-		// Get tool path and add to PATH
+		// Get tool path and add to PATH (returns empty string for system tools already in PATH)
 		toolPath, err := tool.GetPath(resolvedVersion, resolvedConfig)
 		if err != nil {
 			util.LogVerbose("Skipping tool %s: failed to get path: %v", toolName, err)
 			continue
 		}
 
-		// Add tool bin directory to PATH
-		envManager.AddToPath(toolPath)
-		util.LogVerbose("Added %s bin path to PATH: %s", toolName, toolPath)
+		// Add tool bin directory to PATH (only if path is not empty)
+		// For system tools already in PATH, toolPath will be empty and we skip adding it
+		if toolPath != "" {
+			envManager.AddToPath(toolPath)
+			util.LogVerbose("Added %s bin path to PATH: %s", toolName, toolPath)
+		} else {
+			util.LogVerbose("System %s is in PATH, not adding to PATH", toolName)
+		}
 
 		// Set tool-specific environment variables (HOME directories, etc.)
+		// This is important for system tools too - they may need HOME variables set
 		if envProvider, ok := tool.(EnvironmentProvider); ok {
 			if err := envProvider.SetupEnvironment(resolvedVersion, resolvedConfig, envManager); err != nil {
 				util.LogVerbose("Failed to setup environment for %s %s: %v", toolName, resolvedVersion, err)

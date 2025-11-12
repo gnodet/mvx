@@ -352,11 +352,29 @@ func (b *BaseTool) SetupHomeEnvironment(version string, cfg config.ToolConfig, e
 		return nil
 	}
 
+	// If binPath is empty, this might be a system tool already in PATH
+	// Try to get the HOME directory from the system tool detection
+	if binPath == "" && UseSystemTool(b.toolName) {
+		homeEnvVar := getSystemToolHomeEnvVar(b.toolName)
+		if homeEnvVar != "" && homeEnvVar == envVarName {
+			// Try to get the system tool home directory
+			if homeDir, _, err := getSystemToolHome(b.toolName, b.GetBinaryName(), homeEnvVar); err == nil {
+				envVars[envVarName] = homeDir
+				util.LogVerbose("Set %s=%s for system %s %s", envVarName, homeDir, b.toolName, version)
+				return nil
+			}
+		}
+		// If we can't determine HOME, that's okay - the tool might work from PATH alone
+		return nil
+	}
+
 	// *_HOME should point to the installation directory, not the bin directory
-	if strings.HasSuffix(binPath, "/bin") {
-		homeDir := strings.TrimSuffix(binPath, "/bin")
-		envVars[envVarName] = homeDir
-		util.LogVerbose("Set %s=%s for %s %s", envVarName, homeDir, b.toolName, version)
+	if binPath != "" {
+		if strings.HasSuffix(binPath, "/bin") || strings.HasSuffix(binPath, "\\bin") {
+			homeDir := strings.TrimSuffix(strings.TrimSuffix(binPath, "/bin"), "\\bin")
+			envVars[envVarName] = homeDir
+			util.LogVerbose("Set %s=%s for %s %s", envVarName, homeDir, b.toolName, version)
+		}
 	}
 
 	return nil
@@ -644,9 +662,19 @@ func (b *BaseTool) ListInstalledVersions(distribution string) []InstalledVersion
 // StandardIsInstalled provides standard installation check for tools
 func (b *BaseTool) StandardIsInstalled(versionSpec string, cfg config.ToolConfig, getPath func(string, config.ToolConfig) (string, error)) bool {
 	if UseSystemTool(b.toolName) {
+		// Try primary binary name in PATH first
 		if _, err := exec.LookPath(b.GetBinaryName()); err == nil {
 			util.LogVerbose("System %s is available in PATH (MVX_USE_SYSTEM_%s=true)", b.toolName, strings.ToUpper(b.toolName))
 			return true
+		}
+
+		// If not in PATH, try to get HOME environment variable (which can derive from HOME env var or PATH)
+		homeEnvVar := getSystemToolHomeEnvVar(b.toolName)
+		if homeEnvVar != "" {
+			if _, _, err := getSystemToolHome(b.toolName, b.GetBinaryName(), homeEnvVar); err == nil {
+				util.LogVerbose("System %s is available via %s (MVX_USE_SYSTEM_%s=true)", b.toolName, homeEnvVar, strings.ToUpper(b.toolName))
+				return true
+			}
 		}
 
 		util.LogVerbose("System %s not available: not found in environment variables or PATH", b.toolName)
@@ -795,14 +823,26 @@ func (b *BaseTool) StandardGetPath(version string, cfg config.ToolConfig, getIns
 	}
 	// Check if we should use system tool instead of mvx-managed tool
 	if UseSystemTool(b.toolName) {
-		// Try primary binary name in PATH
+		// Try to find system tool - first check if it's in PATH
 		if _, err := exec.LookPath(b.GetBinaryName()); err == nil {
 			util.LogVerbose("Using system %s from PATH (MVX_USE_SYSTEM_%s=true)", b.toolName, strings.ToUpper(b.toolName))
 			b.setCachedPath(cacheKey, "", nil)
 			return "", nil
 		}
 
-		systemErr := SystemToolError(b.toolName, fmt.Errorf("MVX_USE_SYSTEM_%s=true but system %s not available", strings.ToUpper(b.toolName), b.toolName))
+		// If not in PATH, try to get HOME environment variable and use its bin directory
+		homeEnvVar := getSystemToolHomeEnvVar(b.toolName)
+		if homeEnvVar != "" {
+			_, binDir, err := getSystemToolHome(b.toolName, b.GetBinaryName(), homeEnvVar)
+			if err == nil {
+				util.LogVerbose("Using system %s from %s/bin (MVX_USE_SYSTEM_%s=true, adding to PATH)", b.toolName, homeEnvVar, strings.ToUpper(b.toolName))
+				b.setCachedPath(cacheKey, binDir, nil)
+				return binDir, nil
+			}
+		}
+
+		// Neither in PATH nor HOME available
+		systemErr := SystemToolError(b.toolName, fmt.Errorf("MVX_USE_SYSTEM_%s=true but system %s not available (not in PATH and %s not set or invalid)", strings.ToUpper(b.toolName), b.toolName, homeEnvVar))
 		b.setCachedPath(cacheKey, "", systemErr)
 		return "", systemErr
 	}

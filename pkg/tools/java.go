@@ -31,23 +31,6 @@ type DiscoDistribution struct {
 	Available    bool   `json:"available"`
 }
 
-// getSystemJavaHome returns the system JAVA_HOME if available and valid
-func getSystemJavaHome() (string, error) {
-	javaHome := os.Getenv(EnvJavaHome)
-	if javaHome == "" {
-		return "", SystemToolError(ToolJava, fmt.Errorf("%s environment variable not set", EnvJavaHome))
-	}
-
-	// Check if JAVA_HOME points to a valid Java installation
-	javaExe := filepath.Join(javaHome, "bin", getJavaBinaryName())
-
-	if _, err := os.Stat(javaExe); err != nil {
-		return "", SystemToolError(ToolJava, fmt.Errorf("Java executable not found at %s: %w", javaExe, err))
-	}
-
-	return javaHome, nil
-}
-
 // getSystemJavaVersion returns the version of the system Java installation
 func getSystemJavaVersion(javaHome string) (string, error) {
 	javaExe := filepath.Join(javaHome, "bin", getJavaBinaryName())
@@ -260,17 +243,6 @@ func (j *JavaTool) getDownloadURLWithChecksum(version, distribution string) (str
 
 // IsInstalled checks if the specified version is installed
 func (j *JavaTool) IsInstalled(version string, cfg config.ToolConfig) bool {
-	if UseSystemTool(j.toolName) {
-		// Try primary binary name in PATH
-		if _, err := exec.LookPath(j.GetBinaryName()); err == nil {
-			util.LogVerbose("System %s is available in PATH (MVX_USE_SYSTEM_%s=true)", j.toolName, strings.ToUpper(j.toolName))
-			return true
-		}
-
-		util.LogVerbose("System %s not available: not found in environment variables or PATH", j.toolName)
-		return false
-	}
-
 	// Resolve the full version string
 	distribution := cfg.Distribution
 	if distribution == "" {
@@ -282,7 +254,7 @@ func (j *JavaTool) IsInstalled(version string, cfg config.ToolConfig) bool {
 		return false
 	}
 
-	// Use standardized installation check with Java-specific environment variables
+	// Use standardized installation check (includes system tool detection)
 	return j.StandardIsInstalled(fullVersion, cfg, j.GetPath)
 }
 
@@ -312,8 +284,9 @@ func (j *JavaTool) getJavaHomeUncached(version string, cfg config.ToolConfig) (s
 
 	// If using system Java, return system JAVA_HOME if available (no version compatibility check)
 	if UseSystemTool(ToolJava) {
-		if systemJavaHome, err := getSystemJavaHome(); err == nil {
-			util.LogVerbose("Using system Java from %s: %s (MVX_USE_SYSTEM_JAVA=true)", EnvJavaHome, systemJavaHome)
+		homeEnvVar := getSystemToolHomeEnvVar(ToolJava)
+		if systemJavaHome, _, err := getSystemToolHome(ToolJava, j.GetBinaryName(), homeEnvVar); err == nil {
+			util.LogVerbose("Using system Java from %s: %s (MVX_USE_SYSTEM_JAVA=true)", homeEnvVar, systemJavaHome)
 			return systemJavaHome, nil
 		} else {
 			return "", EnvironmentError(ToolJava, version, fmt.Errorf("MVX_USE_SYSTEM_JAVA=true but system Java not available: %w", err))
@@ -383,7 +356,7 @@ func (j *JavaTool) GetBinaryName() string {
 
 // GetPath returns the binary path for the specified version (for PATH management)
 func (j *JavaTool) GetPath(version string, cfg config.ToolConfig) (string, error) {
-	// Use standardized path resolution with Java-specific environment variables
+	// Use standardized path resolution (includes system tool detection)
 	return j.StandardGetPath(version, cfg, j.getInstalledPath)
 }
 
@@ -496,7 +469,7 @@ func (j *JavaTool) GetDisplayName() string {
 
 // SetupEnvironment sets up Java-specific environment variables (implements EnvironmentProvider)
 func (j *JavaTool) SetupEnvironment(version string, cfg config.ToolConfig, envManager *EnvironmentManager) error {
-	// Convert EnvironmentManager to map for the existing helper
+	// Use the standard SetupHomeEnvironment which works for both system and mvx-managed tools
 	envVars := envManager.ToMap()
 	err := j.SetupHomeEnvironment(version, cfg, envVars, EnvJavaHome, j.GetPath)
 	// Update the environment manager with any changes
