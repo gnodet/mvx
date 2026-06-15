@@ -53,13 +53,6 @@ For more information, visit: https://github.com/gnodet/mvx`,
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() error {
-	// Auto-setup tools and environment before executing any command
-	if err := autoSetupEnvironment(); err != nil {
-		// If auto-setup fails, we should fail the command execution
-		// This prevents commands from running with missing tools
-		return fmt.Errorf("auto-setup failed: %w", err)
-	}
-
 	// Add dynamic custom commands and tool commands before execution
 	if err := addCustomCommands(); err != nil {
 		// If we can't load custom commands, continue with built-in commands only
@@ -85,6 +78,13 @@ func SetVersionInfo(v, c, d string) {
 func isWindows() bool { return runtime.GOOS == "windows" }
 
 func init() {
+	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		if !commandNeedsAutoSetup(cmd) {
+			return nil
+		}
+		return autoSetupEnvironment()
+	}
+
 	// Global flags
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose output")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "quiet output (errors only)")
@@ -115,6 +115,33 @@ func printInfo(format string, args ...interface{}) {
 
 func printError(format string, args ...interface{}) {
 	fmt.Fprintf(os.Stderr, "Error: "+format+"\n", args...)
+}
+
+// commandNeedsAutoSetup returns true if the command requires tool auto-setup.
+// Info-only commands (help, version, init, config, etc.) skip auto-setup so
+// they work even when tools fail to download.
+func commandNeedsAutoSetup(cmd *cobra.Command) bool {
+	if help, _ := cmd.Flags().GetBool("help"); help {
+		return false
+	}
+
+	if !cmd.HasParent() {
+		return false
+	}
+
+	// Walk up to the top-level subcommand (direct child of root)
+	c := cmd
+	for c.HasParent() && c.Parent().HasParent() {
+		c = c.Parent()
+	}
+
+	switch c.Name() {
+	case "help", "version", "init", "config", "activate", "deactivate",
+		"env", "update-bootstrap", "info", "tools":
+		return false
+	}
+
+	return true
 }
 
 // autoSetupEnvironment automatically installs tools and sets up environment
