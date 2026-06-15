@@ -196,9 +196,14 @@ func (b *BaseTool) Download(url, version string, cfg config.ToolConfig) (string,
 		return "", fmt.Errorf("%s download failed: %s", strings.Title(b.toolName), DiagnoseDownloadError(url, err))
 	}
 
-	// Show user-friendly URL instead of long redirect URLs
+	// Show both the full URL and a user-friendly version for long redirect URLs
 	displayURL := getUserFriendlyURL(result.FinalURL)
-	fmt.Printf("  📦 Downloaded %d bytes from %s\n", result.Size, displayURL)
+	if displayURL != result.FinalURL {
+		fmt.Printf("  📦 Downloaded %d bytes from %s\n", result.Size, displayURL)
+		fmt.Printf("     Full URL: %s\n", result.FinalURL)
+	} else {
+		fmt.Printf("  📦 Downloaded %d bytes from %s\n", result.Size, result.FinalURL)
+	}
 
 	// Return the path to the downloaded file
 	return tmpFile.Name(), nil

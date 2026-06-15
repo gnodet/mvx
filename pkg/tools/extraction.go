@@ -377,28 +377,69 @@ func extractTarXzFile(src, dest string) error {
 
 // detectArchiveType detects the archive type from file extension
 func detectArchiveType(filename string) string {
-	filename = strings.ToLower(filename)
+	lower := strings.ToLower(filename)
 
-	if strings.HasSuffix(filename, ".tar.gz") || strings.HasSuffix(filename, ".tgz") {
+	if strings.HasSuffix(lower, ".tar.gz") || strings.HasSuffix(lower, ".tgz") {
 		return "tar.gz"
 	}
-	if strings.HasSuffix(filename, ".tar.xz") {
+	if strings.HasSuffix(lower, ".tar.xz") {
 		return "tar.xz"
 	}
-	if strings.HasSuffix(filename, ".zip") {
+	if strings.HasSuffix(lower, ".zip") {
 		return "zip"
 	}
-	if strings.HasSuffix(filename, ".gz") {
-		return "tar.gz" // Assume tar.gz for .gz files
+	if strings.HasSuffix(lower, ".gz") {
+		return "tar.gz"
 	}
 
-	// Default fallback
-	return "tar.gz"
+	return ""
 }
 
-// ExtractArchive extracts an archive file automatically detecting the type
+// detectArchiveTypeFromContent detects the archive type by reading magic bytes
+// from the file header. This is used as a fallback when the filename extension
+// is missing or ambiguous (e.g., temp files from redirected downloads).
+func detectArchiveTypeFromContent(filePath string) (string, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open file: %w", err)
+	}
+	defer f.Close()
+
+	header := make([]byte, 6)
+	n, err := f.Read(header)
+	if err != nil {
+		return "", fmt.Errorf("failed to read file header: %w", err)
+	}
+	header = header[:n]
+
+	if n >= 2 && header[0] == 0x50 && header[1] == 0x4b {
+		return "zip", nil
+	}
+	if n >= 2 && header[0] == 0x1f && header[1] == 0x8b {
+		return "tar.gz", nil
+	}
+	if n >= 6 && header[0] == 0xfd && header[1] == 0x37 && header[2] == 0x7a &&
+		header[3] == 0x58 && header[4] == 0x5a && header[5] == 0x00 {
+		return "tar.xz", nil
+	}
+
+	return "", fmt.Errorf("unrecognized archive format (magic bytes: %x)", header)
+}
+
+// ExtractArchive extracts an archive file automatically detecting the type.
+// It first tries extension-based detection, then falls back to reading magic
+// bytes from the file content. This handles cases where the file has a temp
+// name or the download URL was a redirect that lost the original extension.
 func ExtractArchive(src, dest string) error {
 	archiveType := detectArchiveType(src)
+	if archiveType == "" {
+		var err error
+		archiveType, err = detectArchiveTypeFromContent(src)
+		if err != nil {
+			return fmt.Errorf("unable to determine archive type for %s: %w", src, err)
+		}
+		util.LogVerbose("Detected archive type from content: %s", archiveType)
+	}
 
 	switch archiveType {
 	case "zip":
