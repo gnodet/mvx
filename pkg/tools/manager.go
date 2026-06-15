@@ -719,15 +719,10 @@ func (m *Manager) EnsureTool(toolName string, cfg config.ToolConfig) (string, er
 
 	// Check if installed
 	if !tool.IsInstalled(resolvedVersion, resolvedConfig) {
-		// Auto-install
+		// Auto-install (Install already verifies internally)
 		util.LogVerbose("Auto-installing %s %s...", toolName, resolvedVersion)
 		if err := tool.Install(resolvedVersion, resolvedConfig); err != nil {
 			return "", fmt.Errorf("failed to install %s %s: %w", toolName, resolvedVersion, err)
-		}
-
-		// Verify installation
-		if err := tool.Verify(resolvedVersion, resolvedConfig); err != nil {
-			return "", fmt.Errorf("failed to verify %s %s: %w", toolName, resolvedVersion, err)
 		}
 	}
 
