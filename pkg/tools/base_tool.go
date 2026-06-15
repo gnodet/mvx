@@ -759,32 +759,8 @@ func (b *BaseTool) StandardIsInstalled(versionSpec string, cfg config.ToolConfig
 		return true
 	}
 
-	if resolveErr != nil {
-		return false
-	}
-
-	if targetVersion == "" {
-		util.LogVerbose("Resolved target version for %s %s is empty", b.toolName, versionSpec)
-		return false
-	}
-
-	installCfg := cfg
-	installCfg.Version = targetVersion
-
-	util.LogVerbose("%s version %s not installed, attempting automatic installation", b.toolName, targetVersion)
-	if err := tool.Install(targetVersion, installCfg); err != nil {
-		util.LogVerbose("Automatic installation of %s %s failed: %v", b.toolName, targetVersion, err)
-		return false
-	}
-
-	if err := tool.Verify(targetVersion, installCfg); err != nil {
-		util.LogVerbose("Verification after installing %s %s failed: %v", b.toolName, targetVersion, err)
-		return false
-	}
-
-	b.clearPathCache()
-	util.LogVerbose("Successfully installed %s %s on demand", b.toolName, targetVersion)
-	return true
+	util.LogVerbose("%s version %s is not installed", b.toolName, versionSpec)
+	return false
 }
 
 func (b *BaseTool) resolveTargetVersion(tool Tool, spec *version.Spec, versionSpec string, cfg config.ToolConfig) (string, error) {
