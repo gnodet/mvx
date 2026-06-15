@@ -48,6 +48,16 @@ func TestURLExtensionDetection(t *testing.T) {
 			downloadURL: "https://github.com/adoptium/temurin22-binaries/releases/download/jdk-22.0.2%2B9/OpenJDK22U-jdk_x64_linux_hotspot_22.0.2_9.tar.gz",
 			expectedExt: ".tar.gz",
 		},
+		{
+			name:        "Disco API redirect URL (no extension)",
+			downloadURL: "https://api.foojay.io/disco/v3.0/ids/abc123def456/redirect",
+			expectedExt: ".tar.gz",
+		},
+		{
+			name:        "URL with query parameters and .zip",
+			downloadURL: "https://example.com/download/tool-1.0.0.zip?token=abc123",
+			expectedExt: ".zip",
+		},
 	}
 
 	for _, tc := range testCases {
